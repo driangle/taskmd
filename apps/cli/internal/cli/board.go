@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strings"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
 	"github.com/spf13/cobra"
 )
@@ -53,12 +52,6 @@ func init() {
 	boardCmd.Flags().StringVarP(&boardOut, "out", "o", "", "write output to file instead of stdout")
 }
 
-// groupResult holds ordered group keys and the grouped tasks map.
-type groupResult struct {
-	Keys   []string
-	Groups map[string][]*model.Task
-}
-
 func runBoard(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
@@ -81,7 +74,7 @@ func runBoard(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	grouped, err := groupTasks(result.Tasks, boardGroupBy)
+	grouped, err := board.GroupTasks(result.Tasks, boardGroupBy)
 	if err != nil {
 		return err
 	}
@@ -110,152 +103,7 @@ func runBoard(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func groupTasks(tasks []*model.Task, field string) (*groupResult, error) {
-	groups := make(map[string][]*model.Task)
-
-	switch field {
-	case "status":
-		for _, t := range tasks {
-			key := string(t.Status)
-			if key == "" {
-				key = "(none)"
-			}
-			groups[key] = append(groups[key], t)
-		}
-		return &groupResult{
-			Keys:   orderedKeys(groups, statusOrder()),
-			Groups: groups,
-		}, nil
-
-	case "priority":
-		for _, t := range tasks {
-			key := string(t.Priority)
-			if key == "" {
-				key = "(none)"
-			}
-			groups[key] = append(groups[key], t)
-		}
-		return &groupResult{
-			Keys:   orderedKeys(groups, priorityOrder()),
-			Groups: groups,
-		}, nil
-
-	case "effort":
-		for _, t := range tasks {
-			key := string(t.Effort)
-			if key == "" {
-				key = "(none)"
-			}
-			groups[key] = append(groups[key], t)
-		}
-		return &groupResult{
-			Keys:   orderedKeys(groups, effortOrder()),
-			Groups: groups,
-		}, nil
-
-	case "group":
-		for _, t := range tasks {
-			key := t.GetGroup()
-			if key == "" {
-				key = "(none)"
-			}
-			groups[key] = append(groups[key], t)
-		}
-		return &groupResult{
-			Keys:   sortedKeys(groups),
-			Groups: groups,
-		}, nil
-
-	case "tag":
-		for _, t := range tasks {
-			if len(t.Tags) == 0 {
-				groups["(none)"] = append(groups["(none)"], t)
-			} else {
-				for _, tag := range t.Tags {
-					groups[tag] = append(groups[tag], t)
-				}
-			}
-		}
-		return &groupResult{
-			Keys:   sortedKeys(groups),
-			Groups: groups,
-		}, nil
-
-	default:
-		return nil, fmt.Errorf("unsupported group-by field: %s (supported: status, priority, effort, group, tag)", field)
-	}
-}
-
-func statusOrder() []string {
-	return []string{
-		string(model.StatusPending),
-		string(model.StatusInProgress),
-		string(model.StatusBlocked),
-		string(model.StatusCompleted),
-	}
-}
-
-func priorityOrder() []string {
-	return []string{
-		string(model.PriorityCritical),
-		string(model.PriorityHigh),
-		string(model.PriorityMedium),
-		string(model.PriorityLow),
-	}
-}
-
-func effortOrder() []string {
-	return []string{
-		string(model.EffortSmall),
-		string(model.EffortMedium),
-		string(model.EffortLarge),
-	}
-}
-
-// orderedKeys returns group keys in a predefined order, appending any extra keys alphabetically.
-func orderedKeys(groups map[string][]*model.Task, order []string) []string {
-	var keys []string
-	seen := make(map[string]bool)
-
-	for _, k := range order {
-		if _, ok := groups[k]; ok {
-			keys = append(keys, k)
-			seen[k] = true
-		}
-	}
-
-	// Append any keys not in the predefined order (e.g., "(none)")
-	var extra []string
-	for k := range groups {
-		if !seen[k] {
-			extra = append(extra, k)
-		}
-	}
-	sort.Strings(extra)
-	keys = append(keys, extra...)
-
-	return keys
-}
-
-// sortedKeys returns map keys sorted alphabetically, with "(none)" last.
-func sortedKeys(groups map[string][]*model.Task) []string {
-	var keys []string
-	hasNone := false
-	for k := range groups {
-		if k == "(none)" {
-			hasNone = true
-			continue
-		}
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	if hasNone {
-		keys = append(keys, "(none)")
-	}
-	return keys
-}
-
-func outputBoardMarkdown(gr *groupResult, w io.Writer) error {
+func outputBoardMarkdown(gr *board.GroupResult, w io.Writer) error {
 	for i, key := range gr.Keys {
 		tasks := gr.Groups[key]
 		if i > 0 {
@@ -273,7 +121,7 @@ func outputBoardMarkdown(gr *groupResult, w io.Writer) error {
 	return nil
 }
 
-func outputBoardText(gr *groupResult, w io.Writer) error {
+func outputBoardText(gr *board.GroupResult, w io.Writer) error {
 	for i, key := range gr.Keys {
 		tasks := gr.Groups[key]
 		if i > 0 {
@@ -289,41 +137,8 @@ func outputBoardText(gr *groupResult, w io.Writer) error {
 	return nil
 }
 
-type boardJSONGroup struct {
-	Group string          `json:"group"`
-	Count int             `json:"count"`
-	Tasks []boardJSONTask `json:"tasks"`
-}
-
-type boardJSONTask struct {
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	Status   string `json:"status"`
-	Priority string `json:"priority,omitempty"`
-	Effort   string `json:"effort,omitempty"`
-}
-
-func outputBoardJSON(gr *groupResult, w io.Writer) error {
-	var out []boardJSONGroup
-	for _, key := range gr.Keys {
-		tasks := gr.Groups[key]
-		jTasks := make([]boardJSONTask, len(tasks))
-		for i, t := range tasks {
-			jTasks[i] = boardJSONTask{
-				ID:       t.ID,
-				Title:    t.Title,
-				Status:   string(t.Status),
-				Priority: string(t.Priority),
-				Effort:   string(t.Effort),
-			}
-		}
-		out = append(out, boardJSONGroup{
-			Group: key,
-			Count: len(tasks),
-			Tasks: jTasks,
-		})
-	}
-
+func outputBoardJSON(gr *board.GroupResult, w io.Writer) error {
+	out := board.ToJSON(gr)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)

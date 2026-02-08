@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
 )
 
 // createBoardTestFiles creates test task files with varied statuses, priorities, tags, and efforts.
@@ -263,7 +265,7 @@ func TestBoardCommand_JSONFormat(t *testing.T) {
 
 	output := captureBoardOutput(t, tmpDir)
 
-	var result []boardJSONGroup
+	var result []board.JSONGroup
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}

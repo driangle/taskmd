@@ -1,4 +1,4 @@
-.PHONY: build run clean install test lint lint-fix
+.PHONY: build run clean install install-full test lint lint-fix web-build web-embed build-full
 
 # Build the binary
 build:
@@ -11,10 +11,15 @@ run:
 # Clean build artifacts
 clean:
 	rm -f taskmd
+	rm -rf internal/web/static/dist
 
 # Install the binary to $GOPATH/bin
 install:
 	go install ./cmd/taskmd
+
+# Install with embedded web assets
+install-full: web-embed
+	go install -tags embed_web ./cmd/taskmd
 
 # Run tests
 test:
@@ -27,6 +32,20 @@ lint:
 # Run linter with auto-fix
 lint-fix:
 	golangci-lint run --fix
+
+# Build the web SPA
+web-build:
+	cd ../../apps/web && pnpm install && pnpm build
+
+# Copy built SPA into Go-embeddable location
+web-embed: web-build
+	rm -rf internal/web/static/dist
+	mkdir -p internal/web/static
+	cp -r ../../apps/web/dist internal/web/static/dist
+
+# Build Go binary with embedded web assets
+build-full: web-embed
+	go build -tags embed_web -o taskmd ./cmd/taskmd
 
 # Build for multiple platforms
 build-all:

@@ -36,19 +36,19 @@ const (
 // Task represents a parsed task from a markdown file
 type Task struct {
 	// Frontmatter fields
-	ID           string    `yaml:"id"`
-	Title        string    `yaml:"title"`
-	Status       Status    `yaml:"status"`
-	Priority     Priority  `yaml:"priority"`
-	Effort       Effort    `yaml:"effort"`
-	Dependencies []string  `yaml:"dependencies"`
-	Tags         []string  `yaml:"tags"`
-	Group        string    `yaml:"group"` // From frontmatter or derived from directory
-	Created      time.Time `yaml:"created"`
+	ID           string    `yaml:"id" json:"id"`
+	Title        string    `yaml:"title" json:"title"`
+	Status       Status    `yaml:"status" json:"status"`
+	Priority     Priority  `yaml:"priority" json:"priority,omitempty"`
+	Effort       Effort    `yaml:"effort" json:"effort,omitempty"`
+	Dependencies []string  `yaml:"dependencies" json:"dependencies"`
+	Tags         []string  `yaml:"tags" json:"tags"`
+	Group        string    `yaml:"group" json:"group,omitempty"`
+	Created      time.Time `yaml:"created" json:"created"`
 
 	// Content fields
-	Body     string // Markdown body content
-	FilePath string // Source file path
+	Body     string `json:"-"`
+	FilePath string `json:"file_path"`
 }
 
 // IsValid checks if the task has required fields

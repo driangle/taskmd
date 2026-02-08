@@ -1,0 +1,70 @@
+export interface Task {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  effort: string;
+  dependencies: string[] | null;
+  tags: string[] | null;
+  group: string;
+  created: string;
+  body: string;
+  file_path: string;
+}
+
+export interface BoardGroup {
+  group: string;
+  count: number;
+  tasks: BoardTask[];
+}
+
+export interface BoardTask {
+  id: string;
+  title: string;
+  status: string;
+  priority?: string;
+  effort?: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  cycles?: string[][];
+}
+
+export interface GraphNode {
+  id: string;
+  title: string;
+  status: string;
+  priority?: string;
+  group?: string;
+}
+
+export interface GraphEdge {
+  from: string;
+  to: string;
+}
+
+export interface Stats {
+  total_tasks: number;
+  tasks_by_status: Record<string, number>;
+  tasks_by_priority: Record<string, number>;
+  tasks_by_effort: Record<string, number>;
+  blocked_tasks_count: number;
+  critical_path_length: number;
+  max_dependency_depth: number;
+  avg_dependencies_per_task: number;
+}
+
+export interface ValidationResult {
+  issues: ValidationIssue[];
+  errors: number;
+  warnings: number;
+}
+
+export interface ValidationIssue {
+  level: "error" | "warning";
+  task_id?: string;
+  file_path?: string;
+  message: string;
+}
