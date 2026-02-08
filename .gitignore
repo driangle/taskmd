@@ -32,5 +32,8 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+# binaries
+apps/cli/taskmd
+
 # misc
 settings.local.json
