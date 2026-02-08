@@ -72,6 +72,36 @@ make clean
 # Run tests
 make test
 
+# Run linter
+make lint
+
+# Auto-fix linting issues
+make lint-fix
+
 # Build for multiple platforms
 make build-all
+```
+
+### Code Quality
+
+This project enforces code quality standards using `golangci-lint`:
+
+- **Function length**: Max 60 lines per function
+- **Cyclomatic complexity**: Max 15 per function
+- **Cognitive complexity**: Max 20 per function
+- **Error handling**: All errors must be checked
+- **Code formatting**: Enforced via gofmt and goimports
+
+Run `make lint` before committing to ensure your code meets these standards.
+
+**Installation of golangci-lint**:
+```bash
+# macOS
+brew install golangci-lint
+
+# Linux/WSL
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+# Or using Go
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 ```

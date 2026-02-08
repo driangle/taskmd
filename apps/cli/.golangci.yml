@@ -1,0 +1,88 @@
+# golangci-lint configuration
+# Follows Go conventions for code quality and maintainability
+# See: https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters-settings:
+  # Function length checker - max 60 lines per function
+  # This is the Go-idiomatic way to keep code manageable
+  # Small functions naturally lead to reasonably-sized files
+  funlen:
+    lines: 60
+    statements: 40
+    ignore-comments: true
+
+  # Cyclomatic complexity - catches overly complex functions
+  gocyclo:
+    min-complexity: 15
+
+  # Cognitive complexity - how hard code is to understand
+  gocognit:
+    min-complexity: 20
+
+  # Repeated strings that should be constants
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  # Formatting
+  gofmt:
+    simplify: true
+
+  # Import ordering
+  goimports:
+    local-prefixes: github.com/driangle/md-task-tracker
+
+  # Error checking
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+linters:
+  enable:
+    - funlen      # Function length checker
+    - gocyclo     # Cyclomatic complexity
+    - gocognit    # Cognitive complexity
+    - goconst     # Repeated strings
+    - gofmt       # Formatting
+    - goimports   # Import ordering
+    - revive      # General linting
+    - errcheck    # Unchecked errors
+    - gosimple    # Simplifications
+    - govet       # Go vet
+    - ineffassign # Ineffectual assignments
+    - staticcheck # Static analysis
+    - unused      # Unused code
+    - misspell    # Misspellings
+
+  disable:
+    - typecheck   # Disabled to avoid module issues
+
+issues:
+  # Exclude test files from some checks
+  exclude-rules:
+    # Allow longer test functions
+    - path: _test\.go
+      linters:
+        - funlen
+        - gocyclo
+
+  # Maximum issues count per linter
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text
+  max-same-issues: 0
+
+  # Show all issues
+  exclude-use-default: false
+
+# Output configuration
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true

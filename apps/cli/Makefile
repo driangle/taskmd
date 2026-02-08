@@ -1,4 +1,4 @@
-.PHONY: build run clean install test
+.PHONY: build run clean install test lint lint-fix
 
 # Build the binary
 build:
@@ -19,6 +19,14 @@ install:
 # Run tests
 test:
 	go test ./...
+
+# Run linter
+lint:
+	golangci-lint run
+
+# Run linter with auto-fix
+lint-fix:
+	golangci-lint run --fix
 
 # Build for multiple platforms
 build-all:

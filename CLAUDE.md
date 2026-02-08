@@ -81,21 +81,38 @@ go test -cover ./...
 
 ### Linting
 
-The project uses `golangci-lint` for code quality checks:
+The project uses `golangci-lint` for code quality checks, following Go conventions:
 
 ```bash
-# Run linter
+# Run linter (from apps/cli directory)
+make lint
+
+# Or run directly
 golangci-lint run
 
-# Auto-fix issues
-golangci-lint run --fix
+# Auto-fix issues where possible
+make lint-fix
 ```
+
+**Key quality metrics enforced**:
+- **Function length**: Max 60 lines per function (excluding comments)
+  - Promotes single responsibility principle
+  - Improves testability and readability
+- **Cyclomatic complexity**: Max 15 complexity per function
+  - Catches overly complex branching logic
+- **Cognitive complexity**: Max 20 cognitive complexity
+  - Measures how hard code is to understand
+- **Code quality**: errcheck, staticcheck, govet, unused code detection
+- **Formatting**: gofmt, goimports
+
+**Note on file length**: Unlike some languages, Go doesn't enforce file-length limits. Instead, the focus is on keeping functions small and focused. If functions stay under 60 lines, files naturally remain manageable.
 
 **Common lint rules**:
 - Use `any` instead of `interface{}`
 - No unused imports or variables
 - Proper error handling (don't ignore errors)
 - Consistent naming conventions
+- No magic numbers - use named constants
 
 ### Go Conventions
 
@@ -304,10 +321,12 @@ Types:
 
 ### Before Committing
 
-1. Run tests: `go test ./...`
-2. Run linter: `golangci-lint run`
-3. Build successfully: `go build ./...`
+1. Run tests: `make test` or `go test ./...`
+2. Run linter: `make lint` or `golangci-lint run`
+3. Build successfully: `make build` or `go build ./...`
 4. Update relevant documentation
+
+All three checks (test, lint, build) should pass before committing.
 
 ## Troubleshooting
 
