@@ -1,7 +1,7 @@
 ---
 id: "022"
 title: "graph command - Export dependency graph"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies: ["017", "019"]
@@ -21,20 +21,20 @@ Implement the `graph` command to export task dependency graphs in various format
 
 ## Tasks
 
-- [ ] Create `internal/cli/graph.go` for graph command
-- [ ] Create `internal/graph/` package for graph generation
-- [ ] Support output formats:
+- [x] Create `internal/cli/graph.go` for graph command
+- [x] Create `internal/graph/` package for graph generation
+- [x] Support output formats:
   - `dot` - Graphviz DOT format
   - `mermaid` - Mermaid diagram syntax
   - `ascii` - ASCII art tree
   - `json` - JSON graph structure
-- [ ] Implement `--root <task-id>` to start from specific task
-- [ ] Implement `--focus <task-id>` to highlight specific task
-- [ ] Implement `--upstream` to show only dependencies (ancestors)
-- [ ] Implement `--downstream` to show only dependents (descendants)
-- [ ] Implement `--out <file>` to write to file
-- [ ] Default: full graph in mermaid format
-- [ ] Handle cyclic dependencies gracefully
+- [x] Implement `--root <task-id>` to start from specific task
+- [x] Implement `--focus <task-id>` to highlight specific task
+- [x] Implement `--upstream` to show only dependencies (ancestors)
+- [x] Implement `--downstream` to show only dependents (descendants)
+- [x] Implement `--out <file>` to write to file
+- [x] Default: full graph in mermaid format
+- [x] Handle cyclic dependencies gracefully
 
 ## Acceptance Criteria
 

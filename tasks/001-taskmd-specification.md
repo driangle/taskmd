@@ -1,7 +1,7 @@
 ---
 id: "001"
 title: "taskmd specification - Define markdown task format conventions"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: []
@@ -20,43 +20,43 @@ Create a comprehensive specification document that defines the conventions, form
 
 ## Tasks
 
-- [ ] Create `TASKMD_SPEC.md` or `docs/taskmd-specification.md` specification document
-- [ ] Define frontmatter schema:
+- [x] Create `TASKMD_SPEC.md` or `docs/taskmd-specification.md` specification document
+- [x] Define frontmatter schema:
   - Required fields (id, title, status)
   - Optional fields (priority, effort, dependencies, tags, group, created, description)
   - Field types and valid values
   - Enum definitions (Status, Priority, Effort)
-- [ ] Document markdown file naming conventions:
+- [x] Document markdown file naming conventions:
   - File naming patterns (e.g., `001-task-name.md`, `task-name.md`)
   - Best practices for file organization
-- [ ] Define directory structure conventions:
+- [x] Define directory structure conventions:
   - How groups are derived from directory structure
   - Frontmatter `group` field vs. directory-based groups
   - Recommended directory organization patterns
-- [ ] Document dependency reference format:
+- [x] Document dependency reference format:
   - How to reference other tasks (by ID)
   - Circular dependency handling
   - Missing dependency behavior
-- [ ] Define status lifecycle:
+- [x] Define status lifecycle:
   - Valid status values: pending, in-progress, completed, blocked
   - Status transitions and meanings
   - When to use each status
-- [ ] Define priority levels:
+- [x] Define priority levels:
   - Valid values: low, medium, high, critical
   - Guidance on when to use each level
-- [ ] Define effort estimates:
+- [x] Define effort estimates:
   - Valid values: small, medium, large
   - Guidelines for estimating effort
-- [ ] Document tag conventions:
+- [x] Document tag conventions:
   - Tag naming patterns
   - Common/standard tags
   - Best practices for tag usage
-- [ ] Include examples:
+- [x] Include examples:
   - Minimal valid task
   - Fully-specified task
   - Task with dependencies
   - Task with complex markdown body
-- [ ] Document best practices:
+- [x] Document best practices:
   - Task granularity guidelines
   - Dependency management
   - Status updates workflow
