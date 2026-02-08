@@ -1,7 +1,7 @@
 ---
 id: "web-017"
 title: "Fix task detail page to show full markdown content"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["web-015", "web-018"]
@@ -31,17 +31,17 @@ Fix the task detail page at `/tasks/:id` to show the full task content including
 
 ### Backend
 
-- [ ] Add `GET /api/tasks/:id` endpoint in `internal/web/server.go` that returns a single task
+- [x] Add `GET /api/tasks/:id` endpoint in `internal/web/server.go` that returns a single task
   - Should include the full task body/content from the markdown file
   - Ensure markdown body is properly escaped in JSON
   - Return 404 if task not found
-- [ ] Consider creating a separate Task type that includes the body field for this endpoint
+- [x] Consider creating a separate Task type that includes the body field for this endpoint
 
 ### Frontend
 
-- [ ] Install a markdown renderer library (e.g., `react-markdown` or `marked` + `dompurify`)
-- [ ] Create `src/api/task-detail.ts` hook to fetch single task: `GET /api/tasks/:id`
-- [ ] Update `TaskDetailPage.tsx` to:
+- [x] Install a markdown renderer library (e.g., `react-markdown` or `marked` + `dompurify`)
+- [x] Create `src/api/task-detail.ts` hook to fetch single task: `GET /api/tasks/:id`
+- [x] Update `TaskDetailPage.tsx` to:
   - Use the new data fetching hook for individual task
   - Render markdown body content with the markdown renderer
   - Show file path if available

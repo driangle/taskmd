@@ -1,15 +1,17 @@
 import { useParams, Link } from "react-router-dom";
-import { useTasks } from "../hooks/use-tasks.ts";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import { useTaskDetail } from "../hooks/use-task-detail.ts";
 
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: tasks, error, isLoading } = useTasks();
+  const { data: task, error, isLoading } = useTaskDetail(id);
 
   if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
   if (error)
     return <p className="text-sm text-red-600">Error: {error.message}</p>;
 
-  const task = tasks?.find((t) => t.id === id);
   if (!task) {
     return (
       <div>
@@ -87,9 +89,20 @@ export function TaskDetailPage() {
 
         {task.body && (
           <div className="border-t border-gray-200 pt-4">
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
-              {task.body}
-            </pre>
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw]}
+              >
+                {task.body}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {task.file_path && (
+          <div className="mt-4 text-xs text-gray-400 font-mono">
+            {task.file_path}
           </div>
         )}
       </div>

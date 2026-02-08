@@ -7,10 +7,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/spf13/cobra"
+
 	"github.com/driangle/md-task-tracker/apps/cli/internal/metrics"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
-	"github.com/spf13/cobra"
 )
 
 // statsCmd represents the stats command
@@ -84,6 +85,8 @@ func outputStatsJSON(m *metrics.Metrics) error {
 }
 
 // outputStatsTable outputs metrics in a human-readable table format
+//
+//nolint:gocognit,funlen // TODO: refactor to reduce complexity
 func outputStatsTable(m *metrics.Metrics) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()

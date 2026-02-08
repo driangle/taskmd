@@ -1,7 +1,7 @@
 ---
 id: "cli-001"
 title: "Fix linting and code quality tooling"
-status: pending
+status: completed
 priority: high
 effort: small
 tags:
@@ -34,21 +34,21 @@ Fix the linting setup so developers can run code quality checks consistently. En
 
 ### Documentation
 
-- [ ] Add golangci-lint installation instructions to CLAUDE.md
+- [x] Add golangci-lint installation instructions to CLAUDE.md
   - macOS: `brew install golangci-lint`
   - Linux: `curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin`
   - Or: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
-- [ ] Add section on "Prerequisites" or "Developer Setup" near the top of CLAUDE.md
+- [x] Add section on "Prerequisites" or "Developer Setup" near the top of CLAUDE.md
 
 ### Makefile
 
-- [ ] Add `tidy` target to Makefile:
+- [x] Add `tidy` target to Makefile:
   ```makefile
   # Run go mod tidy to clean up dependencies
   tidy:
       go mod tidy
   ```
-- [ ] Consider adding a `check` or `verify` target that runs multiple checks:
+- [x] Consider adding a `check` or `verify` target that runs multiple checks:
   ```makefile
   # Run all checks (test, lint, vet)
   check: test lint
@@ -57,10 +57,10 @@ Fix the linting setup so developers can run code quality checks consistently. En
 
 ### Linting Configuration
 
-- [ ] Verify `.golangci.yml` configuration is correct
-- [ ] Run `golangci-lint run` after installation to check for existing issues
-- [ ] Document any intentional lint suppressions needed
-- [ ] Consider adding a `.golangci.yml` explanation comment if rules are complex
+- [x] Verify `.golangci.yml` configuration is correct
+- [x] Run `golangci-lint run` after installation to check for existing issues
+- [x] Document any intentional lint suppressions needed
+- [x] Consider adding a `.golangci.yml` explanation comment if rules are complex
 
 ### CI/CD Consideration
 

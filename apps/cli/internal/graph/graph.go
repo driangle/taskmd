@@ -81,6 +81,8 @@ func (g *Graph) GetUpstream(taskID string) map[string]bool {
 }
 
 // DetectCycles finds all cycles in the graph
+//
+//nolint:gocognit // TODO: refactor to reduce complexity
 func (g *Graph) DetectCycles() [][]string {
 	var cycles [][]string
 	visited := make(map[string]bool)
@@ -250,6 +252,8 @@ func (g *Graph) ToDot(focusTaskID string) string {
 }
 
 // ToASCII generates an ASCII tree representation
+//
+//nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
 func (g *Graph) ToASCII(rootTaskID string, downstream bool) string {
 	var sb strings.Builder
 

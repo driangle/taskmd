@@ -6,14 +6,14 @@ import (
 
 // Metrics contains computed statistics about a task set
 type Metrics struct {
-	TotalTasks           int                       `json:"total_tasks"`
-	TasksByStatus        map[model.Status]int      `json:"tasks_by_status"`
-	TasksByPriority      map[model.Priority]int    `json:"tasks_by_priority"`
-	TasksByEffort        map[model.Effort]int      `json:"tasks_by_effort"`
-	BlockedTasksCount    int                       `json:"blocked_tasks_count"`
-	CriticalPathLength   int                       `json:"critical_path_length"`
-	MaxDependencyDepth   int                       `json:"max_dependency_depth"`
-	AvgDependenciesPerTask float64                 `json:"avg_dependencies_per_task"`
+	TotalTasks             int                    `json:"total_tasks"`
+	TasksByStatus          map[model.Status]int   `json:"tasks_by_status"`
+	TasksByPriority        map[model.Priority]int `json:"tasks_by_priority"`
+	TasksByEffort          map[model.Effort]int   `json:"tasks_by_effort"`
+	BlockedTasksCount      int                    `json:"blocked_tasks_count"`
+	CriticalPathLength     int                    `json:"critical_path_length"`
+	MaxDependencyDepth     int                    `json:"max_dependency_depth"`
+	AvgDependenciesPerTask float64                `json:"avg_dependencies_per_task"`
 }
 
 // Calculate computes metrics for a set of tasks

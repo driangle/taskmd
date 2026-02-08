@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
-	"github.com/spf13/cobra"
 )
 
 var (

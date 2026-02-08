@@ -51,6 +51,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// API routes
 	mux.HandleFunc("GET /api/tasks", handleTasks(s.dp))
+	mux.HandleFunc("GET /api/tasks/{id}", handleTaskByID(s.dp))
 	mux.HandleFunc("GET /api/board", handleBoard(s.dp))
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))
 	mux.HandleFunc("GET /api/graph/mermaid", handleGraphMermaid(s.dp))

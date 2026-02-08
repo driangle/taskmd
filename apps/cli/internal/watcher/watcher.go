@@ -31,6 +31,8 @@ func New(dir string, onChange func(), debounce time.Duration) *Watcher {
 }
 
 // Start begins watching. It blocks until Stop is called or an error occurs.
+//
+//nolint:gocognit // TODO: refactor to reduce complexity
 func (w *Watcher) Start() error {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {

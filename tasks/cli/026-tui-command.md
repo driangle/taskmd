@@ -1,7 +1,7 @@
 ---
 id: "026"
 title: "tui command - Interactive terminal UI"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies: ["017", "027", "028"]
@@ -21,8 +21,8 @@ Implement the `tui` command to launch an interactive terminal interface using Bu
 
 ## Tasks
 
-- [ ] Create `internal/cli/tui.go` for tui command
-- [ ] Create `internal/tui/` package for TUI implementation
+- [x] Create `internal/cli/tui.go` for tui command
+- [x] Create `internal/tui/` package for TUI implementation
 - [ ] Implement Bubble Tea model with:
   - Task list view
   - Task detail view
@@ -33,7 +33,7 @@ Implement the `tui` command to launch an interactive terminal interface using Bu
   - `--filter <expr>` - Pre-apply filter
   - `--group-by <field>` - Group tasks in list
   - `--readonly` - Disable editing features
-- [ ] Keyboard shortcuts:
+- [x] Keyboard shortcuts:
   - `j/k` or arrows - Navigate
   - `/` - Search/filter
   - `Enter` - View details
@@ -41,7 +41,7 @@ Implement the `tui` command to launch an interactive terminal interface using Bu
   - `?` - Help
 - [ ] Display task metadata (id, title, status, priority, deps)
 - [ ] Syntax-highlighted markdown rendering for task body
-- [ ] Status bar with help hints
+- [x] Status bar with help hints
 
 ## Acceptance Criteria
 

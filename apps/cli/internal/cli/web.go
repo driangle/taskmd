@@ -10,8 +10,9 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/web"
 	"github.com/spf13/cobra"
+
+	"github.com/driangle/md-task-tracker/apps/cli/internal/web"
 )
 
 var (
@@ -97,5 +98,5 @@ func openBrowser(url string) {
 	default:
 		return
 	}
-	cmd.Run()
+	cmd.Run() //nolint:errcheck
 }

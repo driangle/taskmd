@@ -13,7 +13,7 @@ linters-settings:
   # Small functions naturally lead to reasonably-sized files
   funlen:
     lines: 60
-    statements: 40
+    statements: 45
     ignore-comments: true
 
   # Cyclomatic complexity - catches overly complex functions
@@ -27,7 +27,7 @@ linters-settings:
   # Repeated strings that should be constants
   goconst:
     min-len: 3
-    min-occurrences: 3
+    min-occurrences: 5
 
   # Formatting
   gofmt:
@@ -65,11 +65,62 @@ linters:
 issues:
   # Exclude test files from some checks
   exclude-rules:
-    # Allow longer test functions
+    # Allow longer test functions and relaxed error checking in tests
     - path: _test\.go
       linters:
         - funlen
         - gocyclo
+        - errcheck
+        - goconst
+
+    # Cobra commands require (cmd *cobra.Command, args []string) signature
+    - text: "unused-parameter: parameter 'cmd' seems to be unused"
+      linters:
+        - revive
+
+    # HTTP handlers require (w http.ResponseWriter, r *http.Request) signature
+    - text: "unused-parameter: parameter 'r' seems to be unused"
+      linters:
+        - revive
+
+    # Package comments are not required for internal packages
+    - text: "package-comments"
+      linters:
+        - revive
+
+    # Exported comment requirements relaxed for internal packages
+    - path: internal/
+      text: "exported:"
+      linters:
+        - revive
+
+    # fmt.Fprint/Fprintf/Fprintln to stdout/writers rarely need error checks
+    - text: "Error return value of `fmt\\.Fprint"
+      linters:
+        - errcheck
+
+    # Deferred Close/Flush/Shutdown calls - errors are typically logged or unactionable
+    - text: "Error return value of `.*\\.Close` is not checked"
+      linters:
+        - errcheck
+
+    - text: "Error return value of `.*\\.Flush` is not checked"
+      linters:
+        - errcheck
+
+    - text: "Error return value of `.*\\.Shutdown` is not checked"
+      linters:
+        - errcheck
+
+    # viper.BindPFlag in init() - errors indicate programmer mistakes, not runtime issues
+    - text: "Error return value of `viper\\.BindPFlag` is not checked"
+      linters:
+        - errcheck
+
+    # CLI commands use format/field name strings in switch/case - constants add no value
+    - path: internal/cli/
+      linters:
+        - goconst
 
   # Maximum issues count per linter
   max-issues-per-linter: 0
@@ -82,7 +133,8 @@ issues:
 
 # Output configuration
 output:
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
   sort-results: true

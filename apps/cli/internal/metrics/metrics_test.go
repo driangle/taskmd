@@ -162,7 +162,7 @@ func TestCalculate_MultipleDependencies(t *testing.T) {
 		t.Errorf("expected CriticalPathLength=3, got %d", m.CriticalPathLength)
 	}
 
-	expectedAvg := 4.0 / 4.0 // (0 + 1 + 1 + 2) / 4
+	expectedAvg := 1.0 // (0 + 1 + 1 + 2) / 4
 	if m.AvgDependenciesPerTask != expectedAvg {
 		t.Errorf("expected AvgDependenciesPerTask=%.2f, got %.2f", expectedAvg, m.AvgDependenciesPerTask)
 	}

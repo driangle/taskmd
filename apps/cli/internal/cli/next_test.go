@@ -15,16 +15,17 @@ import (
 // the next command's scoring, filtering, and actionability logic.
 //
 // Task graph:
-//   001 (completed, high, small)         - root, completed
-//   002 (completed, medium, medium)      - depends on 001, completed
-//   003 (pending, critical, small, cli)  - depends on 001 (completed) → actionable
-//   004 (pending, high, large, cli)      - depends on 002 (completed) → actionable
-//   005 (pending, low, small)            - no deps → actionable
-//   006 (pending, high, medium)          - depends on 007 (pending) → blocked
-//   007 (pending, medium, small)         - no deps → actionable
-//   008 (in-progress, high, small, cli)  - depends on 001 (completed) → actionable
-//   009 (pending, medium, large)         - depends on 006 (pending) → blocked
-//   010 (pending, low, medium)           - depends on 003 → blocked (003 pending)
+//
+//	001 (completed, high, small)         - root, completed
+//	002 (completed, medium, medium)      - depends on 001, completed
+//	003 (pending, critical, small, cli)  - depends on 001 (completed) → actionable
+//	004 (pending, high, large, cli)      - depends on 002 (completed) → actionable
+//	005 (pending, low, small)            - no deps → actionable
+//	006 (pending, high, medium)          - depends on 007 (pending) → blocked
+//	007 (pending, medium, small)         - no deps → actionable
+//	008 (in-progress, high, small, cli)  - depends on 001 (completed) → actionable
+//	009 (pending, medium, large)         - depends on 006 (pending) → blocked
+//	010 (pending, low, medium)           - depends on 003 → blocked (003 pending)
 func createNextTestTaskFiles(t *testing.T) string {
 	t.Helper()
 

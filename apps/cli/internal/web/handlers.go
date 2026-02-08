@@ -7,6 +7,7 @@ import (
 	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/graph"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/metrics"
+	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/validator"
 )
 
@@ -19,6 +20,12 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 }
 
+// TaskDetail includes the body field for individual task detail views
+type TaskDetail struct {
+	*model.Task
+	Body string `json:"body"`
+}
+
 func handleTasks(dp *DataProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tasks, err := dp.GetTasks()
@@ -27,6 +34,44 @@ func handleTasks(dp *DataProvider) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, tasks)
+	}
+}
+
+func handleTaskByID(dp *DataProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		taskID := r.PathValue("id")
+		if taskID == "" {
+			http.Error(w, "task ID is required", http.StatusBadRequest)
+			return
+		}
+
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Find task by ID
+		var foundTask *model.Task
+		for _, task := range tasks {
+			if task.ID == taskID {
+				foundTask = task
+				break
+			}
+		}
+
+		if foundTask == nil {
+			http.Error(w, "task not found", http.StatusNotFound)
+			return
+		}
+
+		// Return task with body
+		detail := TaskDetail{
+			Task: foundTask,
+			Body: foundTask.Body,
+		}
+
+		writeJSON(w, detail)
 	}
 }
 
@@ -76,7 +121,7 @@ func handleGraphMermaid(dp *DataProvider) http.HandlerFunc {
 
 		g := graph.NewGraph(tasks)
 		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte(g.ToMermaid("")))
+		w.Write([]byte(g.ToMermaid(""))) //nolint:errcheck
 	}
 }
 

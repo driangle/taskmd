@@ -8,10 +8,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+
+	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
 )
 
 var (
@@ -101,7 +102,6 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported format: %s (supported: table, json, yaml)", flags.Format)
 	}
 }
-
 
 // applyFilters applies multiple filter expressions to tasks (AND logic)
 func applyFilters(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {

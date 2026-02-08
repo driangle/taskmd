@@ -74,6 +74,63 @@ func TestHandleTasks(t *testing.T) {
 	}
 }
 
+func TestHandleTaskByID_Success(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/001", nil)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleTaskByID(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	ct := rec.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Fatalf("expected application/json, got %s", ct)
+	}
+
+	var task map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &task); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if task["id"] != "001" {
+		t.Fatalf("expected task ID 001, got %v", task["id"])
+	}
+
+	if task["title"] != "Task One" {
+		t.Fatalf("expected title 'Task One', got %v", task["title"])
+	}
+
+	// Verify body is included
+	body, ok := task["body"]
+	if !ok {
+		t.Fatal("expected body field in response")
+	}
+	if body == "" || body == nil {
+		t.Fatal("expected non-empty body")
+	}
+}
+
+func TestHandleTaskByID_NotFound(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/999", nil)
+	req.SetPathValue("id", "999")
+	rec := httptest.NewRecorder()
+
+	handleTaskByID(dp)(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
 func TestHandleBoard(t *testing.T) {
 	dir := createTestTaskDir(t)
 	dp := NewDataProvider(dir, false)

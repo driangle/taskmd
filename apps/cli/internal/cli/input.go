@@ -84,7 +84,7 @@ func (ir *InputResolver) ReadAll(args []string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer cleanup()
+	defer cleanup() //nolint:errcheck
 
 	content, err := io.ReadAll(reader)
 	if err != nil {

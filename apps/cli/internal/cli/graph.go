@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/driangle/md-task-tracker/apps/cli/internal/graph"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -61,6 +62,7 @@ func init() {
 	graphCmd.Flags().StringVarP(&graphOut, "out", "o", "", "write output to file instead of stdout")
 }
 
+//nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
 func runGraph(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 

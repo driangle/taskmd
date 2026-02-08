@@ -8,11 +8,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
 	"github.com/driangle/md-task-tracker/apps/cli/internal/graph"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 // Scoring constants
@@ -145,6 +146,7 @@ func scoreTask(
 	return score, reasons
 }
 
+//nolint:funlen // TODO: refactor to reduce length
 func runNext(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 

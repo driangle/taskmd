@@ -5,9 +5,10 @@ import (
 	"os"
 	"sort"
 
+	"github.com/spf13/cobra"
+
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -63,10 +64,10 @@ type TaskSnapshot struct {
 	FilePath     string   `json:"file_path,omitempty" yaml:"file_path,omitempty"`
 
 	// Derived fields (only included with --derived)
-	IsBlocked        *bool  `json:"is_blocked,omitempty" yaml:"is_blocked,omitempty"`
-	DependencyDepth  *int   `json:"dependency_depth,omitempty" yaml:"dependency_depth,omitempty"`
-	TopologicalOrder *int   `json:"topological_order,omitempty" yaml:"topological_order,omitempty"`
-	OnCriticalPath   *bool  `json:"on_critical_path,omitempty" yaml:"on_critical_path,omitempty"`
+	IsBlocked        *bool `json:"is_blocked,omitempty" yaml:"is_blocked,omitempty"`
+	DependencyDepth  *int  `json:"dependency_depth,omitempty" yaml:"dependency_depth,omitempty"`
+	TopologicalOrder *int  `json:"topological_order,omitempty" yaml:"topological_order,omitempty"`
+	OnCriticalPath   *bool `json:"on_critical_path,omitempty" yaml:"on_critical_path,omitempty"`
 }
 
 // SnapshotOutput represents the full snapshot output
@@ -75,6 +76,7 @@ type SnapshotOutput struct {
 	Groups map[string][]TaskSnapshot `json:"groups,omitempty" yaml:"groups,omitempty"`
 }
 
+//nolint:funlen // TODO: refactor to reduce length
 func runSnapshot(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 

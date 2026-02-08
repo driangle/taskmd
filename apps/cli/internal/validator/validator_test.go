@@ -369,13 +369,13 @@ func TestValidate_StrictMode(t *testing.T) {
 
 func TestValidationResult_IsValid(t *testing.T) {
 	tests := []struct {
-		name     string
-		result   *ValidationResult
+		name      string
+		result    *ValidationResult
 		wantValid bool
 	}{
 		{
-			name:     "no issues",
-			result:   &ValidationResult{},
+			name:      "no issues",
+			result:    &ValidationResult{},
 			wantValid: true,
 		},
 		{

@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 	"gopkg.in/yaml.v3"
+
+	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 )
 
 const (

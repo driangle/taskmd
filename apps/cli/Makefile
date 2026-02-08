@@ -1,4 +1,4 @@
-.PHONY: build run clean install install-full test lint lint-fix web-build web-embed build-full
+.PHONY: build run clean install install-full test lint lint-fix tidy check web-build web-embed build-full
 
 # Build the binary
 build:
@@ -32,6 +32,14 @@ lint:
 # Run linter with auto-fix
 lint-fix:
 	golangci-lint run --fix
+
+# Run go mod tidy to clean up dependencies
+tidy:
+	go mod tidy
+
+# Run all checks (test, lint, vet)
+check: test lint
+	go vet ./...
 
 # Build the web SPA
 web-build:

@@ -1,7 +1,7 @@
 ---
 id: "027"
 title: "File watcher & live reload"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["017"]
@@ -21,14 +21,14 @@ Implement file watching functionality to detect changes to task files and trigge
 
 ## Tasks
 
-- [ ] Create `internal/watcher/` package for file watching
-- [ ] Use `fsnotify` to watch task files
-- [ ] Detect file modifications, creations, and deletions
-- [ ] Debounce rapid changes (e.g., 100ms delay)
-- [ ] Provide event channel for consumers
-- [ ] Handle errors gracefully (file moved, deleted, permissions)
-- [ ] Support watching multiple files or directories
-- [ ] Add tests with temporary file system changes
+- [x] Create `internal/watcher/` package for file watching
+- [x] Use `fsnotify` to watch task files
+- [x] Detect file modifications, creations, and deletions
+- [x] Debounce rapid changes (e.g., 100ms delay)
+- [x] Provide event channel for consumers
+- [x] Handle errors gracefully (file moved, deleted, permissions)
+- [x] Support watching multiple files or directories
+- [x] Add tests with temporary file system changes
 
 ## Acceptance Criteria
 

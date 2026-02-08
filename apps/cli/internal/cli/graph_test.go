@@ -1006,7 +1006,7 @@ func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
 	// --all should override the default exclude
 	graphFormat = "json"
 	graphExcludeStatus = []string{"completed"} // default value
-	graphAll = true                             // --all overrides
+	graphAll = true                            // --all overrides
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false

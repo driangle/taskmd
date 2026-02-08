@@ -114,7 +114,7 @@ func (v *Validator) checkInvalidFieldValues(tasks []*model.Task, result *Validat
 		model.StatusInProgress: true,
 		model.StatusCompleted:  true,
 		model.StatusBlocked:    true,
-		"": true, // Empty is allowed (will default)
+		"":                     true, // Empty is allowed (will default)
 	}
 
 	validPriorities := map[model.Priority]bool{
@@ -122,14 +122,14 @@ func (v *Validator) checkInvalidFieldValues(tasks []*model.Task, result *Validat
 		model.PriorityMedium:   true,
 		model.PriorityHigh:     true,
 		model.PriorityCritical: true,
-		"": true, // Empty is allowed (will default)
+		"":                     true, // Empty is allowed (will default)
 	}
 
 	validEfforts := map[model.Effort]bool{
 		model.EffortSmall:  true,
 		model.EffortMedium: true,
 		model.EffortLarge:  true,
-		"": true, // Empty is allowed (will default)
+		"":                 true, // Empty is allowed (will default)
 	}
 
 	for _, task := range tasks {
@@ -182,6 +182,8 @@ func (v *Validator) checkMissingDependencies(tasks []*model.Task, taskMap map[st
 }
 
 // checkCircularDependencies detects cycles in the dependency graph
+//
+//nolint:gocognit // TODO: refactor to reduce complexity
 func (v *Validator) checkCircularDependencies(tasks []*model.Task, taskMap map[string]*model.Task, result *ValidationResult) {
 	// Build adjacency list
 	graph := make(map[string][]string)

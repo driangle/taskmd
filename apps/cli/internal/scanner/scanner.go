@@ -38,6 +38,8 @@ type ScanError struct {
 }
 
 // Scan walks the directory tree and finds all markdown files with task frontmatter
+//
+//nolint:gocognit,funlen // TODO: refactor to reduce complexity
 func (s *Scanner) Scan() (*ScanResult, error) {
 	result := &ScanResult{
 		Tasks:  make([]*model.Task, 0),

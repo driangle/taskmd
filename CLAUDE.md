@@ -2,6 +2,17 @@
 
 This document provides guidelines and conventions for developing the md-task-tracker project. These instructions are designed to help maintain code quality, consistency, and reliability across the codebase.
 
+## Prerequisites
+
+Before developing, ensure you have the following tools installed:
+
+- **Go** (1.22+): [https://go.dev/dl/](https://go.dev/dl/)
+- **pnpm**: `npm install -g pnpm` (for web frontend)
+- **golangci-lint**: Required for `make lint` and `make lint-fix`
+  - macOS: `brew install golangci-lint`
+  - go install: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
+  - Other: See [golangci-lint install docs](https://golangci-lint.run/welcome/install/)
+
 ## Testing Requirements
 
 ### CLI Testing Policy
@@ -92,6 +103,12 @@ golangci-lint run
 
 # Auto-fix issues where possible
 make lint-fix
+
+# Run go mod tidy
+make tidy
+
+# Run all checks (test, lint, vet)
+make check
 ```
 
 **Key quality metrics enforced**:

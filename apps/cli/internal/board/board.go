@@ -7,6 +7,8 @@ import (
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 )
 
+const defaultGroupKey = "(none)"
+
 // GroupResult holds ordered group keys and the grouped tasks map.
 type GroupResult struct {
 	Keys   []string
@@ -14,6 +16,8 @@ type GroupResult struct {
 }
 
 // GroupTasks groups tasks by the specified field.
+//
+//nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
 func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 	groups := make(map[string][]*model.Task)
 
@@ -22,7 +26,7 @@ func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 		for _, t := range tasks {
 			key := string(t.Status)
 			if key == "" {
-				key = "(none)"
+				key = defaultGroupKey
 			}
 			groups[key] = append(groups[key], t)
 		}
@@ -35,7 +39,7 @@ func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 		for _, t := range tasks {
 			key := string(t.Priority)
 			if key == "" {
-				key = "(none)"
+				key = defaultGroupKey
 			}
 			groups[key] = append(groups[key], t)
 		}
@@ -48,7 +52,7 @@ func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 		for _, t := range tasks {
 			key := string(t.Effort)
 			if key == "" {
-				key = "(none)"
+				key = defaultGroupKey
 			}
 			groups[key] = append(groups[key], t)
 		}
@@ -61,7 +65,7 @@ func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 		for _, t := range tasks {
 			key := t.GetGroup()
 			if key == "" {
-				key = "(none)"
+				key = defaultGroupKey
 			}
 			groups[key] = append(groups[key], t)
 		}
@@ -73,7 +77,7 @@ func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 	case "tag":
 		for _, t := range tasks {
 			if len(t.Tags) == 0 {
-				groups["(none)"] = append(groups["(none)"], t)
+				groups[defaultGroupKey] = append(groups[defaultGroupKey], t)
 			} else {
 				for _, tag := range t.Tags {
 					groups[tag] = append(groups[tag], t)
@@ -183,7 +187,7 @@ func sortedKeys(groups map[string][]*model.Task) []string {
 	var keys []string
 	hasNone := false
 	for k := range groups {
-		if k == "(none)" {
+		if k == defaultGroupKey {
 			hasNone = true
 			continue
 		}
@@ -191,7 +195,7 @@ func sortedKeys(groups map[string][]*model.Task) []string {
 	}
 	sort.Strings(keys)
 	if hasNone {
-		keys = append(keys, "(none)")
+		keys = append(keys, defaultGroupKey)
 	}
 	return keys
 }

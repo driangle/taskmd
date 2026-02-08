@@ -16,7 +16,7 @@ created: 2026-02-08
 
 ## Objective
 
-Add a `taskmd sync` command that synchronizes tasks from external project management tools (Jira, Asana, Trello, Monday.com, etc.) into local markdown task files. The architecture should be extensible so new sources can be added as plugins without modifying core sync logic.
+Add a `taskmd sync` command that synchronizes tasks from external project management tools (Jira, Asana, Trello, Monday.com, GitHub Issues, etc.) into local markdown task files. The architecture should be extensible so new sources can be added as plugins without modifying core sync logic.
 
 ## Tasks
 
