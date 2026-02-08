@@ -358,9 +358,10 @@ monitor_workflow() {
     local tag="v$version"
 
     if ! command -v gh &> /dev/null; then
-        log_warning "gh CLI not available - skipping workflow monitoring"
+        log_warning "gh CLI not available - cannot monitor workflow"
         log_info "Check workflow status at: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/actions"
-        return
+        log_info "Release artifacts will be available once the workflow completes"
+        return 0
     fi
 
     log_step "Monitoring GitHub Actions workflow"
@@ -375,7 +376,8 @@ monitor_workflow() {
     if [[ -z "$workflow_id" ]]; then
         log_warning "Could not find workflow run"
         log_info "Check manually at: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/actions"
-        return
+        log_info "Release artifacts will be available once the workflow completes"
+        return 0
     fi
 
     log_info "Workflow started (ID: $workflow_id)"
@@ -384,9 +386,12 @@ monitor_workflow() {
     # Watch the workflow
     if gh run watch "$workflow_id" --exit-status; then
         log_success "Workflow completed successfully!"
+        return 0
     else
         log_error "Workflow failed or was cancelled"
-        log_info "Check details at: $(gh run view "$workflow_id" --json url --jq '.url')"
+        local workflow_url
+        workflow_url=$(gh run view "$workflow_id" --json url --jq '.url' 2>/dev/null || echo "https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/actions")
+        log_error "Check details at: $workflow_url"
         return 1
     fi
 }
@@ -482,6 +487,7 @@ main() {
 
     # Perform release
     local release_failed=false
+    local workflow_failed=false
 
     {
         update_package_json "$clean_version"
@@ -491,8 +497,10 @@ main() {
         if [[ "$NO_PUSH" == "false" ]]; then
             push_changes "$clean_version"
 
-            # Monitor workflow (don't fail on monitoring errors)
-            monitor_workflow "$clean_version" || true
+            # Monitor workflow
+            if ! monitor_workflow "$clean_version"; then
+                workflow_failed=true
+            fi
         else
             log_warning "Skipping push (--no-push enabled)"
             log_info "To push manually: git push origin $(git rev-parse --abbrev-ref HEAD) && git push origin $tag"
@@ -506,31 +514,50 @@ main() {
         error_exit "Release failed"
     fi
 
-    # Success!
+    # Report results
     echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     Release Created Successfully!     ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════╝${NC}\n"
+    if [[ "$workflow_failed" == "true" ]]; then
+        echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
+        echo -e "${YELLOW}║   Tag Pushed but Workflow Failed!     ║${NC}"
+        echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}\n"
 
-    log_success "Version: $clean_version"
-    log_success "Tag: $tag"
+        log_warning "Version: $clean_version"
+        log_warning "Tag: $tag (pushed successfully)"
+        log_error "GitHub Actions workflow failed"
 
-    if [[ "$NO_PUSH" == "false" ]]; then
-        local release_url
-        release_url=$(get_release_url "$clean_version")
-        log_success "Release URL: $release_url"
+        local repo_url
+        repo_url=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+        log_info "Check workflow at: https://github.com/$repo_url/actions"
+        log_info "Fix the issue and re-run the workflow, or delete the tag to retry:"
+        log_info "  git tag -d $tag"
+        log_info "  git push origin :refs/tags/$tag"
+
+        exit 1
+    else
+        echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║     Release Created Successfully!     ║${NC}"
+        echo -e "${GREEN}╚════════════════════════════════════════╝${NC}\n"
+
+        log_success "Version: $clean_version"
+        log_success "Tag: $tag"
+
+        if [[ "$NO_PUSH" == "false" ]]; then
+            local release_url
+            release_url=$(get_release_url "$clean_version")
+            log_success "Release URL: $release_url"
+
+            echo ""
+            log_info "Release artifacts available at:"
+            log_info "  • taskmd-$tag-linux-amd64.tar.gz"
+            log_info "  • taskmd-$tag-linux-arm64.tar.gz"
+            log_info "  • taskmd-$tag-darwin-amd64.tar.gz"
+            log_info "  • taskmd-$tag-darwin-arm64.tar.gz"
+            log_info "  • taskmd-$tag-windows-amd64.zip"
+            log_info "  • checksums.txt"
+        fi
 
         echo ""
-        log_info "Release artifacts will be available at:"
-        log_info "  • taskmd-$tag-linux-amd64.tar.gz"
-        log_info "  • taskmd-$tag-linux-arm64.tar.gz"
-        log_info "  • taskmd-$tag-darwin-amd64.tar.gz"
-        log_info "  • taskmd-$tag-darwin-arm64.tar.gz"
-        log_info "  • taskmd-$tag-windows-amd64.zip"
-        log_info "  • checksums.txt"
     fi
-
-    echo ""
 }
 
 # Run main
