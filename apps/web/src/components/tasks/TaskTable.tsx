@@ -27,7 +27,14 @@ const columns = [
   }),
   columnHelper.accessor("title", {
     header: "Title",
-    cell: (info) => <span className="font-medium">{info.getValue()}</span>,
+    cell: (info) => (
+      <Link
+        to={`/tasks/${info.row.original.id}`}
+        className="font-medium text-blue-600 hover:underline"
+      >
+        {info.getValue()}
+      </Link>
+    ),
   }),
   columnHelper.accessor("status", {
     header: "Status",
