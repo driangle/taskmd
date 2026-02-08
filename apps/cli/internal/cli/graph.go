@@ -51,7 +51,7 @@ By default, completed tasks are excluded. Use --all to include them.`,
 func init() {
 	rootCmd.AddCommand(graphCmd)
 
-	graphCmd.Flags().StringVar(&graphFormat, "format", "mermaid", "output format (mermaid, dot, ascii, json)")
+	graphCmd.Flags().StringVar(&graphFormat, "format", "ascii", "output format (mermaid, dot, ascii, json)")
 	graphCmd.Flags().StringVar(&graphRoot, "root", "", "start graph from specific task ID")
 	graphCmd.Flags().StringVar(&graphFocus, "focus", "", "highlight specific task ID")
 	graphCmd.Flags().BoolVar(&graphUpstream, "upstream", false, "show only dependencies (ancestors)")

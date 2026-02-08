@@ -952,6 +952,54 @@ func TestGraphCommand_DefaultExcludesCompleted(t *testing.T) {
 	}
 }
 
+func TestGraphCommand_DefaultFormat_IsASCII(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	// Reset flags to defaults — notably, do NOT set graphFormat
+	graphFormat = graphCmd.Flag("format").DefValue
+	graphExcludeStatus = []string{}
+	graphAll = false
+	graphRoot = ""
+	graphFocus = ""
+	graphUpstream = false
+	graphDownstream = false
+	graphOut = ""
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := runGraph(graphCmd, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runGraph failed: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	// Verify the default value is "ascii"
+	defVal := graphCmd.Flag("format").DefValue
+	if defVal != "ascii" {
+		t.Errorf("Expected default format flag to be 'ascii', got %q", defVal)
+	}
+
+	// Verify the output looks like ASCII tree (not mermaid or dot)
+	if strings.Contains(output, "graph TD") {
+		t.Error("Default format should not produce mermaid output")
+	}
+	if strings.Contains(output, "digraph tasks") {
+		t.Error("Default format should not produce DOT output")
+	}
+	if !strings.Contains(output, "[001]") && !strings.Contains(output, "[005]") {
+		t.Error("Expected ASCII output to contain task IDs like [001] or [005]")
+	}
+}
+
 func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
 	tmpDir := createTestTaskFiles(t)
 
