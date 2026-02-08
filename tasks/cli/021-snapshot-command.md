@@ -1,7 +1,7 @@
 ---
 id: "021"
 title: "snapshot command - Static machine-readable output"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["017", "019"]
@@ -21,18 +21,18 @@ Implement the `snapshot` command to produce a frozen, machine-readable represent
 
 ## Tasks
 
-- [ ] Create `internal/cli/snapshot.go` for snapshot command
-- [ ] Support output formats: `json`, `yaml`, `md`
-- [ ] Implement `--core` flag: output only core fields (id, title, duration, dependencies)
-- [ ] Implement `--derived` flag: include computed fields (blocked status, depth, topological order, critical path)
-- [ ] Implement `--group-by <field>` for grouping tasks in output
-- [ ] Implement `--out <file>` for writing to file instead of stdout
-- [ ] Calculate derived fields:
+- [x] Create `internal/cli/snapshot.go` for snapshot command
+- [x] Support output formats: `json`, `yaml`, `md`
+- [x] Implement `--core` flag: output only core fields (id, title, duration, dependencies)
+- [x] Implement `--derived` flag: include computed fields (blocked status, depth, topological order, critical path)
+- [x] Implement `--group-by <field>` for grouping tasks in output
+- [x] Implement `--out <file>` for writing to file instead of stdout
+- [x] Calculate derived fields:
   - Blocked status (dependencies not met)
   - Dependency depth
   - Topological order
   - Critical path membership
-- [ ] Default: output all fields in JSON format
+- [x] Default: output all fields in JSON format
 
 ## Acceptance Criteria
 
