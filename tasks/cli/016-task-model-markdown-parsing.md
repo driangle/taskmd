@@ -1,7 +1,7 @@
 ---
 id: "016"
 title: "Task model & markdown parsing"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["015"]
@@ -20,14 +20,14 @@ Define the core Task data model in Go and implement markdown parsing that extrac
 
 ## Tasks
 
-- [ ] Define `Task` struct in `internal/model/` matching the frontmatter schema (id, title, status, priority, effort, dependencies, tags, group, created)
-- [ ] Define supporting types/constants for Status, Priority, Effort enums
-- [ ] Include a `Group` field on `Task` — populated from frontmatter `group` field if present, otherwise derived from parent directory name by the scanner
-- [ ] Implement frontmatter+body parser using goldmark and a YAML frontmatter library (e.g. `go-yaml`)
-- [ ] Parse YAML frontmatter into `Task` struct
-- [ ] Preserve the markdown body as a string field on the Task
-- [ ] Handle edge cases: missing frontmatter, malformed YAML, empty files
-- [ ] Write unit tests for parsing valid, invalid, and edge-case markdown files
+- [x] Define `Task` struct in `internal/model/` matching the frontmatter schema (id, title, status, priority, effort, dependencies, tags, group, created)
+- [x] Define supporting types/constants for Status, Priority, Effort enums
+- [x] Include a `Group` field on `Task` — populated from frontmatter `group` field if present, otherwise derived from parent directory name by the scanner
+- [x] Implement frontmatter+body parser using goldmark and a YAML frontmatter library (e.g. `go-yaml`)
+- [x] Parse YAML frontmatter into `Task` struct
+- [x] Preserve the markdown body as a string field on the Task
+- [x] Handle edge cases: missing frontmatter, malformed YAML, empty files
+- [x] Write unit tests for parsing valid, invalid, and edge-case markdown files
 
 ## Acceptance Criteria
 

@@ -1,7 +1,7 @@
 ---
 id: "015"
 title: "Go CLI scaffolding (taskmd)"
-status: pending
+status: completed
 priority: high
 effort: small
 dependencies: []
@@ -20,19 +20,19 @@ Initialize the Go CLI project for taskmd under `apps/cli/`. This is the terminal
 
 ## Tasks
 
-- [ ] Initialize Go module under `apps/cli/` (`go mod init`)
-- [ ] Set up directory structure:
+- [x] Initialize Go module under `apps/cli/` (`go mod init`)
+- [x] Set up directory structure:
   - `cmd/taskmd/main.go` — entrypoint
   - `internal/` — core application logic
-- [ ] Add core dependencies:
+- [x] Add core dependencies:
   - `github.com/charmbracelet/bubbletea` — TUI framework
   - `github.com/charmbracelet/lipgloss` — terminal styling
   - `github.com/charmbracelet/glamour` — markdown rendering
   - `github.com/fsnotify/fsnotify` — file watching
   - `github.com/yuin/goldmark` — markdown parsing
-- [ ] Create a minimal `main.go` that compiles and runs
-- [ ] Add a `Makefile` or build script for `go build -o taskmd`
-- [ ] Verify `go run ./cmd/taskmd` executes without errors
+- [x] Create a minimal `main.go` that compiles and runs
+- [x] Add a `Makefile` or build script for `go build -o taskmd`
+- [x] Verify `go run ./cmd/taskmd` executes without errors
 
 ## Acceptance Criteria
 
