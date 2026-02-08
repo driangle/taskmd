@@ -195,7 +195,7 @@ When working on tasks:
 
 1. **Check task status** before starting:
    ```bash
-   ./bin/taskmd list tasks/cli
+   taskmd list tasks/cli
    ```
 
 2. **Update task status** as you work:
@@ -213,7 +213,7 @@ When working on tasks:
 - Ensure dependent tasks are completed first
 - Use the graph command to visualize dependencies:
   ```bash
-  ./bin/taskmd graph --format ascii --exclude-status completed
+  taskmd graph --format ascii --exclude-status completed
   ```
 
 ## Building and Deployment
@@ -222,7 +222,7 @@ When working on tasks:
 
 ```bash
 cd apps/cli
-go build -o ../../bin/taskmd ./cmd/taskmd
+make build-full
 ```
 
 ### Build Flags

@@ -1,7 +1,7 @@
 ---
 id: "032"
 title: "next command - Suggest the best task to pick up"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["018", "021"]
@@ -25,18 +25,18 @@ Today, determining the next best task requires combining output from multiple co
 
 ## Tasks
 
-- [ ] Create `internal/cli/next.go` for the next command
-- [ ] Filter to actionable tasks: status is `pending` or `in-progress`, and not blocked (all dependencies completed)
-- [ ] Rank actionable tasks using a scoring heuristic that considers:
+- [x]Create `internal/cli/next.go` for the next command
+- [x]Filter to actionable tasks: status is `pending` or `in-progress`, and not blocked (all dependencies completed)
+- [x]Rank actionable tasks using a scoring heuristic that considers:
   - Priority (high > medium > low)
   - Critical path membership (prefer tasks on the critical path)
   - Dependency depth (prefer tasks that unblock the most downstream work)
   - Effort (optional tiebreaker — prefer smaller effort for quick wins)
-- [ ] Display the top-N recommendations (default 5, configurable via `--limit`)
-- [ ] Show why each task was recommended (e.g., "high priority, on critical path, unblocks 3 tasks")
-- [ ] Support output formats: `table` (default), `json`, `yaml`
-- [ ] Support `--filter` flag to narrow scope (e.g., `--filter tag=cli`)
-- [ ] Add comprehensive tests in `internal/cli/next_test.go`
+- [x]Display the top-N recommendations (default 5, configurable via `--limit`)
+- [x]Show why each task was recommended (e.g., "high priority, on critical path, unblocks 3 tasks")
+- [x]Support output formats: `table` (default), `json`, `yaml`
+- [x]Support `--filter` flag to narrow scope (e.g., `--filter tag=cli`)
+- [x]Add comprehensive tests in `internal/cli/next_test.go`
 
 ## Acceptance Criteria
 
