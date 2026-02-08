@@ -1,14 +1,15 @@
 ---
-id: "022"
+id: "archive-022"
 title: "Task filtering & sorting"
 status: pending
 priority: medium
 effort: medium
-dependencies: ["020"]
+dependencies: ["archive-020"]
 tags:
   - cli
   - go
   - tui
+  - archived
 created: 2026-02-08
 ---
 

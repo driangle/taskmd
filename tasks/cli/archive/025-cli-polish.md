@@ -1,14 +1,15 @@
 ---
-id: "025"
+id: "archive-025"
 title: "CLI polish & error handling"
 status: pending
 priority: low
 effort: medium
-dependencies: ["021", "022", "023", "024"]
+dependencies: ["archive-021", "archive-022", "archive-023", "archive-024"]
 tags:
   - cli
   - go
   - polish
+  - archived
 created: 2026-02-08
 ---
 

@@ -1,14 +1,15 @@
 ---
-id: "021"
+id: "archive-021"
 title: "Task detail view"
 status: pending
 priority: medium
 effort: medium
-dependencies: ["020"]
+dependencies: ["archive-020"]
 tags:
   - cli
   - go
   - tui
+  - archived
 created: 2026-02-08
 ---
 

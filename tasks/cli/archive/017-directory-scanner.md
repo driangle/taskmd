@@ -1,5 +1,5 @@
 ---
-id: "017"
+id: "archive-017"
 title: "Directory scanner"
 status: pending
 priority: high
@@ -9,6 +9,7 @@ tags:
   - cli
   - go
   - core
+  - archived
 created: 2026-02-08
 ---
 

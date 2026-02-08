@@ -1,5 +1,5 @@
 ---
-id: "019"
+id: "archive-019"
 title: "TUI app shell (bubbletea)"
 status: pending
 priority: high
@@ -9,6 +9,7 @@ tags:
   - cli
   - go
   - tui
+  - archived
 created: 2026-02-08
 ---
 

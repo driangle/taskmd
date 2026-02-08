@@ -1,14 +1,15 @@
 ---
-id: "020"
+id: "archive-020"
 title: "Task list view"
 status: pending
 priority: high
 effort: large
-dependencies: ["017", "019"]
+dependencies: ["archive-017", "archive-019"]
 tags:
   - cli
   - go
   - tui
+  - archived
 created: 2026-02-08
 ---
 

@@ -1,7 +1,7 @@
 ---
 id: "019"
 title: "validate command - Lint and validate tasks"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["017"]
@@ -21,18 +21,18 @@ Implement the `validate` command to lint task files and check for common errors 
 
 ## Tasks
 
-- [ ] Create `internal/cli/validate.go` for validate command
-- [ ] Create `internal/validator/` package for validation logic
-- [ ] Implement validation checks:
+- [x] Create `internal/cli/validate.go` for validate command
+- [x] Create `internal/validator/` package for validation logic
+- [x] Implement validation checks:
   - Missing dependencies (refs to non-existent task IDs)
   - Circular dependencies (detect cycles)
   - Duplicate task IDs
   - Invalid field values (status, priority, effort)
   - Required fields (id, title)
-- [ ] Implement `--strict` flag for stricter validation
-- [ ] Support output formats: `text` (default), `json`
-- [ ] Return appropriate exit codes (0 = valid, 1 = errors, 2 = warnings in strict mode)
-- [ ] Display clear error messages with file paths and line numbers if possible
+- [x] Implement `--strict` flag for stricter validation
+- [x] Support output formats: `text` (default), `json`
+- [x] Return appropriate exit codes (0 = valid, 1 = errors, 2 = warnings in strict mode)
+- [x] Display clear error messages with file paths and line numbers if possible
 
 ## Acceptance Criteria
 

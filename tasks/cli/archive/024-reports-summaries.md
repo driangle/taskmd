@@ -1,14 +1,15 @@
 ---
-id: "024"
+id: "archive-024"
 title: "Reports & summaries"
 status: pending
 priority: medium
 effort: medium
-dependencies: ["017"]
+dependencies: ["archive-017"]
 tags:
   - cli
   - go
   - reports
+  - archived
 created: 2026-02-08
 ---
 

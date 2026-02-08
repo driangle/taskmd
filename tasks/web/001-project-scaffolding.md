@@ -1,5 +1,5 @@
 ---
-id: "001"
+id: "web-001"
 title: "Project scaffolding (Next.js + Tailwind)"
 status: pending
 priority: high

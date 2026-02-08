@@ -1,14 +1,15 @@
 ---
-id: "018"
+id: "archive-018"
 title: "File watcher & live reload"
 status: pending
 priority: high
 effort: medium
-dependencies: ["017"]
+dependencies: ["archive-017"]
 tags:
   - cli
   - go
   - core
+  - archived
 created: 2026-02-08
 ---
 

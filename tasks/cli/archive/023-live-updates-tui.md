@@ -1,14 +1,15 @@
 ---
-id: "023"
+id: "archive-023"
 title: "Live file updates in TUI"
 status: pending
 priority: medium
 effort: medium
-dependencies: ["018", "020"]
+dependencies: ["archive-018", "archive-020"]
 tags:
   - cli
   - go
   - tui
+  - archived
 created: 2026-02-08
 ---
 
