@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
@@ -36,7 +36,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
       - name: Run tests
         working-directory: apps/cli
@@ -48,8 +48,8 @@ jobs:
           files: apps/cli/coverage.txt
           flags: cli
 
-  build:
-    name: Build
+  build-cli:
+    name: Build CLI
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -58,8 +58,81 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
-      - name: Build
+      - name: Build CLI only
         working-directory: apps/cli
         run: go build -v ./cmd/taskmd
+
+  build-web:
+    name: Build Web Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web frontend
+        working-directory: apps/web
+        run: pnpm build
+
+  build-full:
+    name: Build Full (CLI + Embedded Web)
+    runs-on: ubuntu-latest
+    needs: [build-cli, build-web]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Build web frontend
+        working-directory: apps/web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Copy web assets to CLI
+        run: |
+          mkdir -p apps/cli/internal/web/static
+          cp -r apps/web/dist apps/cli/internal/web/static/dist
+
+      - name: Build CLI with embedded web
+        working-directory: apps/cli
+        run: go build -tags embed_web -v ./cmd/taskmd
+
+      - name: Verify binary
+        working-directory: apps/cli
+        run: |
+          ./taskmd --version
+          ./taskmd --help

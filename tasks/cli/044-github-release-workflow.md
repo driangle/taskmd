@@ -1,7 +1,7 @@
 ---
 id: "044"
 title: "Add GitHub Actions workflow to build and attach release artifacts"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: []
@@ -10,6 +10,7 @@ tags:
   - infrastructure
   - cli
 created: 2026-02-08
+completed: 2026-02-08
 ---
 
 # Add GitHub Actions Workflow to Build and Attach Release Artifacts
@@ -24,21 +25,21 @@ Currently there is no automated release process. Users must build from source to
 
 ## Tasks
 
-- [ ] Create `.github/workflows/release.yml`
-- [ ] Trigger on tag push (`v*` pattern)
-- [ ] Build `taskmd` binaries for target platforms:
+- [x] Create `.github/workflows/release.yml`
+- [x] Trigger on tag push (`v*` pattern)
+- [x] Build `taskmd` binaries for target platforms:
   - `linux/amd64`
   - `linux/arm64`
   - `darwin/amd64`
   - `darwin/arm64`
   - `windows/amd64`
-- [ ] Use `embed_web` build tag for full builds (includes web dashboard)
-- [ ] Build the web frontend (`pnpm install && pnpm build`) and copy dist to `apps/cli/internal/web/static/dist/` before Go compilation
-- [ ] Name artifacts clearly (e.g., `taskmd-linux-amd64`, `taskmd-darwin-arm64.tar.gz`)
-- [ ] Compress binaries (tar.gz for Linux/macOS, zip for Windows)
-- [ ] Attach compressed artifacts to the GitHub release
-- [ ] Include version info via ldflags (`-X main.Version`, `-X main.GitCommit`, `-X main.BuildDate`)
-- [ ] Generate checksums file (SHA256) for all artifacts
+- [x] Use `embed_web` build tag for full builds (includes web dashboard)
+- [x] Build the web frontend (`pnpm install && pnpm build`) and copy dist to `apps/cli/internal/web/static/dist/` before Go compilation
+- [x] Name artifacts clearly (e.g., `taskmd-linux-amd64`, `taskmd-darwin-arm64.tar.gz`)
+- [x] Compress binaries (tar.gz for Linux/macOS, zip for Windows)
+- [x] Attach compressed artifacts to the GitHub release
+- [x] Include version info via ldflags (`-X main.Version`, `-X main.GitCommit`, `-X main.BuildDate`)
+- [x] Generate checksums file (SHA256) for all artifacts
 
 ## Acceptance Criteria
 
