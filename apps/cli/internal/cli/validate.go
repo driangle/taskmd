@@ -16,7 +16,7 @@ var (
 
 // validateCmd represents the validate command
 var validateCmd = &cobra.Command{
-	Use:   "validate [directory]",
+	Use:   "validate",
 	Short: "Lint and validate tasks",
 	Long: `Validate checks task files for common errors and issues.
 
@@ -52,11 +52,7 @@ func init() {
 func runValidate(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	// Determine scan directory
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	// Create scanner and scan for tasks
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)

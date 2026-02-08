@@ -22,7 +22,7 @@ var (
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list [directory]",
+	Use:   "list",
 	Short: "List tasks in a quick textual format",
 	Long: `List displays tasks in various formats with filtering and sorting support.
 
@@ -54,11 +54,7 @@ func init() {
 func runList(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	// Determine scan directory
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	// Create scanner and scan for tasks
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)

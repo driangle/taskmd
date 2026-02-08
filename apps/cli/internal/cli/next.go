@@ -48,7 +48,7 @@ var (
 )
 
 var nextCmd = &cobra.Command{
-	Use:   "next [directory]",
+	Use:   "next",
 	Short: "Recommend what task to work on next",
 	Long: `Next analyzes all tasks and recommends the best ones to work on next.
 
@@ -148,10 +148,7 @@ func scoreTask(
 func runNext(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
 	result, err := taskScanner.Scan()

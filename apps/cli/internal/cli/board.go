@@ -19,7 +19,7 @@ var (
 )
 
 var boardCmd = &cobra.Command{
-	Use:   "board [directory]",
+	Use:   "board",
 	Short: "Display tasks grouped in a kanban-like board view",
 	Long: `Display tasks grouped by a field in a board/kanban-like view.
 
@@ -55,10 +55,7 @@ func init() {
 func runBoard(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
 	result, err := taskScanner.Scan()

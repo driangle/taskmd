@@ -19,7 +19,7 @@ var (
 
 // snapshotCmd represents the snapshot command
 var snapshotCmd = &cobra.Command{
-	Use:   "snapshot [directory]",
+	Use:   "snapshot",
 	Short: "Produce a frozen, machine-readable representation of tasks",
 	Long: `Snapshot produces a static, machine-readable representation of tasks
 for CI/CD pipelines and automation.
@@ -78,11 +78,7 @@ type SnapshotOutput struct {
 func runSnapshot(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	// Determine scan directory
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	// Create scanner and scan for tasks
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)

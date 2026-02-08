@@ -1,7 +1,7 @@
 ---
 id: "033"
 title: "Consistent --dir flag across all commands"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: []

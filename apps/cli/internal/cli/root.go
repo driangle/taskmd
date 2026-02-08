@@ -20,6 +20,7 @@ var (
 	format  string
 	quiet   bool
 	verbose bool
+	dir     string
 )
 
 // rootCmd represents the base command
@@ -52,12 +53,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format (table, json, yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
+	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory to scan")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
 }
 
 // initConfig reads in config file and ENV variables if set
@@ -98,6 +101,7 @@ func GetGlobalFlags() GlobalFlags {
 		Format:  format,
 		Quiet:   quiet,
 		Verbose: verbose,
+		Dir:     dir,
 	}
 }
 
@@ -107,4 +111,14 @@ type GlobalFlags struct {
 	Format  string
 	Quiet   bool
 	Verbose bool
+	Dir     string
+}
+
+// ResolveScanDir returns the scan directory from positional arg or --dir flag.
+// Positional arg takes precedence for backward compatibility.
+func ResolveScanDir(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	return GetGlobalFlags().Dir
 }

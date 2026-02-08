@@ -15,7 +15,7 @@ import (
 
 // statsCmd represents the stats command
 var statsCmd = &cobra.Command{
-	Use:   "stats [directory]",
+	Use:   "stats",
 	Short: "Show computed metrics about tasks",
 	Long: `Stats displays computed metrics about your task set including:
 - Total tasks and breakdown by status, priority, and effort
@@ -42,11 +42,7 @@ func init() {
 func runStats(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	// Determine scan directory
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	// Create scanner and scan for tasks
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)

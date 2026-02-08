@@ -16,7 +16,6 @@ import (
 
 var (
 	webPort int
-	webDir  string
 	webDev  bool
 	webOpen bool
 )
@@ -51,13 +50,12 @@ func init() {
 	webCmd.AddCommand(webStartCmd)
 
 	webStartCmd.Flags().IntVar(&webPort, "port", 8080, "server port")
-	webStartCmd.Flags().StringVar(&webDir, "dir", ".", "task directory to scan")
 	webStartCmd.Flags().BoolVar(&webDev, "dev", false, "enable dev mode (CORS for Vite dev server)")
 	webStartCmd.Flags().BoolVar(&webOpen, "open", false, "open browser on start")
 }
 
 func runWebStart(cmd *cobra.Command, _ []string) error {
-	absDir, err := filepath.Abs(webDir)
+	absDir, err := filepath.Abs(GetGlobalFlags().Dir)
 	if err != nil {
 		return fmt.Errorf("invalid directory: %w", err)
 	}

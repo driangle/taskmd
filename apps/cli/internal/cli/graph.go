@@ -24,7 +24,7 @@ var (
 
 // graphCmd represents the graph command
 var graphCmd = &cobra.Command{
-	Use:   "graph [directory]",
+	Use:   "graph",
 	Short: "Export task dependency graph",
 	Long: `Export task dependency graphs in various formats for visualization and analysis.
 
@@ -74,11 +74,7 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		graphExcludeStatus = []string{}
 	}
 
-	// Determine scan directory
-	scanDir := "."
-	if len(args) > 0 {
-		scanDir = args[0]
-	}
+	scanDir := ResolveScanDir(args)
 
 	// Create scanner and scan for tasks
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
