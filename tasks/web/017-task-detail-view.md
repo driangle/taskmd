@@ -1,6 +1,6 @@
 ---
 id: "web-017"
-title: "Task detail page"
+title: "Fix task detail page to show full markdown content"
 status: pending
 priority: high
 effort: medium
@@ -9,34 +9,50 @@ tags:
   - ui
   - tasks
   - ux
+  - bug
 created: 2026-02-08
+updated: 2026-02-08
 ---
 
-# Task Detail Page
+# Fix Task Detail Page to Show Full Markdown Content
+
+## Current Status
+
+TaskDetailPage.tsx was created in task web-018 but it's not working properly. The page appears empty because:
+1. There's no dedicated `GET /api/tasks/:id` endpoint that returns the task body
+2. The current `/api/tasks` endpoint excludes the body field (`json:"-"`)
+3. Frontend needs a markdown renderer to display the body content
 
 ## Objective
 
-Create a dedicated task detail page at `/tasks/:id` that shows the full details of a task including its rendered markdown body. Currently the API returns tasks without the body field (`json:"-"`). This requires both a backend change to expose task body and a frontend page to display it.
+Fix the task detail page at `/tasks/:id` to show the full task content including the rendered markdown body.
 
 ## Tasks
 
 ### Backend
 
-- [ ] Add `GET /api/tasks/:id` endpoint that returns a single task including its markdown body
-- [ ] Ensure markdown body is properly escaped in JSON
+- [ ] Add `GET /api/tasks/:id` endpoint in `internal/web/server.go` that returns a single task
+  - Should include the full task body/content from the markdown file
+  - Ensure markdown body is properly escaped in JSON
+  - Return 404 if task not found
+- [ ] Consider creating a separate Task type that includes the body field for this endpoint
 
 ### Frontend
 
-- [ ] Create `src/pages/TaskDetailPage.tsx` — a dedicated page routed at `/tasks/:id`
-  - Display task title, status, priority, effort, tags as metadata header
-  - Render markdown body content (use a markdown renderer or `dangerouslySetInnerHTML` with sanitized HTML)
-  - Show file path, dependencies, and other frontmatter fields
-  - Back navigation to return to the previous view
-- [ ] Add data fetching hook for the individual task endpoint
+- [ ] Install a markdown renderer library (e.g., `react-markdown` or `marked` + `dompurify`)
+- [ ] Create `src/api/task-detail.ts` hook to fetch single task: `GET /api/tasks/:id`
+- [ ] Update `TaskDetailPage.tsx` to:
+  - Use the new data fetching hook for individual task
+  - Render markdown body content with the markdown renderer
+  - Show file path if available
+  - Display all frontmatter fields properly
+  - Handle loading and error states
 
 ## Acceptance Criteria
 
-- Navigating to `/tasks/:id` shows the full task detail page
-- Task metadata (status, priority, tags, dependencies) is displayed clearly
-- Markdown body content is rendered
-- Back button returns to the previous view (tasks list, board, or graph)
+- Navigating to `/tasks/:id` shows the full task detail page with content
+- Task metadata (status, priority, tags, dependencies, created date) is displayed clearly
+- Markdown body content is rendered with proper formatting (headers, lists, code blocks, etc.)
+- Back button returns to `/tasks` view
+- 404 state is shown for invalid task IDs
+- Loading states work correctly
