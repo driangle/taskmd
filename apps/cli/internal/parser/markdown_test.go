@@ -280,6 +280,65 @@ Body with leading/trailing whitespace
 	}
 }
 
+func TestParseTaskContent_DeriveIDFromFilename(t *testing.T) {
+	content := []byte(`---
+title: "My Task"
+status: pending
+---
+
+Body
+`)
+
+	task, err := ParseTaskContent("009-add-feature.md", content)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if task.ID != "009" {
+		t.Errorf("expected ID '009' derived from filename, got '%s'", task.ID)
+	}
+
+	if task.Title != "My Task" {
+		t.Errorf("expected title from frontmatter 'My Task', got '%s'", task.Title)
+	}
+}
+
+func TestParseTaskContent_DeriveTitleFromFilename(t *testing.T) {
+	content := []byte(`---
+status: pending
+---
+
+Body
+`)
+
+	task, err := ParseTaskContent("012-setup-database.md", content)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if task.ID != "012" {
+		t.Errorf("expected ID '012', got '%s'", task.ID)
+	}
+
+	if task.Title != "setup database" {
+		t.Errorf("expected title 'setup database' derived from filename, got '%s'", task.Title)
+	}
+}
+
+func TestParseTaskContent_NonNumericFilenameNoDerivation(t *testing.T) {
+	content := []byte(`---
+title: "Some Task"
+---
+
+Body
+`)
+
+	_, err := ParseTaskContent("readme.md", content)
+	if err == nil {
+		t.Error("expected error for non-numeric filename with missing ID")
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) &&

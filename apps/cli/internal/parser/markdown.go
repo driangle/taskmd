@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
@@ -75,6 +76,11 @@ func ParseTaskContent(filePath string, content []byte) (*model.Task, error) {
 		}
 	}
 
+	// Derive missing fields from filename
+	if task.ID == "" || task.Title == "" {
+		deriveFieldsFromFilename(task)
+	}
+
 	if !task.IsValid() {
 		return nil, &ParseError{
 			FilePath: filePath,
@@ -83,6 +89,27 @@ func ParseTaskContent(filePath string, content []byte) (*model.Task, error) {
 	}
 
 	return task, nil
+}
+
+// deriveFieldsFromFilename extracts ID and title from a filename like "009-add-microsoft-oauth.md".
+// Only derives fields when the filename starts with a digit (task ID convention).
+func deriveFieldsFromFilename(task *model.Task) {
+	base := filepath.Base(task.FilePath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+
+	if len(name) == 0 || name[0] < '0' || name[0] > '9' {
+		return
+	}
+
+	parts := strings.SplitN(name, "-", 2)
+
+	if task.ID == "" {
+		task.ID = parts[0]
+	}
+
+	if task.Title == "" && len(parts) == 2 {
+		task.Title = strings.ReplaceAll(parts[1], "-", " ")
+	}
 }
 
 // extractFrontmatter splits content into frontmatter and body
