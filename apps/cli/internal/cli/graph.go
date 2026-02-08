@@ -19,6 +19,7 @@ var (
 	graphDownstream    bool
 	graphOut           string
 	graphExcludeStatus []string
+	graphAll           bool
 )
 
 // graphCmd represents the graph command
@@ -39,8 +40,10 @@ Examples:
   taskmd graph --format ascii
   taskmd graph --root 022 --downstream
   taskmd graph --focus 022 --format mermaid
-  taskmd graph --exclude-status completed --format ascii
-  cat tasks.md | taskmd graph --stdin --format mermaid`,
+  taskmd graph --all --format ascii
+  cat tasks.md | taskmd graph --stdin --format mermaid
+
+By default, completed tasks are excluded. Use --all to include them.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runGraph,
 }
@@ -53,7 +56,8 @@ func init() {
 	graphCmd.Flags().StringVar(&graphFocus, "focus", "", "highlight specific task ID")
 	graphCmd.Flags().BoolVar(&graphUpstream, "upstream", false, "show only dependencies (ancestors)")
 	graphCmd.Flags().BoolVar(&graphDownstream, "downstream", false, "show only dependents (descendants)")
-	graphCmd.Flags().StringSliceVar(&graphExcludeStatus, "exclude-status", []string{}, "exclude tasks with status (completed, pending, in-progress, blocked)")
+	graphCmd.Flags().StringSliceVar(&graphExcludeStatus, "exclude-status", []string{"completed"}, "exclude tasks with status (completed, pending, in-progress, blocked)")
+	graphCmd.Flags().BoolVar(&graphAll, "all", false, "include all tasks (overrides --exclude-status)")
 	graphCmd.Flags().StringVarP(&graphOut, "out", "o", "", "write output to file instead of stdout")
 }
 
@@ -63,6 +67,11 @@ func runGraph(cmd *cobra.Command, args []string) error {
 	// Validate conflicting flags
 	if graphUpstream && graphDownstream {
 		return fmt.Errorf("cannot use both --upstream and --downstream")
+	}
+
+	// --all overrides --exclude-status
+	if graphAll {
+		graphExcludeStatus = []string{}
 	}
 
 	// Determine scan directory

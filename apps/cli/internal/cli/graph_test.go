@@ -109,6 +109,7 @@ func TestGraphCommand_JSON_Format(t *testing.T) {
 	// Reset flags
 	graphFormat = "json"
 	graphExcludeStatus = []string{}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -169,6 +170,7 @@ func TestGraphCommand_ExcludeStatus_BugFix(t *testing.T) {
 	// Reset flags
 	graphFormat = "json"
 	graphExcludeStatus = []string{"completed"}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -244,6 +246,7 @@ func TestGraphCommand_ASCII_Format(t *testing.T) {
 	// Reset flags
 	graphFormat = "ascii"
 	graphExcludeStatus = []string{}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -291,6 +294,7 @@ func TestGraphCommand_ASCII_ExcludeCompleted(t *testing.T) {
 	// Reset flags
 	graphFormat = "ascii"
 	graphExcludeStatus = []string{"completed"}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -354,6 +358,7 @@ func TestGraphCommand_Mermaid_Format(t *testing.T) {
 	// Reset flags
 	graphFormat = "mermaid"
 	graphExcludeStatus = []string{}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -445,6 +450,7 @@ func TestGraphCommand_DOT_Format(t *testing.T) {
 	// Reset flags
 	graphFormat = "dot"
 	graphExcludeStatus = []string{}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -758,6 +764,7 @@ func TestGraphCommand_ExcludeMultipleStatuses(t *testing.T) {
 	// Reset flags
 	graphFormat = "json"
 	graphExcludeStatus = []string{"completed", "pending"}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -840,6 +847,7 @@ created: 2026-02-08
 	// Reset flags
 	graphFormat = "json"
 	graphExcludeStatus = []string{"completed"}
+	graphAll = false
 	graphRoot = ""
 	graphFocus = ""
 	graphUpstream = false
@@ -890,5 +898,99 @@ created: 2026-02-08
 		if edge["from"] != "002" || edge["to"] != "003" {
 			t.Errorf("Expected edge from 002 to 003, got from %s to %s", edge["from"], edge["to"])
 		}
+	}
+}
+
+func TestGraphCommand_DefaultExcludesCompleted(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	// Use the default exclude-status (completed) by not overriding it
+	graphFormat = "json"
+	graphExcludeStatus = []string{"completed"} // simulates default
+	graphAll = false
+	graphRoot = ""
+	graphFocus = ""
+	graphUpstream = false
+	graphDownstream = false
+	graphOut = ""
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := runGraph(graphCmd, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runGraph failed: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	var result map[string]any
+	err = json.Unmarshal([]byte(output), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON output: %v", err)
+	}
+
+	nodes := result["nodes"].([]any)
+	// Only pending tasks (003, 004, 005) should be included
+	if len(nodes) != 3 {
+		t.Errorf("Expected 3 nodes (completed excluded by default), got %d", len(nodes))
+	}
+
+	for _, node := range nodes {
+		nodeMap := node.(map[string]any)
+		status := nodeMap["status"].(string)
+		if status == "completed" {
+			t.Errorf("Completed task %s should be excluded by default", nodeMap["id"])
+		}
+	}
+}
+
+func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	// --all should override the default exclude
+	graphFormat = "json"
+	graphExcludeStatus = []string{"completed"} // default value
+	graphAll = true                             // --all overrides
+	graphRoot = ""
+	graphFocus = ""
+	graphUpstream = false
+	graphDownstream = false
+	graphOut = ""
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := runGraph(graphCmd, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runGraph failed: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	var result map[string]any
+	err = json.Unmarshal([]byte(output), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON output: %v", err)
+	}
+
+	nodes := result["nodes"].([]any)
+	// All 5 tasks should be included when --all is used
+	if len(nodes) != 5 {
+		t.Errorf("Expected 5 nodes with --all flag, got %d", len(nodes))
 	}
 }
