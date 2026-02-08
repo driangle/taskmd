@@ -25,9 +25,10 @@ type ValidationIssue struct {
 
 // ValidationResult contains all validation issues found
 type ValidationResult struct {
-	Issues []ValidationIssue `json:"issues"`
-	Errors int               `json:"errors"`
-	Warnings int             `json:"warnings"`
+	Issues    []ValidationIssue `json:"issues"`
+	Errors    int               `json:"errors"`
+	Warnings  int               `json:"warnings"`
+	TaskCount int               `json:"task_count"`
 }
 
 // IsValid returns true if there are no errors
@@ -69,7 +70,8 @@ func NewValidator(strict bool) *Validator {
 // Validate performs all validation checks on a set of tasks
 func (v *Validator) Validate(tasks []*model.Task) *ValidationResult {
 	result := &ValidationResult{
-		Issues: make([]ValidationIssue, 0),
+		Issues:    make([]ValidationIssue, 0),
+		TaskCount: len(tasks),
 	}
 
 	// Build task ID map for lookups

@@ -108,7 +108,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 func outputValidationText(result *validator.ValidationResult, quiet bool) {
 	if len(result.Issues) == 0 {
 		if !quiet {
-			fmt.Println("✓ All tasks are valid")
+			fmt.Printf("✓ All %d task(s) are valid\n", result.TaskCount)
 		}
 		return
 	}
@@ -144,13 +144,13 @@ func outputValidationText(result *validator.ValidationResult, quiet bool) {
 	// Print summary
 	fmt.Println()
 	if result.Errors > 0 {
-		fmt.Printf("Validation failed: %d error(s)", result.Errors)
+		fmt.Printf("Validated %d task(s): %d error(s)", result.TaskCount, result.Errors)
 		if result.Warnings > 0 {
 			fmt.Printf(", %d warning(s)", result.Warnings)
 		}
 		fmt.Println()
 	} else if result.Warnings > 0 {
-		fmt.Printf("Validation passed with %d warning(s)\n", result.Warnings)
+		fmt.Printf("Validated %d task(s) with %d warning(s)\n", result.TaskCount, result.Warnings)
 	}
 }
 
