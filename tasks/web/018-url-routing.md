@@ -2,7 +2,7 @@
 id: "web-018"
 title: "URL-based routing with deep linking"
 status: pending
-priority: low
+priority: high
 effort: medium
 dependencies: ["web-015"]
 tags:
@@ -22,6 +22,7 @@ Replace tab-based state switching with URL-based routing so users can bookmark a
 
 - [ ] Add `react-router-dom` dependency
 - [ ] Set up routes: `/tasks`, `/board`, `/graph`, `/stats`, `/validate`
+- [ ] Add task detail route: `/tasks/:id` for individual task pages
 - [ ] Update `Shell.tsx` navigation to use `<NavLink>` instead of onClick state
 - [ ] Default route `/` redirects to `/tasks`
 - [ ] Preserve query parameters for board groupBy (e.g., `/board?groupBy=priority`)
@@ -31,6 +32,7 @@ Replace tab-based state switching with URL-based routing so users can bookmark a
 ## Acceptance Criteria
 
 - Each view has its own URL path
+- Task detail page accessible at `/tasks/:id`
 - Browser back/forward buttons work correctly
 - Refreshing the page stays on the current view
 - Bookmarks work for any view
