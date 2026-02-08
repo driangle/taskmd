@@ -8,6 +8,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { Task } from "../../api/types.ts";
 
 const columnHelper = createColumnHelper<Task>();
@@ -16,7 +17,12 @@ const columns = [
   columnHelper.accessor("id", {
     header: "ID",
     cell: (info) => (
-      <span className="font-mono text-xs">{info.getValue()}</span>
+      <Link
+        to={`/tasks/${info.getValue()}`}
+        className="font-mono text-xs text-blue-600 hover:underline"
+      >
+        {info.getValue()}
+      </Link>
     ),
   }),
   columnHelper.accessor("title", {

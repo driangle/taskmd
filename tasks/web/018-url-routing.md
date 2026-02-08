@@ -1,7 +1,7 @@
 ---
 id: "web-018"
 title: "URL-based routing with deep linking"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["web-015"]
@@ -20,14 +20,14 @@ Replace tab-based state switching with URL-based routing so users can bookmark a
 
 ## Tasks
 
-- [ ] Add `react-router-dom` dependency
-- [ ] Set up routes: `/tasks`, `/board`, `/graph`, `/stats`, `/validate`
-- [ ] Add task detail route: `/tasks/:id` for individual task pages
-- [ ] Update `Shell.tsx` navigation to use `<NavLink>` instead of onClick state
-- [ ] Default route `/` redirects to `/tasks`
-- [ ] Preserve query parameters for board groupBy (e.g., `/board?groupBy=priority`)
-- [ ] Ensure SPA fallback in Go server works with all routes (already using `/{path...}`)
-- [ ] Update Vite proxy config if needed
+- [x] Add `react-router-dom` dependency
+- [x] Set up routes: `/tasks`, `/board`, `/graph`, `/stats`
+- [x] Add task detail route: `/tasks/:id` for individual task pages
+- [x] Update `Shell.tsx` navigation to use `<NavLink>` instead of onClick state
+- [x] Default route `/` redirects to `/tasks`
+- [x] Preserve query parameters for board groupBy (e.g., `/board?groupBy=priority`)
+- [x] Ensure SPA fallback in Go server works with all routes (already using `/{path...}`)
+- [x] Update Vite proxy config if needed (no changes needed)
 
 ## Acceptance Criteria
 
