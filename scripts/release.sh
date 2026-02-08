@@ -140,7 +140,7 @@ validate_version() {
         error_exit "Invalid version format: $version. Must follow semantic versioning (e.g., 1.2.3, 1.0.0-beta.1)"
     fi
 
-    log_success "Version format valid: $version"
+    log_success "Version format valid: $version" >&2
     echo "$version"
 }
 
