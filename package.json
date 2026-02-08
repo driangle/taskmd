@@ -1,5 +1,10 @@
 {
   "name": "taskmd",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }

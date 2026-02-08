@@ -87,7 +87,7 @@ jobs:
           path: |
             ~/.pnpm-store
             apps/web/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
@@ -128,7 +128,7 @@ jobs:
           path: |
             ~/.pnpm-store
             apps/web/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
