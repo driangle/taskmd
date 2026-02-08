@@ -1,7 +1,7 @@
 ---
 id: "archive-017"
 title: "Directory scanner"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["016"]

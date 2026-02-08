@@ -9,7 +9,6 @@ tags:
   - cli
   - go
   - tui
-  - archived
 created: 2026-02-08
 ---
 

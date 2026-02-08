@@ -9,7 +9,6 @@ tags:
   - cli
   - go
   - core
-  - archived
 created: 2026-02-08
 ---
 
