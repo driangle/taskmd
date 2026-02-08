@@ -407,7 +407,7 @@ os.WriteFile(path, data, 0644)
 
 - Check existing tasks for similar implementations
 - Review test files for usage examples
-- Refer to `docs/TASKMD_SPEC.md` for task format questions
+- Refer to `docs/taskmd_specification.md` for task format questions
 - Use the graph command to understand dependencies
 
 ---

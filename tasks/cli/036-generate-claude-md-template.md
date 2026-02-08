@@ -1,7 +1,7 @@
 ---
 id: "036"
 title: "Generate CLAUDE.md template for taskmd users"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: []
@@ -31,24 +31,24 @@ This should be minimal but practical—focusing on the most essential informatio
 
 ## Tasks
 
-- [ ] Create `docs/templates/CLAUDE.md` template file
-- [ ] Include taskmd file format essentials:
+- [x] Create `docs/templates/CLAUDE.md` template file
+- [x] Include taskmd file format essentials:
   - Frontmatter schema (id, title, status, priority, etc.)
   - Status values (pending, in-progress, blocked, completed)
   - Priority levels (low, medium, high, critical)
   - Dependencies format
-- [ ] Document essential CLI commands:
+- [x] Document essential CLI commands:
   - `taskmd list` - List and filter tasks
   - `taskmd validate` - Validate task files
   - `taskmd graph` - Visualize dependencies
   - `taskmd next` - Find next available task
   - `taskmd stats` - Show project statistics
-- [ ] Include task workflow guidance:
+- [x] Include task workflow guidance:
   - How to update task status
   - How to check dependencies before starting
   - When to use validation
-- [ ] Keep it concise (aim for ~100-150 lines)
-- [ ] Use clear, actionable language
+- [x] Keep it concise (aim for ~100-150 lines)
+- [x] Use clear, actionable language
 - [ ] Add to README with instructions for users
 
 ## Acceptance Criteria
