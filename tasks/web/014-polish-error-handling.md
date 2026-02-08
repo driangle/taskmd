@@ -1,7 +1,7 @@
 ---
 id: "014"
 title: "Polish, error handling, and loading states"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies:

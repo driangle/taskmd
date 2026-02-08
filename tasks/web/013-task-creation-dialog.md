@@ -1,7 +1,7 @@
 ---
 id: "013"
 title: "Task creation dialog"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies:

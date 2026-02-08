@@ -1,7 +1,7 @@
 ---
 id: "009"
 title: "Project switcher and add-project dialog"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies:

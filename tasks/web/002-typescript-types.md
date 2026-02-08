@@ -1,7 +1,7 @@
 ---
 id: "002"
 title: "TypeScript types and shared constants"
-status: pending
+status: completed
 priority: high
 effort: small
 dependencies:

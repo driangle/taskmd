@@ -1,7 +1,7 @@
 ---
 id: "008"
 title: "Install shadcn/ui components + layout shell"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies:

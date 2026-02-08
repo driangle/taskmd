@@ -1,7 +1,7 @@
 ---
 id: "007"
 title: "API routes — Tasks (CRUD)"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies:

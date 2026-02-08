@@ -1,7 +1,7 @@
 ---
 id: "web-001"
-title: "Project scaffolding (Next.js + Tailwind)"
-status: pending
+title: "Project scaffolding (Vite + React + Tailwind)"
+status: completed
 priority: high
 effort: small
 dependencies: []

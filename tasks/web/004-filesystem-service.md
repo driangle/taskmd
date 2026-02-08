@@ -1,7 +1,7 @@
 ---
 id: "004"
 title: "Filesystem service (dir scanning, CRUD)"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies:

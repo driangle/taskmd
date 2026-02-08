@@ -1,7 +1,7 @@
 ---
 id: "011"
 title: "Table sorting and filtering"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies:

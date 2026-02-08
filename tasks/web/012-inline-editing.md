@@ -1,7 +1,7 @@
 ---
 id: "012"
 title: "Inline status and priority editing"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies:

@@ -1,7 +1,7 @@
 ---
 id: "010"
 title: "Task table — column definitions + base"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies:

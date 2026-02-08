@@ -1,7 +1,7 @@
 ---
 id: "005"
 title: "Config service (project path persistence)"
-status: pending
+status: completed
 priority: high
 effort: small
 dependencies:

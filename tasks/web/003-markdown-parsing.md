@@ -1,7 +1,7 @@
 ---
 id: "003"
 title: "Markdown parsing and serialization service"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies:

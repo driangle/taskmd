@@ -1,7 +1,7 @@
 ---
 id: "006"
 title: "API routes — Projects"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies:
