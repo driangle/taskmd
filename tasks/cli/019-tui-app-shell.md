@@ -1,7 +1,7 @@
 ---
 id: "archive-019"
 title: "TUI app shell (bubbletea)"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["015"]
@@ -20,14 +20,14 @@ Set up the bubbletea application shell with a basic layout: header, main content
 
 ## Tasks
 
-- [ ] Create the root bubbletea `Model` in `internal/tui/`
-- [ ] Implement `Init`, `Update`, and `View` for the app shell
-- [ ] Add a header bar showing the app name and scanned directory path
-- [ ] Add a footer/status bar showing key bindings (q=quit, ?=help, etc.)
-- [ ] Set up lipgloss styles for the layout (borders, colors, padding)
-- [ ] Handle terminal resize events
-- [ ] Implement graceful quit (q / ctrl+c)
-- [ ] Wire up the app shell in `cmd/taskmd/main.go`
+- [x] Create the root bubbletea `Model` in `internal/tui/`
+- [x] Implement `Init`, `Update`, and `View` for the app shell
+- [x] Add a header bar showing the app name and scanned directory path
+- [x] Add a footer/status bar showing key bindings (q=quit, ?=help, etc.)
+- [x] Set up lipgloss styles for the layout (borders, colors, padding)
+- [x] Handle terminal resize events
+- [x] Implement graceful quit (q / ctrl+c)
+- [x] Wire up the app shell in `cmd/taskmd/main.go`
 
 ## Acceptance Criteria
 
