@@ -1,7 +1,7 @@
 ---
 id: "020"
 title: "stats command - Show computed metrics"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["017"]
@@ -21,9 +21,9 @@ Implement the `stats` command to display computed metrics about the task set inc
 
 ## Tasks
 
-- [ ] Create `internal/cli/stats.go` for stats command
-- [ ] Create `internal/metrics/` package for metric calculations
-- [ ] Implement metric calculations:
+- [x] Create `internal/cli/stats.go` for stats command
+- [x] Create `internal/metrics/` package for metric calculations
+- [x] Implement metric calculations:
   - Total tasks
   - Tasks by status (pending, in-progress, completed, blocked)
   - Tasks by priority
@@ -32,9 +32,9 @@ Implement the `stats` command to display computed metrics about the task set inc
   - Critical path length (longest dependency chain)
   - Maximum dependency depth
   - Average dependencies per task
-- [ ] Support output formats: `table` (default), `json`
-- [ ] Display metrics in human-readable table format
-- [ ] JSON format includes all raw metric data
+- [x] Support output formats: `table` (default), `json`
+- [x] Display metrics in human-readable table format
+- [x] JSON format includes all raw metric data
 
 ## Acceptance Criteria
 

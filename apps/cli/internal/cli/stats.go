@@ -1,0 +1,166 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/driangle/md-task-tracker/apps/cli/internal/metrics"
+	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
+	"github.com/spf13/cobra"
+)
+
+// statsCmd represents the stats command
+var statsCmd = &cobra.Command{
+	Use:   "stats [directory]",
+	Short: "Show computed metrics about tasks",
+	Long: `Stats displays computed metrics about your task set including:
+- Total tasks and breakdown by status, priority, and effort
+- Blocked tasks count
+- Critical path length (longest dependency chain)
+- Maximum dependency depth
+- Average dependencies per task
+
+By default, scans the current directory and all subdirectories for markdown files
+with task frontmatter. You can specify a different directory to scan.
+
+Examples:
+  taskmd stats
+  taskmd stats ./tasks
+  taskmd stats --format json`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runStats,
+}
+
+func init() {
+	rootCmd.AddCommand(statsCmd)
+}
+
+func runStats(cmd *cobra.Command, args []string) error {
+	flags := GetGlobalFlags()
+
+	// Determine scan directory
+	scanDir := "."
+	if len(args) > 0 {
+		scanDir = args[0]
+	}
+
+	// Create scanner and scan for tasks
+	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
+	result, err := taskScanner.Scan()
+	if err != nil {
+		return fmt.Errorf("scan failed: %w", err)
+	}
+
+	tasks := result.Tasks
+
+	// Report any scan errors if verbose
+	if flags.Verbose && len(result.Errors) > 0 {
+		fmt.Fprintf(os.Stderr, "\nWarning: encountered %d errors during scan:\n", len(result.Errors))
+		for _, scanErr := range result.Errors {
+			fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
+		}
+		fmt.Fprintln(os.Stderr)
+	}
+
+	// Calculate metrics
+	m := metrics.Calculate(tasks)
+
+	// Output in requested format
+	switch flags.Format {
+	case "json":
+		return outputStatsJSON(m)
+	case "table":
+		return outputStatsTable(m)
+	default:
+		return fmt.Errorf("unsupported format: %s (supported: table, json)", flags.Format)
+	}
+}
+
+// outputStatsJSON outputs metrics as JSON
+func outputStatsJSON(m *metrics.Metrics) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(m)
+}
+
+// outputStatsTable outputs metrics in a human-readable table format
+func outputStatsTable(m *metrics.Metrics) error {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+
+	fmt.Fprintln(w, "TASK STATISTICS")
+	fmt.Fprintln(w, strings.Repeat("=", 50))
+	fmt.Fprintln(w)
+
+	// Overall stats
+	fmt.Fprintf(w, "Total Tasks:\t%d\n", m.TotalTasks)
+	fmt.Fprintf(w, "Blocked Tasks:\t%d\n", m.BlockedTasksCount)
+	fmt.Fprintf(w, "Critical Path Length:\t%d\n", m.CriticalPathLength)
+	fmt.Fprintf(w, "Max Dependency Depth:\t%d\n", m.MaxDependencyDepth)
+	fmt.Fprintf(w, "Avg Dependencies/Task:\t%.2f\n", m.AvgDependenciesPerTask)
+	fmt.Fprintln(w)
+
+	// Tasks by status
+	fmt.Fprintln(w, "BY STATUS:")
+	if len(m.TasksByStatus) > 0 {
+		// Order: pending, in-progress, completed, blocked
+		statusOrder := []model.Status{
+			model.StatusPending,
+			model.StatusInProgress,
+			model.StatusCompleted,
+			model.StatusBlocked,
+		}
+		for _, status := range statusOrder {
+			if count, ok := m.TasksByStatus[status]; ok && count > 0 {
+				fmt.Fprintf(w, "  %s:\t%d\n", status, count)
+			}
+		}
+	} else {
+		fmt.Fprintln(w, "  (none)")
+	}
+	fmt.Fprintln(w)
+
+	// Tasks by priority
+	fmt.Fprintln(w, "BY PRIORITY:")
+	if len(m.TasksByPriority) > 0 {
+		// Order: critical, high, medium, low
+		priorityOrder := []model.Priority{
+			model.PriorityCritical,
+			model.PriorityHigh,
+			model.PriorityMedium,
+			model.PriorityLow,
+		}
+		for _, priority := range priorityOrder {
+			if count, ok := m.TasksByPriority[priority]; ok && count > 0 {
+				fmt.Fprintf(w, "  %s:\t%d\n", priority, count)
+			}
+		}
+	} else {
+		fmt.Fprintln(w, "  (none)")
+	}
+	fmt.Fprintln(w)
+
+	// Tasks by effort
+	fmt.Fprintln(w, "BY EFFORT:")
+	if len(m.TasksByEffort) > 0 {
+		// Order: small, medium, large
+		effortOrder := []model.Effort{
+			model.EffortSmall,
+			model.EffortMedium,
+			model.EffortLarge,
+		}
+		for _, effort := range effortOrder {
+			if count, ok := m.TasksByEffort[effort]; ok && count > 0 {
+				fmt.Fprintf(w, "  %s:\t%d\n", effort, count)
+			}
+		}
+	} else {
+		fmt.Fprintln(w, "  (none)")
+	}
+
+	return nil
+}
