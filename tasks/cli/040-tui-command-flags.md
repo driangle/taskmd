@@ -1,7 +1,7 @@
 ---
 id: "040"
 title: "TUI command flags (--focus, --filter, --group-by)"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["037", "039"]

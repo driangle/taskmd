@@ -400,3 +400,57 @@ func TestGetFilteredTasks_CaseInsensitive(t *testing.T) {
 		t.Errorf("expected 1 task (case insensitive), got %d", len(filtered))
 	}
 }
+
+func TestNewWithOptions_FocusTask(t *testing.T) {
+	tasks := sampleTasks()
+	opts := Options{FocusTaskID: "003"}
+	app := NewWithOptions("/tmp", tasks, opts)
+
+	if app.selectedIndex != 2 {
+		t.Errorf("expected selectedIndex to be 2 for task 003, got %d", app.selectedIndex)
+	}
+}
+
+func TestNewWithOptions_Filter(t *testing.T) {
+	tasks := sampleTasks()
+	opts := Options{Filter: "status=pending"}
+	app := NewWithOptions("/tmp", tasks, opts)
+
+	if app.searchQuery != "pending" {
+		t.Errorf("expected searchQuery to be 'pending', got %s", app.searchQuery)
+	}
+}
+
+func TestNewWithOptions_ReadOnly(t *testing.T) {
+	tasks := sampleTasks()
+	opts := Options{ReadOnly: true}
+	app := NewWithOptions("/tmp", tasks, opts)
+
+	if !app.readonly {
+		t.Error("expected readonly to be true")
+	}
+}
+
+func TestNewWithOptions_GroupBy(t *testing.T) {
+	tasks := sampleTasks()
+	opts := Options{GroupBy: "priority"}
+	app := NewWithOptions("/tmp", tasks, opts)
+
+	if app.groupBy != "priority" {
+		t.Errorf("expected groupBy to be 'priority', got %s", app.groupBy)
+	}
+}
+
+func TestParseFilter_Simple(t *testing.T) {
+	result := parseFilter("status=pending")
+	if result != "pending" {
+		t.Errorf("expected 'pending', got %s", result)
+	}
+}
+
+func TestParseFilter_NoEquals(t *testing.T) {
+	result := parseFilter("pending")
+	if result != "pending" {
+		t.Errorf("expected 'pending', got %s", result)
+	}
+}

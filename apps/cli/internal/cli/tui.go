@@ -10,6 +10,13 @@ import (
 	"github.com/driangle/md-task-tracker/apps/cli/internal/tui"
 )
 
+var (
+	tuiFocus   string
+	tuiFilter  string
+	tuiGroupBy string
+	tuiReadonly bool
+)
+
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
 	Short: "Launch interactive TUI (Terminal User Interface)",
@@ -20,6 +27,11 @@ var tuiCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(tuiCmd)
+
+	tuiCmd.Flags().StringVar(&tuiFocus, "focus", "", "Start with a specific task selected (task ID)")
+	tuiCmd.Flags().StringVar(&tuiFilter, "filter", "", "Pre-apply a filter (e.g., 'status=pending', 'priority=high')")
+	tuiCmd.Flags().StringVar(&tuiGroupBy, "group-by", "", "Group tasks by field (status, priority, group)")
+	tuiCmd.Flags().BoolVar(&tuiReadonly, "readonly", false, "Launch in read-only mode (future: disable editing)")
 }
 
 func runTUI(cmd *cobra.Command, args []string) error {
@@ -32,7 +44,15 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	app := tui.New(scanDir, result.Tasks)
+	// Create TUI options from flags
+	opts := tui.Options{
+		FocusTaskID: tuiFocus,
+		Filter:      tuiFilter,
+		GroupBy:     tuiGroupBy,
+		ReadOnly:    tuiReadonly,
+	}
+
+	app := tui.NewWithOptions(scanDir, result.Tasks, opts)
 	p := tea.NewProgram(app, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("failed to run TUI: %w", err)

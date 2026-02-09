@@ -10,6 +10,14 @@ import (
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
 )
 
+// Options holds configuration options for the TUI.
+type Options struct {
+	FocusTaskID string
+	Filter      string
+	GroupBy     string
+	ReadOnly    bool
+}
+
 // App is the root bubbletea model for the TUI shell.
 type App struct {
 	width         int
@@ -22,14 +30,52 @@ type App struct {
 	scrollOffset  int
 	searchMode    bool
 	searchQuery   string
+	groupBy       string
+	readonly      bool
 }
 
 // New creates a new TUI app shell.
 func New(scanDir string, tasks []*model.Task) App {
-	return App{
-		scanDir: scanDir,
-		tasks:   tasks,
+	return NewWithOptions(scanDir, tasks, Options{})
+}
+
+// NewWithOptions creates a new TUI app shell with configuration options.
+func NewWithOptions(scanDir string, tasks []*model.Task, opts Options) App {
+	app := App{
+		scanDir:  scanDir,
+		tasks:    tasks,
+		groupBy:  opts.GroupBy,
+		readonly: opts.ReadOnly,
 	}
+
+	// Apply initial filter if provided
+	if opts.Filter != "" {
+		app.searchQuery = parseFilter(opts.Filter)
+	}
+
+	// Find and focus on specific task if requested
+	if opts.FocusTaskID != "" {
+		filteredTasks := app.getFilteredTasks()
+		for i, task := range filteredTasks {
+			if task.ID == opts.FocusTaskID {
+				app.selectedIndex = i
+				break
+			}
+		}
+	}
+
+	return app
+}
+
+// parseFilter converts a filter expression like "status=pending" to a search query.
+// For now, this is simplified - we just extract the value after '='.
+// Future: support more complex filter expressions.
+func parseFilter(filter string) string {
+	parts := strings.Split(filter, "=")
+	if len(parts) == 2 {
+		return strings.TrimSpace(parts[1])
+	}
+	return filter
 }
 
 func (m App) Init() tea.Cmd {
