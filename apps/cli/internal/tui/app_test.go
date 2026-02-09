@@ -127,20 +127,28 @@ func TestView_AfterReady(t *testing.T) {
 		t.Error("expected view to contain scan dir")
 	}
 
-	// Content should show task counts
-	if !strings.Contains(view, "4 total") {
-		t.Error("expected view to contain '4 total'")
+	// Content should show task list with summary
+	if !strings.Contains(view, "4 tasks:") {
+		t.Error("expected view to contain '4 tasks:'")
 	}
-	if !strings.Contains(view, "Pending:     1") {
+	if !strings.Contains(view, "1 pending") {
 		t.Error("expected view to contain pending count")
 	}
-	if !strings.Contains(view, "In Progress: 1") {
+	if !strings.Contains(view, "1 in-progress") {
 		t.Error("expected view to contain in-progress count")
+	}
+
+	// Should show task IDs
+	if !strings.Contains(view, "001") {
+		t.Error("expected view to contain task ID 001")
 	}
 
 	// Footer should show key bindings
 	if !strings.Contains(view, "q: quit") {
 		t.Error("expected view to contain quit hint")
+	}
+	if !strings.Contains(view, "navigate") {
+		t.Error("expected view to contain navigate hint")
 	}
 }
 
@@ -170,7 +178,95 @@ func TestView_EmptyTasks(t *testing.T) {
 	m := updated.(App)
 
 	view := m.View()
-	if !strings.Contains(view, "0 total") {
-		t.Error("expected '0 total' for empty task list")
+	if !strings.Contains(view, "No tasks found") {
+		t.Error("expected 'No tasks found' for empty task list")
+	}
+}
+
+func TestNavigation_Down(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+
+	if app.selectedIndex != 0 {
+		t.Errorf("expected initial selectedIndex to be 0, got %d", app.selectedIndex)
+	}
+
+	// Press 'j' to move down
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m := updated.(App)
+	if m.selectedIndex != 1 {
+		t.Errorf("expected selectedIndex to be 1 after j, got %d", m.selectedIndex)
+	}
+
+	// Press down arrow
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(App)
+	if m.selectedIndex != 2 {
+		t.Errorf("expected selectedIndex to be 2 after down, got %d", m.selectedIndex)
+	}
+
+	// Try to move past end
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updated.(App)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = updated.(App)
+	if m.selectedIndex != 3 {
+		t.Errorf("expected selectedIndex to stay at 3 (max), got %d", m.selectedIndex)
+	}
+}
+
+func TestNavigation_Up(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+	app.selectedIndex = 2
+
+	// Press 'k' to move up
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m := updated.(App)
+	if m.selectedIndex != 1 {
+		t.Errorf("expected selectedIndex to be 1 after k, got %d", m.selectedIndex)
+	}
+
+	// Press up arrow
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(App)
+	if m.selectedIndex != 0 {
+		t.Errorf("expected selectedIndex to be 0 after up, got %d", m.selectedIndex)
+	}
+
+	// Try to move before start
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m = updated.(App)
+	if m.selectedIndex != 0 {
+		t.Errorf("expected selectedIndex to stay at 0 (min), got %d", m.selectedIndex)
+	}
+}
+
+func TestNavigation_GotoTop(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+	app.selectedIndex = 3
+
+	// Press 'g' to go to top
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	m := updated.(App)
+	if m.selectedIndex != 0 {
+		t.Errorf("expected selectedIndex to be 0 after g, got %d", m.selectedIndex)
+	}
+	if m.scrollOffset != 0 {
+		t.Errorf("expected scrollOffset to be 0 after g, got %d", m.scrollOffset)
+	}
+}
+
+func TestNavigation_GotoBottom(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+
+	// Press 'G' to go to bottom
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	m := updated.(App)
+	expectedIndex := len(tasks) - 1
+	if m.selectedIndex != expectedIndex {
+		t.Errorf("expected selectedIndex to be %d after G, got %d", expectedIndex, m.selectedIndex)
 	}
 }

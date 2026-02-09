@@ -1,7 +1,7 @@
 ---
 id: "037"
 title: "TUI task list view with navigation"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies: ["026"]

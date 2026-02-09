@@ -19,4 +19,16 @@ var (
 
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
+
+	selectedRowStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("62")).
+				Foreground(lipgloss.Color("255")).
+				Bold(true)
+
+	completedRowStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240"))
+
+	summaryStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Italic(true)
 )
