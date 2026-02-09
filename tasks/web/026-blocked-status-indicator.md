@@ -1,7 +1,7 @@
 ---
 id: "026"
 title: "Add blocked status indicator to tasks table"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies:
