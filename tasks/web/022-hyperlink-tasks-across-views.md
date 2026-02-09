@@ -1,7 +1,7 @@
 ---
 id: "web-022"
 title: "Hyperlink tasks to detail page across all views"
-status: pending
+status: completed
 priority: high
 effort: small
 dependencies: ["web-017", "web-018"]

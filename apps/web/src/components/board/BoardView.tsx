@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type { BoardGroup } from "../../api/types.ts";
 
 const statusColors: Record<string, string> = {
@@ -34,9 +35,12 @@ export function BoardView({ groups }: BoardViewProps) {
                 className="p-3 bg-white rounded border border-gray-100 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-sm font-medium leading-snug">
+                  <Link
+                    to={`/tasks/${task.id}`}
+                    className="text-sm font-medium leading-snug text-blue-600 hover:underline"
+                  >
                     {task.title}
-                  </span>
+                  </Link>
                   <span className="text-xs text-gray-400 font-mono shrink-0">
                     {task.id}
                   </span>
