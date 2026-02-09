@@ -20,6 +20,8 @@ type App struct {
 	showHelp      bool
 	selectedIndex int
 	scrollOffset  int
+	searchMode    bool
+	searchQuery   string
 }
 
 // New creates a new TUI app shell.
@@ -42,13 +44,53 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ready = true
 
 	case tea.KeyMsg:
+		// Handle search mode input
+		if m.searchMode {
+			switch msg.Type {
+			case tea.KeyEscape:
+				// Exit search mode and clear query
+				m.searchMode = false
+				m.searchQuery = ""
+				m.selectedIndex = 0
+				m.scrollOffset = 0
+			case tea.KeyEnter:
+				// Exit search mode but keep query
+				m.searchMode = false
+			case tea.KeyBackspace:
+				if len(m.searchQuery) > 0 {
+					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+					m.selectedIndex = 0
+					m.scrollOffset = 0
+				}
+			case tea.KeyRunes:
+				// Add character to search query
+				m.searchQuery += string(msg.Runes)
+				m.selectedIndex = 0
+				m.scrollOffset = 0
+			}
+			return m, nil
+		}
+
+		// Normal mode keybindings
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "?":
 			m.showHelp = !m.showHelp
+		case "/":
+			// Enter search mode
+			m.searchMode = true
+			m.searchQuery = ""
+		case "escape":
+			// Clear search query if active
+			if m.searchQuery != "" {
+				m.searchQuery = ""
+				m.selectedIndex = 0
+				m.scrollOffset = 0
+			}
 		case "j", "down":
-			if len(m.tasks) > 0 && m.selectedIndex < len(m.tasks)-1 {
+			filteredTasks := m.getFilteredTasks()
+			if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks)-1 {
 				m.selectedIndex++
 			}
 		case "k", "up":
@@ -61,8 +103,9 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.scrollOffset = 0
 		case "G":
 			// Go to bottom
-			if len(m.tasks) > 0 {
-				m.selectedIndex = len(m.tasks) - 1
+			filteredTasks := m.getFilteredTasks()
+			if len(filteredTasks) > 0 {
+				m.selectedIndex = len(filteredTasks) - 1
 			}
 		}
 	}
@@ -86,6 +129,25 @@ func (m App) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, header, content, footer)
 }
 
+func (m App) getFilteredTasks() []*model.Task {
+	if m.searchQuery == "" {
+		return m.tasks
+	}
+
+	query := strings.ToLower(m.searchQuery)
+	var filtered []*model.Task
+
+	for _, task := range m.tasks {
+		// Search in ID and title
+		if strings.Contains(strings.ToLower(task.ID), query) ||
+			strings.Contains(strings.ToLower(task.Title), query) {
+			filtered = append(filtered, task)
+		}
+	}
+
+	return filtered
+}
+
 func (m App) renderHeader() string {
 	title := "taskmd"
 	dir := m.scanDir
@@ -96,10 +158,14 @@ func (m App) renderHeader() string {
 
 func (m App) renderFooter() string {
 	var text string
-	if m.showHelp {
-		text = " q: quit  ?: close help  j/k or ↓/↑: navigate  g/G: top/bottom"
+	if m.searchMode {
+		text = fmt.Sprintf(" Search: %s_  (Esc: cancel, Enter: apply)", m.searchQuery)
+	} else if m.showHelp {
+		text = " q: quit  ?: close help  /: search  j/k or ↓/↑: navigate  g/G: top/bottom"
+	} else if m.searchQuery != "" {
+		text = fmt.Sprintf(" q: quit  ?: help  /: search  Esc: clear filter [%s]", m.searchQuery)
 	} else {
-		text = " q: quit  ?: help  j/k or ↓/↑: navigate"
+		text = " q: quit  ?: help  /: search  j/k or ↓/↑: navigate"
 	}
 
 	return footerStyle.Width(m.width).Render(text)
@@ -110,15 +176,24 @@ func (m App) renderContent(height int) string {
 		height = 0
 	}
 
+	// Get filtered tasks based on search query
+	filteredTasks := m.getFilteredTasks()
+
 	// Handle empty state
 	if len(m.tasks) == 0 {
 		msg := "No tasks found in this directory.\n\nCreate a task file with frontmatter to get started!"
 		return contentStyle.Width(m.width).Height(height).Render(helpStyle.Render(msg))
 	}
 
+	// Handle no search results
+	if len(filteredTasks) == 0 && m.searchQuery != "" {
+		msg := fmt.Sprintf("No tasks match '%s'\n\nPress Esc to clear search.", m.searchQuery)
+		return contentStyle.Width(m.width).Height(height).Render(helpStyle.Render(msg))
+	}
+
 	var lines []string
 
-	// Calculate task counts for summary
+	// Calculate task counts for summary (from all tasks)
 	var pending, inProgress, completed, blocked int
 	for _, t := range m.tasks {
 		switch t.Status {
@@ -147,9 +222,9 @@ func (m App) renderContent(height int) string {
 		m.scrollOffset = m.selectedIndex - listHeight + 1
 	}
 
-	// Render visible tasks
-	for i := m.scrollOffset; i < len(m.tasks) && i < m.scrollOffset+listHeight; i++ {
-		task := m.tasks[i]
+	// Render visible tasks from filtered list
+	for i := m.scrollOffset; i < len(filteredTasks) && i < m.scrollOffset+listHeight; i++ {
+		task := filteredTasks[i]
 		lines = append(lines, m.renderTaskRow(task, i == m.selectedIndex))
 	}
 
@@ -159,8 +234,14 @@ func (m App) renderContent(height int) string {
 	}
 
 	// Add summary line
-	summary := fmt.Sprintf("%d tasks: %d pending, %d in-progress, %d completed",
-		len(m.tasks), pending, inProgress, completed)
+	var summary string
+	if m.searchQuery != "" {
+		summary = fmt.Sprintf("Showing %d of %d tasks: %d pending, %d in-progress, %d completed",
+			len(filteredTasks), len(m.tasks), pending, inProgress, completed)
+	} else {
+		summary = fmt.Sprintf("%d tasks: %d pending, %d in-progress, %d completed",
+			len(m.tasks), pending, inProgress, completed)
+	}
 	if blocked > 0 {
 		summary += fmt.Sprintf(", %d blocked", blocked)
 	}

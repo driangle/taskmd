@@ -270,3 +270,133 @@ func TestNavigation_GotoBottom(t *testing.T) {
 		t.Errorf("expected selectedIndex to be %d after G, got %d", expectedIndex, m.selectedIndex)
 	}
 }
+
+func TestSearch_EnterSearchMode(t *testing.T) {
+	app := New("/tmp", sampleTasks())
+
+	// Press '/' to enter search mode
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m := updated.(App)
+	if !m.searchMode {
+		t.Error("expected searchMode to be true after pressing /")
+	}
+	if m.searchQuery != "" {
+		t.Errorf("expected searchQuery to be empty, got %s", m.searchQuery)
+	}
+}
+
+func TestSearch_TypeQuery(t *testing.T) {
+	app := New("/tmp", sampleTasks())
+	app.searchMode = true
+
+	// Type "Task A"
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("T")})
+	m := updated.(App)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	m = updated.(App)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = updated.(App)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m = updated.(App)
+
+	if m.searchQuery != "Task" {
+		t.Errorf("expected searchQuery to be 'Task', got %s", m.searchQuery)
+	}
+}
+
+func TestSearch_Backspace(t *testing.T) {
+	app := New("/tmp", sampleTasks())
+	app.searchMode = true
+	app.searchQuery = "Test"
+
+	// Press backspace
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m := updated.(App)
+
+	if m.searchQuery != "Tes" {
+		t.Errorf("expected searchQuery to be 'Tes', got %s", m.searchQuery)
+	}
+}
+
+func TestSearch_CancelWithEscape(t *testing.T) {
+	app := New("/tmp", sampleTasks())
+	app.searchMode = true
+	app.searchQuery = "Test"
+
+	// Press Escape to cancel
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m := updated.(App)
+
+	if m.searchMode {
+		t.Error("expected searchMode to be false after Escape")
+	}
+	if m.searchQuery != "" {
+		t.Errorf("expected searchQuery to be cleared, got %s", m.searchQuery)
+	}
+}
+
+func TestSearch_ApplyWithEnter(t *testing.T) {
+	app := New("/tmp", sampleTasks())
+	app.searchMode = true
+	app.searchQuery = "Test"
+
+	// Press Enter to apply
+	updated, _ := app.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m := updated.(App)
+
+	if m.searchMode {
+		t.Error("expected searchMode to be false after Enter")
+	}
+	if m.searchQuery != "Test" {
+		t.Errorf("expected searchQuery to be preserved, got %s", m.searchQuery)
+	}
+}
+
+func TestGetFilteredTasks_NoQuery(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+
+	filtered := app.getFilteredTasks()
+	if len(filtered) != len(tasks) {
+		t.Errorf("expected %d tasks, got %d", len(tasks), len(filtered))
+	}
+}
+
+func TestGetFilteredTasks_ByTitle(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+	app.searchQuery = "Task A"
+
+	filtered := app.getFilteredTasks()
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 task, got %d", len(filtered))
+	}
+	if len(filtered) > 0 && filtered[0].ID != "001" {
+		t.Errorf("expected task 001, got %s", filtered[0].ID)
+	}
+}
+
+func TestGetFilteredTasks_ByID(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+	app.searchQuery = "002"
+
+	filtered := app.getFilteredTasks()
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 task, got %d", len(filtered))
+	}
+	if len(filtered) > 0 && filtered[0].ID != "002" {
+		t.Errorf("expected task 002, got %s", filtered[0].ID)
+	}
+}
+
+func TestGetFilteredTasks_CaseInsensitive(t *testing.T) {
+	tasks := sampleTasks()
+	app := New("/tmp", tasks)
+	app.searchQuery = "task a"
+
+	filtered := app.getFilteredTasks()
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 task (case insensitive), got %d", len(filtered))
+	}
+}

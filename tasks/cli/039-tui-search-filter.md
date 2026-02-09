@@ -1,7 +1,7 @@
 ---
 id: "039"
 title: "TUI search and filter mode"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["037"]
