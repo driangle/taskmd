@@ -1,5 +1,5 @@
 ---
-id: "026"
+id: "047"
 title: "Add blocked status indicator to tasks table"
 status: completed
 priority: medium
