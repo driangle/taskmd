@@ -1,6 +1,6 @@
 ---
 id: "cli-037"
-title: "Add inspect command with fuzzy matching"
+title: "Add show command with fuzzy matching"
 status: pending
 priority: high
 effort: medium
@@ -12,15 +12,15 @@ tags:
 created: 2026-02-08
 ---
 
-# Add Inspect Command with Fuzzy Matching
+# Add Show Command with Fuzzy Matching
 
 ## Objective
 
-Implement a `taskmd inspect <task_id or task_name>` command that allows users to view detailed information about a specific task. The command should support both exact matching and fuzzy matching for task identification.
+Implement a `taskmd show <task_id or task_name>` command that allows users to view detailed information about a specific task. The command should support both exact matching and fuzzy matching for task identification.
 
 ## Background
 
-Currently, users can list tasks and view summaries, but there's no dedicated command to inspect a single task in detail. This command will provide:
+Currently, users can list tasks and view summaries, but there's no dedicated command to show a single task in detail. This command will provide:
 - Full task metadata
 - Complete task description
 - Task relationships (dependencies, blockers)
@@ -51,12 +51,12 @@ Currently, users can list tasks and view summaries, but there's no dedicated com
 
 ```bash
 # Basic usage
-taskmd inspect <task_id_or_name>
+taskmd show <task_id_or_name>
 
 # Examples
-taskmd inspect cli-037
-taskmd inspect "Add inspect command"
-taskmd inspect inspec  # fuzzy match: shows "inspect command" as option
+taskmd show cli-037
+taskmd show "Add show command"
+taskmd show sho  # fuzzy match: shows "show command" as option
 
 # Flags
 --dir <path>         # Directory to scan (default: current)
@@ -70,13 +70,13 @@ taskmd inspect inspec  # fuzzy match: shows "inspect command" as option
 **Text format** (default):
 ```
 Task: cli-037
-Title: Add inspect command with fuzzy matching
+Title: Add show command with fuzzy matching
 Status: pending
 Priority: medium
 Effort: medium
 Tags: cli, feature, fuzzy-matching
 Created: 2026-02-08
-File: tasks/cli/037-inspect-command.md
+File: tasks/cli/037-show-command.md
 
 Description:
 ─────────────────────────────────────────────────
@@ -92,13 +92,13 @@ Dependencies:
 ```json
 {
   "id": "cli-037",
-  "title": "Add inspect command with fuzzy matching",
+  "title": "Add show command with fuzzy matching",
   "status": "pending",
   "priority": "medium",
   "effort": "medium",
   "tags": ["cli", "feature", "fuzzy-matching"],
   "created": "2026-02-08",
-  "file_path": "tasks/cli/037-inspect-command.md",
+  "file_path": "tasks/cli/037-show-command.md",
   "content": "...",
   "dependencies": {
     "depends_on": [],
@@ -112,9 +112,9 @@ Dependencies:
 When fuzzy matching is triggered:
 
 ```
-No exact match found for "inspec". Did you mean:
+No exact match found for "sho". Did you mean:
 
-1. cli-037: Add inspect command with fuzzy matching (95% match)
+1. cli-037: Add show command with fuzzy matching (95% match)
 2. cli-032: Next command (45% match)
 3. web-017: Task detail view (42% match)
 
@@ -126,7 +126,7 @@ User must explicitly choose an option. Ctrl+C or entering 0 cancels.
 ## Implementation Tasks
 
 ### Phase 1: Basic Command Structure
-- [ ] Create `internal/cli/inspect.go`
+- [ ] Create `internal/cli/show.go`
 - [ ] Define command with basic flag support
 - [ ] Register command with root command
 - [ ] Implement exact match by task ID
@@ -160,7 +160,7 @@ User must explicitly choose an option. Ctrl+C or entering 0 cancels.
 - [ ] Test all output formats
 - [ ] Test with special characters in task names
 - [ ] Test user interaction (selection, cancellation)
-- [ ] Add test file `internal/cli/inspect_test.go` with comprehensive coverage
+- [ ] Add test file `internal/cli/show_test.go` with comprehensive coverage
 
 ### Phase 5: Documentation
 - [ ] Add command to CLI help text
@@ -243,9 +243,9 @@ fmt.Fscanln(os.Stdin, &choice)
 
 ## Future Enhancements
 
-- Add `--edit` flag to open task file in editor after inspection
+- Add `--edit` flag to open task file in editor after showing
 - Add `--open` flag to open task file in default markdown viewer
 - Show task history/changelog if tracked
 - Show related tasks (similar tags, same directory)
 - Add `--preview` mode with truncated description
-- Support inspecting multiple tasks at once
+- Support showing multiple tasks at once

@@ -58,7 +58,7 @@ This task aims to create accessible, practical documentation that helps users ge
     - `graph` - Visualize task dependencies
     - `next` - Find available tasks
     - `stats` - Project statistics
-    - `inspect` - View task details
+    - `show` - View task details
     - `export` - Export to other formats
     - `web` - Start web interface
   - [x] Tips and best practices

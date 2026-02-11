@@ -206,6 +206,7 @@ func runMyCommand(cmd *cobra.Command, args []string) error {
 
 ## Task Management
 
+Assume `taskmd` CLI is installed globally. You can run with `taskmd --help` for usage instructions.
 ### Task File Conventions
 
 When working on tasks:
