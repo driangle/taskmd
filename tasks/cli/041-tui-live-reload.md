@@ -2,13 +2,14 @@
 id: "041"
 title: "TUI live reload via file watcher"
 status: pending
-priority: medium
+priority: high
 effort: medium
 dependencies: ["027", "037"]
 tags:
   - cli
   - go
   - tui
+  - mvp
 created: 2026-02-08
 ---
 

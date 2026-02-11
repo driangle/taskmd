@@ -2,7 +2,7 @@
 id: "045"
 title: "Publish taskmd via Homebrew"
 status: pending
-priority: medium
+priority: critical
 effort: medium
 dependencies: []
 tags:
@@ -10,6 +10,7 @@ tags:
   - homebrew
   - packaging
   - infrastructure
+  - mvp
 created: 2026-02-08
 ---
 

@@ -2,7 +2,7 @@
 id: "023"
 title: "board command - Grouped kanban-like view"
 status: pending
-priority: medium
+priority: high
 effort: medium
 dependencies: ["017"]
 tags:
@@ -10,6 +10,7 @@ tags:
   - go
   - commands
   - visualization
+  - mvp
 created: 2026-02-08
 ---
 

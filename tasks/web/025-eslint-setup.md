@@ -1,7 +1,7 @@
 ---
 id: "web-025"
 title: "Add ESLint configuration with file length limits"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: []

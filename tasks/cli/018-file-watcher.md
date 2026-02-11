@@ -1,7 +1,7 @@
 ---
 id: "archive-018"
 title: "File watcher & live reload"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["archive-017"]

@@ -2,13 +2,14 @@
 id: "web-023"
 title: "Next Up widget - Surface recommended tasks in the web UI"
 status: pending
-priority: medium
+priority: low
 effort: medium
 dependencies: ["032"]
 tags:
   - ui
   - productivity
   - api
+  - post-mvp
 created: 2026-02-08
 ---
 

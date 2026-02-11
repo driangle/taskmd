@@ -2,13 +2,14 @@
 id: "038"
 title: "TUI task detail view with markdown rendering"
 status: pending
-priority: high
+priority: critical
 effort: medium
 dependencies: ["037"]
 tags:
   - cli
   - go
   - tui
+  - mvp
 created: 2026-02-08
 ---
 

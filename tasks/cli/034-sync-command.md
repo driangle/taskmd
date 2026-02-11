@@ -2,13 +2,14 @@
 id: "034"
 title: "Sync command with pluggable sources"
 status: pending
-priority: medium
+priority: low
 effort: large
 dependencies: []
 tags:
   - cli
   - go
   - integration
+  - post-mvp
 created: 2026-02-08
 ---
 

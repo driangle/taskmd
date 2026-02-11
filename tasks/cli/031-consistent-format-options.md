@@ -2,7 +2,7 @@
 id: "031"
 title: "Consistent formatting options across CLI commands"
 status: pending
-priority: medium
+priority: low
 effort: medium
 dependencies: ["023"]
 tags:
@@ -10,6 +10,7 @@ tags:
   - go
   - quality
   - ux
+  - post-mvp
 created: 2026-02-08
 ---
 

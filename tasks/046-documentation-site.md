@@ -2,7 +2,7 @@
 id: "046"
 title: "Create documentation site using GitHub Pages or similar"
 status: pending
-priority: medium
+priority: low
 effort: large
 dependencies:
   - "043"
@@ -11,6 +11,7 @@ tags:
   - website
   - github-pages
   - infrastructure
+  - post-mvp
 created: 2026-02-09
 ---
 

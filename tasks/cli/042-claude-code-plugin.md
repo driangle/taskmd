@@ -2,7 +2,7 @@
 id: "cli-042"
 title: "Add Claude Code Plugin with taskmd skill"
 status: pending
-priority: medium
+priority: low
 effort: medium
 tags:
   - cli
@@ -10,6 +10,7 @@ tags:
   - claude-code
   - dx
   - plugin
+  - post-mvp
 created: 2026-02-08
 ---
 

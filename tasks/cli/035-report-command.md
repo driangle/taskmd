@@ -2,7 +2,7 @@
 id: "035"
 title: "report command - Comprehensive report generation"
 status: pending
-priority: medium
+priority: low
 effort: large
 dependencies: ["020", "021", "022", "023"]
 tags:
@@ -10,6 +10,7 @@ tags:
   - go
   - commands
   - reports
+  - post-mvp
 created: 2026-02-08
 ---
 

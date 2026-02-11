@@ -2,13 +2,14 @@
 id: "web-019"
 title: "Polish loading and error states"
 status: pending
-priority: medium
+priority: low
 effort: small
 dependencies: ["web-015"]
 tags:
   - ui
   - polish
   - ux
+  - post-mvp
 created: 2026-02-08
 ---
 

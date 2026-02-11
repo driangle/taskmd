@@ -2,12 +2,13 @@
 id: "cli-037"
 title: "Add inspect command with fuzzy matching"
 status: pending
-priority: medium
+priority: high
 effort: medium
 tags:
   - cli
   - feature
   - fuzzy-matching
+  - mvp
 created: 2026-02-08
 ---
 

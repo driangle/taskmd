@@ -10,6 +10,7 @@ tags:
   - go
   - tui
   - archived
+  - post-mvp
 created: 2026-02-08
 ---
 

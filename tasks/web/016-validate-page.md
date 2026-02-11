@@ -2,13 +2,14 @@
 id: "web-016"
 title: "Validation page - Display task file issues"
 status: pending
-priority: medium
+priority: low
 effort: small
 dependencies: ["web-015"]
 tags:
   - ui
   - validation
   - quality
+  - post-mvp
 created: 2026-02-08
 ---
 
