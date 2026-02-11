@@ -31,7 +31,7 @@ var rootCmd = &cobra.Command{
 It supports reading from files or stdin, multiple output formats, and various
 commands for listing, validating, and visualizing your tasks.`,
 	SilenceUsage:  true,
-	SilenceErrors: false,
+	SilenceErrors: true,
 	Version:       Version,
 }
 
