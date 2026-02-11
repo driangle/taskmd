@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -49,7 +50,7 @@ func init() {
 
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", []string{}, "filter tasks (can specify multiple times for AND conditions, e.g., --filter status=pending --filter priority=high)")
 	listCmd.Flags().StringVar(&listSort, "sort", "", "sort by field (id, title, status, priority, effort, created)")
-	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority", "comma-separated list of columns to display")
+	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority,file", "comma-separated list of columns to display")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -65,6 +66,9 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	tasks := result.Tasks
+
+	// Make file paths relative to scan directory
+	makeFilePathsRelative(tasks, scanDir)
 
 	// Report any scan errors if verbose
 	if flags.Verbose && len(result.Errors) > 0 {
@@ -275,6 +279,19 @@ func outputTable(tasks []*model.Task, columnsStr string) error {
 	return nil
 }
 
+// makeFilePathsRelative converts absolute task file paths to paths relative to baseDir.
+func makeFilePathsRelative(tasks []*model.Task, baseDir string) {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return
+	}
+	for _, task := range tasks {
+		if rel, err := filepath.Rel(absBase, task.FilePath); err == nil {
+			task.FilePath = rel
+		}
+	}
+}
+
 // getColumnValue extracts the value for a specific column from a task
 func getColumnValue(task *model.Task, column string) string {
 	switch column {
@@ -305,6 +322,8 @@ func getColumnValue(task *model.Task, column string) string {
 			return ""
 		}
 		return strings.Join(task.Tags, ",")
+	case "file":
+		return task.FilePath
 	default:
 		return ""
 	}

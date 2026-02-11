@@ -34,6 +34,7 @@ type Recommendation struct {
 	Rank            int      `json:"rank" yaml:"rank"`
 	ID              string   `json:"id" yaml:"id"`
 	Title           string   `json:"title" yaml:"title"`
+	FilePath        string   `json:"file_path" yaml:"file_path"`
 	Status          string   `json:"status" yaml:"status"`
 	Priority        string   `json:"priority" yaml:"priority"`
 	Effort          string   `json:"effort,omitempty" yaml:"effort,omitempty"`
@@ -160,6 +161,9 @@ func runNext(cmd *cobra.Command, args []string) error {
 
 	allTasks := result.Tasks
 
+	// Make file paths relative to scan directory
+	makeFilePathsRelative(allTasks, scanDir)
+
 	// Build analysis on full task set
 	taskMap := buildTaskMap(allTasks)
 	criticalPath := calculateCriticalPathTasks(allTasks, taskMap)
@@ -218,6 +222,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 			Rank:            i + 1,
 			ID:              st.task.ID,
 			Title:           st.task.Title,
+			FilePath:        st.task.FilePath,
 			Status:          string(st.task.Status),
 			Priority:        string(st.task.Priority),
 			Effort:          string(st.task.Effort),
@@ -264,12 +269,12 @@ func outputNextTable(recs []Recommendation) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()
 
-	fmt.Fprintln(w, "#\tID\tTitle\tPriority\tReason")
-	fmt.Fprintln(w, "-\t--\t-----\t--------\t------")
+	fmt.Fprintln(w, "#\tID\tTitle\tPriority\tFile\tReason")
+	fmt.Fprintln(w, "-\t--\t-----\t--------\t----\t------")
 
 	for _, rec := range recs {
 		reason := strings.Join(rec.Reasons, ", ")
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", rec.Rank, rec.ID, rec.Title, rec.Priority, reason)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", rec.Rank, rec.ID, rec.Title, rec.Priority, rec.FilePath, reason)
 	}
 
 	return nil
