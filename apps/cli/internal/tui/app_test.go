@@ -454,3 +454,219 @@ func TestParseFilter_NoEquals(t *testing.T) {
 		t.Errorf("expected 'pending', got %s", result)
 	}
 }
+
+func sampleTasksWithBody() []*model.Task {
+	return []*model.Task{
+		{
+			ID:           "001",
+			Title:        "Task A",
+			Status:       model.StatusPending,
+			Priority:     model.PriorityHigh,
+			Tags:         []string{"cli", "feature"},
+			Dependencies: []string{"000"},
+			Body:         "This is the **body** of task A.",
+			FilePath:     "/tmp/tasks/001.md",
+		},
+		{
+			ID:       "002",
+			Title:    "Task B",
+			Status:   model.StatusInProgress,
+			Body:     "Body of task B.",
+			FilePath: "/tmp/tasks/002.md",
+		},
+	}
+}
+
+func initApp(tasks []*model.Task) App {
+	app := New("/tmp/tasks", tasks)
+	updated, _ := app.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	return updated.(App)
+}
+
+func pressKey(m App, key string) App {
+	var msg tea.KeyMsg
+	switch key {
+	case "enter":
+		msg = tea.KeyMsg{Type: tea.KeyEnter}
+	case "escape":
+		msg = tea.KeyMsg{Type: tea.KeyEscape}
+	case "backspace":
+		msg = tea.KeyMsg{Type: tea.KeyBackspace}
+	case "ctrl+c":
+		msg = tea.KeyMsg{Type: tea.KeyCtrlC}
+	default:
+		msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
+	}
+	updated, _ := m.Update(msg)
+	return updated.(App)
+}
+
+func TestDetailView_EnterOpensDetail(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+
+	if m.viewMode != viewList {
+		t.Errorf("expected viewList, got %d", m.viewMode)
+	}
+
+	m = pressKey(m, "enter")
+
+	if m.viewMode != viewDetail {
+		t.Errorf("expected viewDetail after Enter, got %d", m.viewMode)
+	}
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset 0, got %d", m.detailScrollOffset)
+	}
+	if m.renderedDetail == "" {
+		t.Error("expected renderedDetail to be populated")
+	}
+}
+
+func TestDetailView_EscReturnsToList(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	if m.viewMode != viewDetail {
+		t.Fatal("expected to be in detail view")
+	}
+
+	m = pressKey(m, "escape")
+
+	if m.viewMode != viewList {
+		t.Errorf("expected viewList after Esc, got %d", m.viewMode)
+	}
+}
+
+func TestDetailView_BackspaceReturnsToList(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	if m.viewMode != viewDetail {
+		t.Fatal("expected to be in detail view")
+	}
+
+	m = pressKey(m, "backspace")
+
+	if m.viewMode != viewList {
+		t.Errorf("expected viewList after Backspace, got %d", m.viewMode)
+	}
+}
+
+func TestDetailView_ScrollDown(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	initial := m.detailScrollOffset
+	m = pressKey(m, "j")
+
+	if m.detailScrollOffset != initial+1 {
+		t.Errorf("expected detailScrollOffset %d, got %d", initial+1, m.detailScrollOffset)
+	}
+}
+
+func TestDetailView_ScrollUp(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	// Scroll down first
+	m = pressKey(m, "j")
+	m = pressKey(m, "j")
+
+	m = pressKey(m, "k")
+	if m.detailScrollOffset != 1 {
+		t.Errorf("expected detailScrollOffset 1, got %d", m.detailScrollOffset)
+	}
+
+	// Scroll up past 0 should clamp
+	m = pressKey(m, "k")
+	m = pressKey(m, "k")
+	if m.detailScrollOffset != 0 {
+		t.Errorf("expected detailScrollOffset 0 (clamped), got %d", m.detailScrollOffset)
+	}
+}
+
+func TestDetailView_QuitFromDetail(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")}
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("expected quit command from detail view")
+	}
+}
+
+func TestDetailView_RenderContainsMetadata(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	view := m.View()
+
+	checks := []struct {
+		label string
+		want  string
+	}{
+		{"task ID", "001"},
+		{"task title", "Task A"},
+		{"status", "pending"},
+		{"file path", "/tmp/tasks/001.md"},
+	}
+
+	for _, c := range checks {
+		if !strings.Contains(view, c.want) {
+			t.Errorf("expected detail view to contain %s (%q)", c.label, c.want)
+		}
+	}
+}
+
+func TestDetailView_RenderContainsBody(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	view := m.View()
+
+	// The body contains "body" as a word — it should appear in the rendered output
+	if !strings.Contains(view, "body") {
+		t.Error("expected detail view to contain body content")
+	}
+}
+
+func TestDetailView_FooterShowsDetailHints(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+	m = pressKey(m, "enter")
+
+	view := m.View()
+
+	if !strings.Contains(view, "Esc: back") {
+		t.Error("expected footer to contain 'Esc: back'")
+	}
+	if !strings.Contains(view, "scroll") {
+		t.Error("expected footer to contain 'scroll'")
+	}
+}
+
+func TestDetailView_PreservesListSelection(t *testing.T) {
+	m := initApp(sampleTasksWithBody())
+
+	// Move to second task
+	m = pressKey(m, "j")
+	if m.selectedIndex != 1 {
+		t.Fatalf("expected selectedIndex 1, got %d", m.selectedIndex)
+	}
+
+	// Enter detail view and return
+	m = pressKey(m, "enter")
+	m = pressKey(m, "escape")
+
+	if m.selectedIndex != 1 {
+		t.Errorf("expected selectedIndex preserved at 1, got %d", m.selectedIndex)
+	}
+}
+
+func TestDetailView_EnterWithNoTasks(t *testing.T) {
+	m := initApp(nil)
+	m = pressKey(m, "enter")
+
+	if m.viewMode != viewList {
+		t.Error("expected viewMode to stay viewList when no tasks")
+	}
+}

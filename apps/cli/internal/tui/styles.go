@@ -31,4 +31,19 @@ var (
 	summaryStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("245")).
 			Italic(true)
+
+	detailLabelStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("62"))
+
+	detailValueStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("252"))
+
+	detailTitleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("255"))
+
+	detailFilePathStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("241")).
+				Italic(true)
 )

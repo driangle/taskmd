@@ -5,9 +5,15 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+)
+
+const (
+	viewList   = 0
+	viewDetail = 1
 )
 
 // Options holds configuration options for the TUI.
@@ -20,18 +26,21 @@ type Options struct {
 
 // App is the root bubbletea model for the TUI shell.
 type App struct {
-	width         int
-	height        int
-	scanDir       string
-	tasks         []*model.Task
-	ready         bool
-	showHelp      bool
-	selectedIndex int
-	scrollOffset  int
-	searchMode    bool
-	searchQuery   string
-	groupBy       string
-	readonly      bool
+	width              int
+	height             int
+	scanDir            string
+	tasks              []*model.Task
+	ready              bool
+	showHelp           bool
+	selectedIndex      int
+	scrollOffset       int
+	searchMode         bool
+	searchQuery        string
+	groupBy            string
+	readonly           bool
+	viewMode           int
+	detailScrollOffset int
+	renderedDetail     string
 }
 
 // New creates a new TUI app shell.
@@ -117,6 +126,30 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Detail view keybindings
+		if m.viewMode == viewDetail {
+			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			case "esc", "escape", "backspace":
+				m.viewMode = viewList
+			case "j", "down":
+				m.detailScrollOffset++
+			case "k", "up":
+				if m.detailScrollOffset > 0 {
+					m.detailScrollOffset--
+				}
+			case "g":
+				m.detailScrollOffset = 0
+			case "G":
+				lines := strings.Split(m.renderedDetail, "\n")
+				if len(lines) > 0 {
+					m.detailScrollOffset = len(lines) - 1
+				}
+			}
+			return m, nil
+		}
+
 		// Normal mode keybindings
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -133,6 +166,13 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searchQuery = ""
 				m.selectedIndex = 0
 				m.scrollOffset = 0
+			}
+		case "enter":
+			filteredTasks := m.getFilteredTasks()
+			if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks) {
+				m.viewMode = viewDetail
+				m.detailScrollOffset = 0
+				m.renderedDetail = m.buildDetailContent(filteredTasks[m.selectedIndex])
 			}
 		case "j", "down":
 			filteredTasks := m.getFilteredTasks()
@@ -170,7 +210,13 @@ func (m App) View() string {
 	footerHeight := lipgloss.Height(footer)
 	contentHeight := m.height - headerHeight - footerHeight
 
-	content := m.renderContent(contentHeight)
+	var content string
+	switch m.viewMode {
+	case viewDetail:
+		content = m.renderDetailView(contentHeight)
+	default:
+		content = m.renderContent(contentHeight)
+	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, header, content, footer)
 }
@@ -204,7 +250,9 @@ func (m App) renderHeader() string {
 
 func (m App) renderFooter() string {
 	var text string
-	if m.searchMode {
+	if m.viewMode == viewDetail {
+		text = " Esc: back  j/k or ↓/↑: scroll  g/G: top/bottom  q: quit"
+	} else if m.searchMode {
 		text = fmt.Sprintf(" Search: %s_  (Esc: cancel, Enter: apply)", m.searchQuery)
 	} else if m.showHelp {
 		text = " q: quit  ?: close help  /: search  j/k or ↓/↑: navigate  g/G: top/bottom"
@@ -309,6 +357,122 @@ func (m App) renderContent(height int) string {
 
 	body := strings.Join(lines, "\n")
 
+	return contentStyle.Width(m.width).Height(height).Render(body)
+}
+
+func (m App) buildDetailContent(task *model.Task) string {
+	var sb strings.Builder
+
+	// Title
+	sb.WriteString(detailTitleStyle.Render(task.Title))
+	sb.WriteString("\n\n")
+
+	// Metadata
+	sb.WriteString(detailLabelStyle.Render("ID:       ") + detailValueStyle.Render(task.ID) + "\n")
+	sb.WriteString(detailLabelStyle.Render("Status:   ") + m.statusString(task.Status) + "\n")
+
+	if task.Priority != "" {
+		sb.WriteString(detailLabelStyle.Render("Priority: ") + detailValueStyle.Render(string(task.Priority)) + "\n")
+	}
+	if task.Effort != "" {
+		sb.WriteString(detailLabelStyle.Render("Effort:   ") + detailValueStyle.Render(string(task.Effort)) + "\n")
+	}
+	if len(task.Tags) > 0 {
+		sb.WriteString(detailLabelStyle.Render("Tags:     ") + detailValueStyle.Render(strings.Join(task.Tags, ", ")) + "\n")
+	}
+	if len(task.Dependencies) > 0 {
+		sb.WriteString(detailLabelStyle.Render("Depends:  ") + detailValueStyle.Render(strings.Join(task.Dependencies, ", ")) + "\n")
+	}
+	if !task.Created.IsZero() {
+		sb.WriteString(detailLabelStyle.Render("Created:  ") + detailValueStyle.Render(task.Created.Format("2006-01-02")) + "\n")
+	}
+
+	// Separator
+	sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("─", 40)) + "\n\n")
+
+	// Body rendered as markdown
+	if task.Body != "" {
+		width := m.width - 6 // Account for content padding
+		if width < 40 {
+			width = 40
+		}
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(width),
+		)
+		if err == nil {
+			rendered, err := renderer.Render(task.Body)
+			if err == nil {
+				sb.WriteString(rendered)
+			} else {
+				sb.WriteString(task.Body)
+			}
+		} else {
+			sb.WriteString(task.Body)
+		}
+	} else {
+		sb.WriteString(helpStyle.Render("(no description)"))
+	}
+
+	// File path
+	if task.FilePath != "" {
+		sb.WriteString("\n" + detailFilePathStyle.Render(task.FilePath))
+	}
+
+	return sb.String()
+}
+
+func (m App) statusString(status model.Status) string {
+	icon := " "
+	color := lipgloss.Color("240")
+	switch status {
+	case model.StatusPending:
+		icon = "○"
+		color = lipgloss.Color("yellow")
+	case model.StatusInProgress:
+		icon = "◐"
+		color = lipgloss.Color("blue")
+	case model.StatusCompleted:
+		icon = "●"
+		color = lipgloss.Color("green")
+	case model.StatusBlocked:
+		icon = "✖"
+		color = lipgloss.Color("red")
+	}
+	return lipgloss.NewStyle().Foreground(color).Render(icon+" "+string(status))
+}
+
+func (m App) renderDetailView(height int) string {
+	if height < 0 {
+		height = 0
+	}
+
+	lines := strings.Split(m.renderedDetail, "\n")
+
+	// Clamp scroll offset
+	maxOffset := len(lines) - height
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.detailScrollOffset > maxOffset {
+		m.detailScrollOffset = maxOffset
+	}
+
+	// Slice visible lines
+	start := m.detailScrollOffset
+	end := start + height
+	if end > len(lines) {
+		end = len(lines)
+	}
+
+	visible := lines[start:end]
+
+	// Pad to fill height
+	for len(visible) < height {
+		visible = append(visible, "")
+	}
+
+	body := strings.Join(visible, "\n")
 	return contentStyle.Width(m.width).Height(height).Render(body)
 }
 

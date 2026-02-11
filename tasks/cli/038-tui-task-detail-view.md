@@ -1,7 +1,7 @@
 ---
 id: "038"
 title: "TUI task detail view with markdown rendering"
-status: pending
+status: completed
 priority: critical
 effort: medium
 dependencies: ["037"]
@@ -21,14 +21,14 @@ When a user selects a task and presses Enter, show a full detail view with task 
 
 ## Tasks
 
-- [ ] Create a task detail component
-- [ ] Render task metadata header (ID, status, priority, effort, dependencies, tags, created date)
-- [ ] Render markdown body using glamour for terminal-friendly output
-- [ ] Implement scrolling for long task descriptions
-- [ ] Add keybinding to return to list view (`Esc` / `Backspace`)
-- [ ] Show file path of the task at the bottom
-- [ ] Update footer key hints for detail view context
-- [ ] Add tests for detail view rendering and navigation
+- [x] Create a task detail component
+- [x] Render task metadata header (ID, status, priority, effort, dependencies, tags, created date)
+- [x] Render markdown body using glamour for terminal-friendly output
+- [x] Implement scrolling for long task descriptions
+- [x] Add keybinding to return to list view (`Esc` / `Backspace`)
+- [x] Show file path of the task at the bottom
+- [x] Update footer key hints for detail view context
+- [x] Add tests for detail view rendering and navigation
 
 ## Acceptance Criteria
 
