@@ -1,7 +1,7 @@
 ---
 id: "023"
 title: "board command - Grouped kanban-like view"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["017"]
@@ -22,20 +22,20 @@ Implement the `board` command to generate grouped, human-readable status views s
 
 ## Tasks
 
-- [ ] Create `internal/cli/board.go` for board command
-- [ ] Implement `--group-by` flag with options:
+- [x] Create `internal/cli/board.go` for board command
+- [x] Implement `--group-by` flag with options:
   - `status` (default) - Group by task status
   - `owner` - Group by owner/assignee
   - `area` - Group by area tag
   - `milestone` - Group by milestone
   - `priority` - Group by priority
-- [ ] Support output formats:
+- [x] Support output formats:
   - `md` (default) - Markdown with columns
   - `txt` - Plain text
   - `json` - JSON grouped structure
-- [ ] Implement `--out <file>` to write to file
-- [ ] Display task counts per group
-- [ ] Sort groups logically (e.g., pending -> in-progress -> completed)
+- [x] Implement `--out <file>` to write to file
+- [x] Display task counts per group
+- [x] Sort groups logically (e.g., pending -> in-progress -> completed)
 
 ## Acceptance Criteria
 

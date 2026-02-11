@@ -1,7 +1,7 @@
 ---
 id: "cli-037"
 title: "Add show command with fuzzy matching"
-status: pending
+status: completed
 priority: high
 effort: medium
 tags:
@@ -126,44 +126,44 @@ User must explicitly choose an option. Ctrl+C or entering 0 cancels.
 ## Implementation Tasks
 
 ### Phase 1: Basic Command Structure
-- [ ] Create `internal/cli/show.go`
-- [ ] Define command with basic flag support
-- [ ] Register command with root command
-- [ ] Implement exact match by task ID
-- [ ] Implement exact match by task title
-- [ ] Add basic text output formatter
-- [ ] Add JSON/YAML output formatters
+- [x] Create `internal/cli/show.go`
+- [x] Define command with basic flag support
+- [x] Register command with root command
+- [x] Implement exact match by task ID
+- [x] Implement exact match by task title
+- [x] Add basic text output formatter
+- [x] Add JSON/YAML output formatters
 
 ### Phase 2: Fuzzy Matching
-- [ ] Research and choose fuzzy matching library (e.g., `github.com/sahilm/fuzzy` or `github.com/lithammer/fuzzysearch`)
-- [ ] Implement fuzzy search across task IDs and titles
-- [ ] Rank matches by similarity score
-- [ ] Implement threshold filtering (default 0.6)
-- [ ] Create interactive selection UI
-- [ ] Handle user input (1-N, 0 for cancel, Ctrl+C)
+- [x] Research and choose fuzzy matching library (e.g., `github.com/sahilm/fuzzy` or `github.com/lithammer/fuzzysearch`)
+- [x] Implement fuzzy search across task IDs and titles
+- [x] Rank matches by similarity score
+- [x] Implement threshold filtering (default 0.6)
+- [x] Create interactive selection UI
+- [x] Handle user input (1-N, 0 for cancel, Ctrl+C)
 
 ### Phase 3: Polish
 - [ ] Add color coding for better readability (use existing color helpers)
 - [ ] Format markdown content nicely in terminal
 - [ ] Add syntax highlighting for code blocks in description (optional)
-- [ ] Implement `--exact` flag to disable fuzzy matching
-- [ ] Add helpful error messages
+- [x] Implement `--exact` flag to disable fuzzy matching
+- [x] Add helpful error messages
 - [ ] Consider pagination for very long task descriptions
 
 ### Phase 4: Testing
-- [ ] Test exact match by ID
-- [ ] Test exact match by title
-- [ ] Test fuzzy matching with typos
-- [ ] Test fuzzy matching with partial matches
-- [ ] Test threshold filtering
-- [ ] Test "task not found" scenario
-- [ ] Test all output formats
+- [x] Test exact match by ID
+- [x] Test exact match by title
+- [x] Test fuzzy matching with typos
+- [x] Test fuzzy matching with partial matches
+- [x] Test threshold filtering
+- [x] Test "task not found" scenario
+- [x] Test all output formats
 - [ ] Test with special characters in task names
-- [ ] Test user interaction (selection, cancellation)
-- [ ] Add test file `internal/cli/show_test.go` with comprehensive coverage
+- [x] Test user interaction (selection, cancellation)
+- [x] Add test file `internal/cli/show_test.go` with comprehensive coverage
 
 ### Phase 5: Documentation
-- [ ] Add command to CLI help text
+- [x] Add command to CLI help text
 - [ ] Add examples to CLAUDE.md
 - [ ] Update README if applicable
 - [ ] Add inline code documentation
