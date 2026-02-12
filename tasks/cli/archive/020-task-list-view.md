@@ -1,7 +1,7 @@
 ---
 id: "archive-020"
 title: "Task list view"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies: ["archive-017", "archive-019"]
@@ -22,15 +22,15 @@ Display the scanned tasks in a scrollable table/list within the TUI. This is the
 
 ## Tasks
 
-- [ ] Create a `TaskListModel` bubbletea component in `internal/tui/views/`
-- [ ] Render tasks as rows: ID, status indicator, title, priority, group, tags
+- [x] Create a `TaskListModel` bubbletea component in `internal/tui/views/`
+- [x] Render tasks as rows: ID, status indicator, title, priority, group, tags
 - [ ] Support a grouped view mode (`g` to toggle): tasks grouped under group headers
-- [ ] Implement keyboard navigation: j/k or arrow keys to move selection
-- [ ] Implement scrolling for lists longer than the terminal height
-- [ ] Use lipgloss to style rows (highlight selected, dim completed, color by priority)
-- [ ] Show a summary line (e.g. "12 tasks: 5 pending, 4 in-progress, 3 done")
-- [ ] Wire the scanner output into the task list model
-- [ ] Handle empty state (no tasks found)
+- [x] Implement keyboard navigation: j/k or arrow keys to move selection
+- [x] Implement scrolling for lists longer than the terminal height
+- [x] Use lipgloss to style rows (highlight selected, dim completed, color by priority)
+- [x] Show a summary line (e.g. "12 tasks: 5 pending, 4 in-progress, 3 done")
+- [x] Wire the scanner output into the task list model
+- [x] Handle empty state (no tasks found)
 
 ## Acceptance Criteria
 
