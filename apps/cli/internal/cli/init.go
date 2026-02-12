@@ -43,7 +43,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initStdout, "stdout", false, "print template to stdout instead of writing a file")
 }
 
-func runInit(cmd *cobra.Command, args []string) error {
+func runInit(_ *cobra.Command, _ []string) error {
 	if initStdout {
 		fmt.Print(string(claudeTemplate))
 		return nil

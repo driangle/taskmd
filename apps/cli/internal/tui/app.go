@@ -99,101 +99,108 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ready = true
 
 	case tea.KeyMsg:
-		// Handle search mode input
 		if m.searchMode {
-			switch msg.Type {
-			case tea.KeyEscape:
-				// Exit search mode and clear query
-				m.searchMode = false
-				m.searchQuery = ""
-				m.selectedIndex = 0
-				m.scrollOffset = 0
-			case tea.KeyEnter:
-				// Exit search mode but keep query
-				m.searchMode = false
-			case tea.KeyBackspace:
-				if len(m.searchQuery) > 0 {
-					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
-					m.selectedIndex = 0
-					m.scrollOffset = 0
-				}
-			case tea.KeyRunes:
-				// Add character to search query
-				m.searchQuery += string(msg.Runes)
-				m.selectedIndex = 0
-				m.scrollOffset = 0
-			}
+			m.handleSearchKey(msg)
 			return m, nil
 		}
-
-		// Detail view keybindings
 		if m.viewMode == viewDetail {
-			switch msg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			case "esc", "escape", "backspace":
-				m.viewMode = viewList
-			case "j", "down":
-				m.detailScrollOffset++
-			case "k", "up":
-				if m.detailScrollOffset > 0 {
-					m.detailScrollOffset--
-				}
-			case "g":
-				m.detailScrollOffset = 0
-			case "G":
-				lines := strings.Split(m.renderedDetail, "\n")
-				if len(lines) > 0 {
-					m.detailScrollOffset = len(lines) - 1
-				}
-			}
-			return m, nil
+			return m.handleDetailKey(msg)
 		}
+		return m.handleListKey(msg)
+	}
+	return m, nil
+}
 
-		// Normal mode keybindings
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "?":
-			m.showHelp = !m.showHelp
-		case "/":
-			// Enter search mode
-			m.searchMode = true
-			m.searchQuery = ""
-		case "escape":
-			// Clear search query if active
-			if m.searchQuery != "" {
-				m.searchQuery = ""
-				m.selectedIndex = 0
-				m.scrollOffset = 0
-			}
-		case "enter":
-			filteredTasks := m.getFilteredTasks()
-			if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks) {
-				m.viewMode = viewDetail
-				m.detailScrollOffset = 0
-				m.renderedDetail = m.buildDetailContent(filteredTasks[m.selectedIndex])
-			}
-		case "j", "down":
-			filteredTasks := m.getFilteredTasks()
-			if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks)-1 {
-				m.selectedIndex++
-			}
-		case "k", "up":
-			if m.selectedIndex > 0 {
-				m.selectedIndex--
-			}
-		case "g":
-			// Go to top
+func (m *App) handleSearchKey(msg tea.KeyMsg) {
+	switch msg.Type {
+	case tea.KeyEscape:
+		m.searchMode = false
+		m.searchQuery = ""
+		m.selectedIndex = 0
+		m.scrollOffset = 0
+	case tea.KeyEnter:
+		m.searchMode = false
+	case tea.KeyBackspace:
+		if len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
 			m.selectedIndex = 0
 			m.scrollOffset = 0
-		case "G":
-			// Go to bottom
-			filteredTasks := m.getFilteredTasks()
-			if len(filteredTasks) > 0 {
-				m.selectedIndex = len(filteredTasks) - 1
-			}
 		}
+	case tea.KeyRunes:
+		m.searchQuery += string(msg.Runes)
+		m.selectedIndex = 0
+		m.scrollOffset = 0
+	}
+}
+
+func (m App) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "esc", "escape", "backspace":
+		m.viewMode = viewList
+	case "j", "down":
+		m.detailScrollOffset++
+	case "k", "up":
+		if m.detailScrollOffset > 0 {
+			m.detailScrollOffset--
+		}
+	case "g":
+		m.detailScrollOffset = 0
+	case "G":
+		lines := strings.Split(m.renderedDetail, "\n")
+		if len(lines) > 0 {
+			m.detailScrollOffset = len(lines) - 1
+		}
+	}
+	return m, nil
+}
+
+func (m *App) navigateList(key string) {
+	filteredTasks := m.getFilteredTasks()
+	switch key {
+	case "j", "down":
+		if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks)-1 {
+			m.selectedIndex++
+		}
+	case "k", "up":
+		if m.selectedIndex > 0 {
+			m.selectedIndex--
+		}
+	case "g":
+		m.selectedIndex = 0
+		m.scrollOffset = 0
+	case "G":
+		if len(filteredTasks) > 0 {
+			m.selectedIndex = len(filteredTasks) - 1
+		}
+	}
+}
+
+func (m App) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "?":
+		m.showHelp = !m.showHelp
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
+	case "escape":
+		if m.searchQuery != "" {
+			m.searchQuery = ""
+			m.selectedIndex = 0
+			m.scrollOffset = 0
+		}
+	case "enter":
+		filteredTasks := m.getFilteredTasks()
+		if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks) {
+			m.viewMode = viewDetail
+			m.detailScrollOffset = 0
+			m.renderedDetail = m.buildDetailContent(filteredTasks[m.selectedIndex])
+		}
+	default:
+		m.navigateList(msg.String())
 	}
 	return m, nil
 }
@@ -265,44 +272,58 @@ func (m App) renderFooter() string {
 	return footerStyle.Width(m.width).Render(text)
 }
 
+type statusCounts struct {
+	pending, inProgress, completed, blocked int
+}
+
+func countTaskStatuses(tasks []*model.Task) statusCounts {
+	var c statusCounts
+	for _, t := range tasks {
+		switch t.Status {
+		case model.StatusPending:
+			c.pending++
+		case model.StatusInProgress:
+			c.inProgress++
+		case model.StatusCompleted:
+			c.completed++
+		case model.StatusBlocked:
+			c.blocked++
+		}
+	}
+	return c
+}
+
+func (m App) buildSummaryLine(filteredCount int, counts statusCounts) string {
+	var summary string
+	if m.searchQuery != "" {
+		summary = fmt.Sprintf("Showing %d of %d tasks: %d pending, %d in-progress, %d completed",
+			filteredCount, len(m.tasks), counts.pending, counts.inProgress, counts.completed)
+	} else {
+		summary = fmt.Sprintf("%d tasks: %d pending, %d in-progress, %d completed",
+			len(m.tasks), counts.pending, counts.inProgress, counts.completed)
+	}
+	if counts.blocked > 0 {
+		summary += fmt.Sprintf(", %d blocked", counts.blocked)
+	}
+	return summary
+}
+
 func (m App) renderContent(height int) string {
 	if height < 0 {
 		height = 0
 	}
 
-	// Get filtered tasks based on search query
 	filteredTasks := m.getFilteredTasks()
 
-	// Handle empty state
 	if len(m.tasks) == 0 {
 		msg := "No tasks found in this directory.\n\nCreate a task file with frontmatter to get started!"
 		return contentStyle.Width(m.width).Height(height).Render(helpStyle.Render(msg))
 	}
-
-	// Handle no search results
 	if len(filteredTasks) == 0 && m.searchQuery != "" {
 		msg := fmt.Sprintf("No tasks match '%s'\n\nPress Esc to clear search.", m.searchQuery)
 		return contentStyle.Width(m.width).Height(height).Render(helpStyle.Render(msg))
 	}
 
-	var lines []string
-
-	// Calculate task counts for summary (from all tasks)
-	var pending, inProgress, completed, blocked int
-	for _, t := range m.tasks {
-		switch t.Status {
-		case model.StatusPending:
-			pending++
-		case model.StatusInProgress:
-			inProgress++
-		case model.StatusCompleted:
-			completed++
-		case model.StatusBlocked:
-			blocked++
-		}
-	}
-
-	// Reserve 1 line for summary at bottom
 	listHeight := height - 2
 	if listHeight < 1 {
 		listHeight = 1
@@ -317,35 +338,19 @@ func (m App) renderContent(height int) string {
 	}
 
 	// Render visible tasks from filtered list
+	var lines []string
 	for i := m.scrollOffset; i < len(filteredTasks) && i < m.scrollOffset+listHeight; i++ {
-		task := filteredTasks[i]
-		lines = append(lines, m.renderTaskRow(task, i == m.selectedIndex))
+		lines = append(lines, m.renderTaskRow(filteredTasks[i], i == m.selectedIndex))
 	}
-
-	// Pad to fill height
 	for len(lines) < listHeight {
 		lines = append(lines, "")
 	}
 
-	// Add summary line
-	var summary string
-	if m.searchQuery != "" {
-		summary = fmt.Sprintf("Showing %d of %d tasks: %d pending, %d in-progress, %d completed",
-			len(filteredTasks), len(m.tasks), pending, inProgress, completed)
-	} else {
-		summary = fmt.Sprintf("%d tasks: %d pending, %d in-progress, %d completed",
-			len(m.tasks), pending, inProgress, completed)
-	}
-	if blocked > 0 {
-		summary += fmt.Sprintf(", %d blocked", blocked)
-	}
-	lines = append(lines, "")
-	lines = append(lines, summaryStyle.Render(summary))
+	counts := countTaskStatuses(m.tasks)
+	lines = append(lines, "", summaryStyle.Render(m.buildSummaryLine(len(filteredTasks), counts)))
 
 	if m.showHelp {
-		lines = append(lines,
-			"",
-			helpStyle.Render("Key Bindings:"),
+		lines = append(lines, "", helpStyle.Render("Key Bindings:"),
 			helpStyle.Render("  q / ctrl+c    Quit"),
 			helpStyle.Render("  ? Toggle help"),
 			helpStyle.Render("  j / ↓         Move down"),
@@ -355,9 +360,7 @@ func (m App) renderContent(height int) string {
 		)
 	}
 
-	body := strings.Join(lines, "\n")
-
-	return contentStyle.Width(m.width).Height(height).Render(body)
+	return contentStyle.Width(m.width).Height(height).Render(strings.Join(lines, "\n"))
 }
 
 func (m App) buildDetailContent(task *model.Task) string {
@@ -422,24 +425,37 @@ func (m App) buildDetailContent(task *model.Task) string {
 	return sb.String()
 }
 
-func (m App) statusString(status model.Status) string {
-	icon := " "
-	color := lipgloss.Color("240")
+func statusIconAndColor(status model.Status) (string, lipgloss.Color) {
 	switch status {
 	case model.StatusPending:
-		icon = "○"
-		color = lipgloss.Color("yellow")
+		return "○", lipgloss.Color("yellow")
 	case model.StatusInProgress:
-		icon = "◐"
-		color = lipgloss.Color("blue")
+		return "◐", lipgloss.Color("blue")
 	case model.StatusCompleted:
-		icon = "●"
-		color = lipgloss.Color("green")
+		return "●", lipgloss.Color("green")
 	case model.StatusBlocked:
-		icon = "✖"
-		color = lipgloss.Color("red")
+		return "✖", lipgloss.Color("red")
+	default:
+		return " ", lipgloss.Color("240")
 	}
-	return lipgloss.NewStyle().Foreground(color).Render(icon+" "+string(status))
+}
+
+func priorityColor(p model.Priority) lipgloss.Color {
+	switch p {
+	case model.PriorityCritical:
+		return lipgloss.Color("red")
+	case model.PriorityHigh:
+		return lipgloss.Color("yellow")
+	case model.PriorityMedium:
+		return lipgloss.Color("blue")
+	default:
+		return lipgloss.Color("240")
+	}
+}
+
+func (m App) statusString(status model.Status) string {
+	icon, color := statusIconAndColor(status)
+	return lipgloss.NewStyle().Foreground(color).Render(icon + " " + string(status))
 }
 
 func (m App) renderDetailView(height int) string {
@@ -477,75 +493,29 @@ func (m App) renderDetailView(height int) string {
 }
 
 func (m App) renderTaskRow(task *model.Task, selected bool) string {
-	// Status indicator
-	statusIcon := " "
-	statusColor := lipgloss.Color("240")
-	switch task.Status {
-	case model.StatusPending:
-		statusIcon = "○"
-		statusColor = lipgloss.Color("yellow")
-	case model.StatusInProgress:
-		statusIcon = "◐"
-		statusColor = lipgloss.Color("blue")
-	case model.StatusCompleted:
-		statusIcon = "●"
-		statusColor = lipgloss.Color("green")
-	case model.StatusBlocked:
-		statusIcon = "✖"
-		statusColor = lipgloss.Color("red")
-	}
-
-	// Format ID (fixed width)
+	icon, color := statusIconAndColor(task.Status)
 	id := fmt.Sprintf("%-6s", task.ID)
+	status := lipgloss.NewStyle().Foreground(color).Render(icon)
 
-	// Status indicator with color
-	status := lipgloss.NewStyle().Foreground(statusColor).Render(statusIcon)
+	parts := []string{id, status, task.Title}
 
-	// Priority badge
-	priority := ""
 	if task.Priority != "" {
-		priorityColor := lipgloss.Color("240")
-		switch task.Priority {
-		case model.PriorityCritical:
-			priorityColor = lipgloss.Color("red")
-		case model.PriorityHigh:
-			priorityColor = lipgloss.Color("yellow")
-		case model.PriorityMedium:
-			priorityColor = lipgloss.Color("blue")
-		case model.PriorityLow:
-			priorityColor = lipgloss.Color("240")
-		}
-		priority = lipgloss.NewStyle().Foreground(priorityColor).Render(fmt.Sprintf("[%s]", task.Priority))
+		pColor := priorityColor(task.Priority)
+		parts = append(parts, lipgloss.NewStyle().Foreground(pColor).Render(fmt.Sprintf("[%s]", task.Priority)))
 	}
-
-	// Tags
-	tags := ""
 	if len(task.Tags) > 0 {
 		tagStr := strings.Join(task.Tags, ", ")
 		if len(tagStr) > 20 {
 			tagStr = tagStr[:17] + "..."
 		}
-		tags = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("(%s)", tagStr))
-	}
-
-	// Build row
-	var parts []string
-	parts = append(parts, id, status, task.Title)
-	if priority != "" {
-		parts = append(parts, priority)
-	}
-	if tags != "" {
-		parts = append(parts, tags)
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("(%s)", tagStr)))
 	}
 
 	row := strings.Join(parts, " ")
-
-	// Apply selection style
 	if selected {
 		row = selectedRowStyle.Render(row)
 	} else if task.Status == model.StatusCompleted {
 		row = completedRowStyle.Render(row)
 	}
-
 	return row
 }

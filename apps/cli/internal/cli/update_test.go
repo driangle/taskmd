@@ -487,9 +487,9 @@ func TestUpdate_OtherFieldsPreserved(t *testing.T) {
 
 func TestUpdate_FrontmatterBounds(t *testing.T) {
 	tests := []struct {
-		name     string
-		lines    []string
-		wantOpen int
+		name      string
+		lines     []string
+		wantOpen  int
 		wantClose int
 	}{
 		{
@@ -514,10 +514,10 @@ func TestUpdate_FrontmatterBounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			open, close := findFrontmatterBounds(tt.lines)
-			if open != tt.wantOpen || close != tt.wantClose {
+			open, closeIdx := findFrontmatterBounds(tt.lines)
+			if open != tt.wantOpen || closeIdx != tt.wantClose {
 				t.Errorf("findFrontmatterBounds() = (%d, %d), want (%d, %d)",
-					open, close, tt.wantOpen, tt.wantClose)
+					open, closeIdx, tt.wantOpen, tt.wantClose)
 			}
 		})
 	}

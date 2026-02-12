@@ -362,19 +362,16 @@ func buildShowOutput(task *model.Task, deps dependencyInfo) showOutput {
 		created = task.Created.Format("2006-01-02")
 	}
 	return showOutput{
-		ID:       task.ID,
-		Title:    task.Title,
-		Status:   string(task.Status),
-		Priority: string(task.Priority),
-		Effort:   string(task.Effort),
-		Tags:     task.Tags,
-		Created:  created,
-		FilePath: task.FilePath,
-		Content:  strings.TrimSpace(task.Body),
-		Dependencies: showDepsJSON{
-			DependsOn: deps.DependsOn,
-			Blocks:    deps.Blocks,
-		},
+		ID:           task.ID,
+		Title:        task.Title,
+		Status:       string(task.Status),
+		Priority:     string(task.Priority),
+		Effort:       string(task.Effort),
+		Tags:         task.Tags,
+		Created:      created,
+		FilePath:     task.FilePath,
+		Content:      strings.TrimSpace(task.Body),
+		Dependencies: showDepsJSON(deps),
 	}
 }
 

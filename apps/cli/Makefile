@@ -25,13 +25,15 @@ install-full: web-embed
 test:
 	go test ./...
 
+GOLANGCI_LINT := $(shell command -v golangci-lint 2>/dev/null || echo $(shell go env GOPATH)/bin/golangci-lint)
+
 # Run linter
 lint:
-	golangci-lint run
+	$(GOLANGCI_LINT) run
 
 # Run linter with auto-fix
 lint-fix:
-	golangci-lint run --fix
+	$(GOLANGCI_LINT) run --fix
 
 # Run go mod tidy to clean up dependencies
 tidy:

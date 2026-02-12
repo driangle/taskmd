@@ -433,11 +433,11 @@ func TestCalculateSimilarity(t *testing.T) {
 		minScore float64
 		maxScore float64
 	}{
-		{"auth", "Implement authentication", 0.7, 1.0},  // substring
-		{"setup", "Setup project", 0.7, 1.0},             // substring
-		{"setup project", "Setup project", 1.0, 1.0},     // exact
-		{"zzzzz", "Setup project", 0.0, 0.3},             // no relation
-		{"seutp", "Setup project", 0.3, 0.8},             // typo
+		{"auth", "Implement authentication", 0.7, 1.0}, // substring
+		{"setup", "Setup project", 0.7, 1.0},           // substring
+		{"setup project", "Setup project", 1.0, 1.0},   // exact
+		{"zzzzz", "Setup project", 0.0, 0.3},           // no relation
+		{"seutp", "Setup project", 0.3, 0.8},           // typo
 	}
 
 	for _, tt := range tests {

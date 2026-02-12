@@ -180,7 +180,7 @@ func applyUpdates(task *model.Task, updates []fieldUpdate, tags *tagUpdate) erro
 
 	// Apply tag updates.
 	if tags != nil {
-		lines, closeIdx = applyTagUpdates(lines, openIdx, closeIdx, task.Tags, tags)
+		lines, _ = applyTagUpdates(lines, openIdx, closeIdx, task.Tags, tags)
 	}
 
 	if err := os.WriteFile(task.FilePath, []byte(strings.Join(lines, "\n")), 0644); err != nil {
