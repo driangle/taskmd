@@ -25,8 +25,9 @@ var (
 
 // graphCmd represents the graph command
 var graphCmd = &cobra.Command{
-	Use:   "graph",
-	Short: "Export task dependency graph",
+	Use:        "graph",
+	SuggestFor: []string{"deps", "dependencies", "tree"},
+	Short:      "Export task dependency graph",
 	Long: `Export task dependency graphs in various formats for visualization and analysis.
 
 Supported formats:

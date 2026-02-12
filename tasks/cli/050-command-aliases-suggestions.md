@@ -1,7 +1,7 @@
 ---
 id: "050"
 title: "Add command alias suggestions for 'Did you mean?' hints"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: []
@@ -27,8 +27,8 @@ Each command should declare a list of known aliases/synonyms so that cobra inclu
 
 ## Tasks
 
-- [ ] Add `SuggestFor` field to each cobra command definition with a curated list of aliases
-- [ ] Cover at minimum the following aliases:
+- [x] Add `SuggestFor` field to each cobra command definition with a curated list of aliases
+- [x] Cover at minimum the following aliases:
   - `update`: `set`, `edit`, `modify`, `change`
   - `show`: `view`, `info`, `detail`, `details`, `describe`, `get`
   - `list`: `ls`, `tasks`, `all`
@@ -41,8 +41,8 @@ Each command should declare a list of known aliases/synonyms so that cobra inclu
   - `init`: `setup`, `create`, `new`
   - `tui`: `ui`, `interactive`, `dashboard`
   - `web`: `serve`, `server`, `http`
-- [ ] Add tests to verify that cobra suggests the aliased commands
-- [ ] Run `make lint` and `make test` to verify
+- [x] Add tests to verify that cobra suggests the aliased commands
+- [x] Run `make lint` and `make test` to verify
 
 ## Acceptance Criteria
 

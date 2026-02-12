@@ -22,9 +22,10 @@ var (
 )
 
 var webCmd = &cobra.Command{
-	Use:   "web",
-	Short: "Web dashboard commands",
-	Long:  `Commands for the taskmd web dashboard.`,
+	Use:        "web",
+	SuggestFor: []string{"serve", "server", "http"},
+	Short:      "Web dashboard commands",
+	Long:       `Commands for the taskmd web dashboard.`,
 }
 
 var webStartCmd = &cobra.Command{

@@ -28,8 +28,9 @@ var (
 var showStdinReader io.Reader = os.Stdin
 
 var showCmd = &cobra.Command{
-	Use:   "show <query>",
-	Short: "Show detailed information about a specific task",
+	Use:        "show <query>",
+	SuggestFor: []string{"view", "info", "detail", "details", "describe", "get"},
+	Short:      "Show detailed information about a specific task",
 	Long: `Show displays detailed information about a specific task, identified by ID or title.
 
 Matching priority:

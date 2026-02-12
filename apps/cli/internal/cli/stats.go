@@ -16,8 +16,9 @@ import (
 
 // statsCmd represents the stats command
 var statsCmd = &cobra.Command{
-	Use:   "stats",
-	Short: "Show computed metrics about tasks",
+	Use:        "stats",
+	SuggestFor: []string{"summary", "status", "overview"},
+	Short:      "Show computed metrics about tasks",
 	Long: `Stats displays computed metrics about your task set including:
 - Total tasks and breakdown by status, priority, and effort
 - Blocked tasks count

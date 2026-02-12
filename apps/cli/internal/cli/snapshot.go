@@ -20,8 +20,9 @@ var (
 
 // snapshotCmd represents the snapshot command
 var snapshotCmd = &cobra.Command{
-	Use:   "snapshot",
-	Short: "Produce a frozen, machine-readable representation of tasks",
+	Use:        "snapshot",
+	SuggestFor: []string{"save", "backup", "export"},
+	Short:      "Produce a frozen, machine-readable representation of tasks",
 	Long: `Snapshot produces a static, machine-readable representation of tasks
 for CI/CD pipelines and automation.
 

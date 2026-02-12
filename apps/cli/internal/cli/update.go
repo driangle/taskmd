@@ -40,8 +40,9 @@ var validEfforts = map[string]bool{
 }
 
 var updateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "Update a task's frontmatter fields",
+	Use:        "update",
+	SuggestFor: []string{"set", "edit", "modify", "change"},
+	Short:      "Update a task's frontmatter fields",
 	Long: `Update modifies frontmatter fields (status, priority, effort) of a task file.
 
 The task is identified by --task-id (exact match only).

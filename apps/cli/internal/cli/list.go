@@ -24,8 +24,9 @@ var (
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List tasks in a quick textual format",
+	Use:        "list",
+	SuggestFor: []string{"ls", "tasks", "all"},
+	Short:      "List tasks in a quick textual format",
 	Long: `List displays tasks in various formats with filtering and sorting support.
 
 By default, scans the current directory and all subdirectories for markdown files

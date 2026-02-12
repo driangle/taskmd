@@ -18,8 +18,9 @@ var (
 )
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize taskmd in a project by creating a CLAUDE.md template",
+	Use:        "init",
+	SuggestFor: []string{"setup", "create", "new"},
+	Short:      "Initialize taskmd in a project by creating a CLAUDE.md template",
 	Long: `Initialize creates a CLAUDE.md file in the target directory with a template
 that helps Claude Code understand and work with your taskmd task files.
 

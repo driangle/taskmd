@@ -17,8 +17,9 @@ var (
 
 // validateCmd represents the validate command
 var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Lint and validate tasks",
+	Use:        "validate",
+	SuggestFor: []string{"check", "verify", "lint"},
+	Short:      "Lint and validate tasks",
 	Long: `Validate checks task files for common errors and issues.
 
 Validation checks include:

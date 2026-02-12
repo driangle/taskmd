@@ -50,8 +50,9 @@ var (
 )
 
 var nextCmd = &cobra.Command{
-	Use:   "next",
-	Short: "Recommend what task to work on next",
+	Use:        "next",
+	SuggestFor: []string{"pick", "suggest", "what"},
+	Short:      "Recommend what task to work on next",
 	Long: `Next analyzes all tasks and recommends the best ones to work on next.
 
 Tasks are scored based on priority, critical path position, downstream impact,

@@ -20,8 +20,9 @@ var (
 )
 
 var boardCmd = &cobra.Command{
-	Use:   "board",
-	Short: "Display tasks grouped in a kanban-like board view",
+	Use:        "board",
+	SuggestFor: []string{"kanban", "columns"},
+	Short:      "Display tasks grouped in a kanban-like board view",
 	Long: `Display tasks grouped by a field in a board/kanban-like view.
 
 Supported group-by fields:

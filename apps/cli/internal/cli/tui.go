@@ -18,8 +18,9 @@ var (
 )
 
 var tuiCmd = &cobra.Command{
-	Use:   "tui",
-	Short: "Launch interactive TUI (Terminal User Interface)",
+	Use:        "tui",
+	SuggestFor: []string{"ui", "interactive", "dashboard"},
+	Short:      "Launch interactive TUI (Terminal User Interface)",
 	Long:  "Launch an interactive terminal UI for browsing and managing tasks",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runTUI,
