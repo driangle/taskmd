@@ -138,7 +138,7 @@ Visual board with tasks organized in columns.
 Use the "Group by" dropdown to organize by:
 
 **Status (default):**
-- Columns: pending, in-progress, completed, blocked
+- Columns: pending, in-progress, completed, blocked, cancelled
 - Color-coded for quick status overview
 - Standard kanban workflow
 

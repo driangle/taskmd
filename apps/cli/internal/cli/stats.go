@@ -107,12 +107,13 @@ func outputStatsTable(m *metrics.Metrics) error {
 	// Tasks by status
 	fmt.Fprintln(w, "BY STATUS:")
 	if len(m.TasksByStatus) > 0 {
-		// Order: pending, in-progress, completed, blocked
+		// Order: pending, in-progress, completed, blocked, cancelled
 		statusOrder := []model.Status{
 			model.StatusPending,
 			model.StatusInProgress,
 			model.StatusCompleted,
 			model.StatusBlocked,
+			model.StatusCancelled,
 		}
 		for _, status := range statusOrder {
 			if count, ok := m.TasksByStatus[status]; ok && count > 0 {

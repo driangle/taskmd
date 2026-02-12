@@ -253,3 +253,61 @@ func TestCalculate_MissingDependency(t *testing.T) {
 		t.Errorf("expected BlockedTasksCount=1, got %d", m.BlockedTasksCount)
 	}
 }
+
+func TestCalculate_CancelledStatus(t *testing.T) {
+	tasks := []*model.Task{
+		{
+			ID:     "1",
+			Title:  "Pending Task",
+			Status: model.StatusPending,
+		},
+		{
+			ID:     "2",
+			Title:  "In Progress Task",
+			Status: model.StatusInProgress,
+		},
+		{
+			ID:     "3",
+			Title:  "Completed Task",
+			Status: model.StatusCompleted,
+		},
+		{
+			ID:     "4",
+			Title:  "Blocked Task",
+			Status: model.StatusBlocked,
+		},
+		{
+			ID:     "5",
+			Title:  "Cancelled Task",
+			Status: model.StatusCancelled,
+		},
+		{
+			ID:     "6",
+			Title:  "Another Cancelled Task",
+			Status: model.StatusCancelled,
+		},
+	}
+
+	m := Calculate(tasks)
+
+	if m.TotalTasks != 6 {
+		t.Errorf("expected TotalTasks=6, got %d", m.TotalTasks)
+	}
+
+	// Check all status counts
+	if m.TasksByStatus[model.StatusPending] != 1 {
+		t.Errorf("expected 1 pending task, got %d", m.TasksByStatus[model.StatusPending])
+	}
+	if m.TasksByStatus[model.StatusInProgress] != 1 {
+		t.Errorf("expected 1 in-progress task, got %d", m.TasksByStatus[model.StatusInProgress])
+	}
+	if m.TasksByStatus[model.StatusCompleted] != 1 {
+		t.Errorf("expected 1 completed task, got %d", m.TasksByStatus[model.StatusCompleted])
+	}
+	if m.TasksByStatus[model.StatusBlocked] != 1 {
+		t.Errorf("expected 1 blocked task, got %d", m.TasksByStatus[model.StatusBlocked])
+	}
+	if m.TasksByStatus[model.StatusCancelled] != 2 {
+		t.Errorf("expected 2 cancelled tasks, got %d", m.TasksByStatus[model.StatusCancelled])
+	}
+}

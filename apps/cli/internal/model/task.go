@@ -12,6 +12,7 @@ const (
 	StatusInProgress Status = "in-progress"
 	StatusCompleted  Status = "completed"
 	StatusBlocked    Status = "blocked"
+	StatusCancelled  Status = "cancelled"
 )
 
 // Priority represents the importance level of a task

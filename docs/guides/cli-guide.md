@@ -78,6 +78,7 @@ Tasks are markdown files with YAML frontmatter. Each task has:
 - `in-progress` - Currently being worked on
 - `completed` - Finished
 - `blocked` - Cannot proceed (due to dependencies or external blockers)
+- `cancelled` - Will not be completed (kept for historical reference)
 
 ### Dependencies
 

@@ -396,7 +396,7 @@ func (m App) renderFooter() string {
 }
 
 type statusCounts struct {
-	pending, inProgress, completed, blocked int
+	pending, inProgress, completed, blocked, cancelled int
 }
 
 func countTaskStatuses(tasks []*model.Task) statusCounts {
@@ -411,6 +411,8 @@ func countTaskStatuses(tasks []*model.Task) statusCounts {
 			c.completed++
 		case model.StatusBlocked:
 			c.blocked++
+		case model.StatusCancelled:
+			c.cancelled++
 		}
 	}
 	return c
@@ -427,6 +429,9 @@ func (m App) buildSummaryLine(filteredCount int, counts statusCounts) string {
 	}
 	if counts.blocked > 0 {
 		summary += fmt.Sprintf(", %d blocked", counts.blocked)
+	}
+	if counts.cancelled > 0 {
+		summary += fmt.Sprintf(", %d cancelled", counts.cancelled)
 	}
 	return summary
 }
@@ -558,6 +563,8 @@ func statusIconAndColor(status model.Status) (string, lipgloss.Color) {
 		return "●", lipgloss.Color("green")
 	case model.StatusBlocked:
 		return "✖", lipgloss.Color("red")
+	case model.StatusCancelled:
+		return "⊘", lipgloss.Color("240")
 	default:
 		return " ", lipgloss.Color("240")
 	}

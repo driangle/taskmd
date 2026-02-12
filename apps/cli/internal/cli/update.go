@@ -26,6 +26,7 @@ var validStatuses = map[string]bool{
 	string(model.StatusInProgress): true,
 	string(model.StatusCompleted):  true,
 	string(model.StatusBlocked):    true,
+	string(model.StatusCancelled):  true,
 }
 
 var validPriorities = map[string]bool{
@@ -63,7 +64,7 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 
 	updateCmd.Flags().StringVar(&updateTaskID, "task-id", "", "task ID to update (required)")
-	updateCmd.Flags().StringVar(&updateStatus, "status", "", "new status (pending, in-progress, completed, blocked)")
+	updateCmd.Flags().StringVar(&updateStatus, "status", "", "new status (pending, in-progress, completed, blocked, cancelled)")
 	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "new priority (low, medium, high, critical)")
 	updateCmd.Flags().StringVar(&updateEffort, "effort", "", "new effort (small, medium, large)")
 	updateCmd.Flags().BoolVar(&updateDone, "done", false, "mark task as completed (alias for --status completed)")

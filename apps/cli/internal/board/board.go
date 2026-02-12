@@ -140,6 +140,7 @@ func statusOrder() []string {
 		string(model.StatusInProgress),
 		string(model.StatusBlocked),
 		string(model.StatusCompleted),
+		string(model.StatusCancelled),
 	}
 }
 

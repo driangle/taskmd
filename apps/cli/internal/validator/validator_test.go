@@ -143,6 +143,51 @@ func TestValidate_InvalidFieldValues(t *testing.T) {
 	}
 }
 
+func TestValidate_CancelledStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		tasks    []*model.Task
+		wantErrs int
+	}{
+		{
+			name: "valid cancelled status",
+			tasks: []*model.Task{
+				{
+					ID:     "001",
+					Title:  "Cancelled Task",
+					Status: model.StatusCancelled,
+				},
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "all valid statuses including cancelled",
+			tasks: []*model.Task{
+				{ID: "001", Title: "Pending", Status: model.StatusPending},
+				{ID: "002", Title: "In Progress", Status: model.StatusInProgress},
+				{ID: "003", Title: "Completed", Status: model.StatusCompleted},
+				{ID: "004", Title: "Blocked", Status: model.StatusBlocked},
+				{ID: "005", Title: "Cancelled", Status: model.StatusCancelled},
+			},
+			wantErrs: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := NewValidator(false)
+			result := v.Validate(tt.tasks)
+
+			if result.Errors != tt.wantErrs {
+				t.Errorf("Validate() errors = %d, want %d", result.Errors, tt.wantErrs)
+				for _, issue := range result.Issues {
+					t.Logf("  Issue: %s", issue.Message)
+				}
+			}
+		})
+	}
+}
+
 func TestValidate_DuplicateIDs(t *testing.T) {
 	tasks := []*model.Task{
 		{

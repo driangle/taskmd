@@ -1,7 +1,7 @@
 ---
 id: "060"
 title: "Add cancelled status to spec and code"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["001"]

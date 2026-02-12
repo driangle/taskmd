@@ -73,6 +73,7 @@ Description of what this task aims to accomplish.
   - `in-progress` - Task is currently being worked on
   - `completed` - Task has been finished
   - `blocked` - Task cannot proceed due to dependencies or blockers
+  - `cancelled` - Task will not be completed (kept for historical reference)
 - **Description:** Current state of the task
 - **Example:** `status: pending`
 
@@ -256,8 +257,10 @@ The `validate` command checks for:
 
 ```
 pending → in-progress → completed
-   ↓            ↓
-blocked ← ← ← ← ←
+   ↓            ↓            ↓
+   ↓         blocked        ↓
+   ↓            ↓           ↓
+   └──→ cancelled ←─────────┘
 ```
 
 ### Status Definitions
@@ -268,6 +271,7 @@ blocked ← ← ← ← ←
 | `in-progress` | Actively being worked on | When work begins |
 | `completed` | Finished and verified | When all acceptance criteria are met |
 | `blocked` | Cannot proceed | When dependencies are incomplete or blockers exist |
+| `cancelled` | Will not be completed | When requirements change, task is superseded, or permanently deprioritized |
 
 ### Status Transitions
 
@@ -277,6 +281,10 @@ blocked ← ← ← ← ←
 - `blocked` → `pending` - Blocker resolved, not yet restarted
 - `blocked` → `in-progress` - Blocker resolved, work resumes
 - `pending` → `blocked` - Blocker identified before work begins
+- `pending` → `cancelled` - Task deprioritized or requirements changed before work begins
+- `in-progress` → `cancelled` - Active work stopped, task will not be completed
+- `blocked` → `cancelled` - Blocked task will not be unblocked or completed
+- `completed` → `cancelled` - Rare; used when task was incorrectly marked as completed
 
 ### Best Practices
 
@@ -739,7 +747,7 @@ description: "Add CSV and JSON export functionality for task data"
 |-------|------|----------|---------|--------|
 | `id` | string | Yes | - | Zero-padded numbers |
 | `title` | string | Yes | - | Free text |
-| `status` | enum | Yes | - | pending, in-progress, completed, blocked |
+| `status` | enum | Yes | - | pending, in-progress, completed, blocked, cancelled |
 | `priority` | enum | No | medium | low, medium, high, critical |
 | `effort` | enum | No | - | small, medium, large |
 | `dependencies` | array | No | [] | Array of ID strings |

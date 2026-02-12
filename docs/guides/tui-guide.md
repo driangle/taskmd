@@ -228,7 +228,7 @@ taskmd tui --filter tag=cli
 The filter format is: `field=value`
 
 **Supported filter fields:**
-- `status` - pending, in-progress, completed, blocked
+- `status` - pending, in-progress, completed, blocked, cancelled
 - `priority` - low, medium, high, critical
 - `tag` - any tag value
 
@@ -299,10 +299,10 @@ When filtering, shows both filtered count and total:
 Showing 5 of 15 tasks: 3 pending, 2 in-progress, 0 completed
 ```
 
-If any tasks are blocked:
+If any tasks are blocked or cancelled:
 
 ```
-15 tasks: 8 pending, 3 in-progress, 4 completed, 2 blocked
+15 tasks: 8 pending, 3 in-progress, 4 completed, 2 blocked, 1 cancelled
 ```
 
 ## Common Workflows

@@ -114,6 +114,7 @@ func (v *Validator) checkInvalidFieldValues(tasks []*model.Task, result *Validat
 		model.StatusInProgress: true,
 		model.StatusCompleted:  true,
 		model.StatusBlocked:    true,
+		model.StatusCancelled:  true,
 		"":                     true, // Empty is allowed (will default)
 	}
 
@@ -135,7 +136,7 @@ func (v *Validator) checkInvalidFieldValues(tasks []*model.Task, result *Validat
 	for _, task := range tasks {
 		if !validStatuses[task.Status] {
 			result.AddIssue(LevelError, task.ID, task.FilePath,
-				fmt.Sprintf("invalid status: '%s' (valid values: pending, in-progress, completed, blocked)", task.Status))
+				fmt.Sprintf("invalid status: '%s' (valid values: pending, in-progress, completed, blocked, cancelled)", task.Status))
 		}
 
 		if !validPriorities[task.Priority] {

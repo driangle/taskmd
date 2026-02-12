@@ -58,7 +58,7 @@ func init() {
 	graphCmd.Flags().StringVar(&graphFocus, "focus", "", "highlight specific task ID")
 	graphCmd.Flags().BoolVar(&graphUpstream, "upstream", false, "show only dependencies (ancestors)")
 	graphCmd.Flags().BoolVar(&graphDownstream, "downstream", false, "show only dependents (descendants)")
-	graphCmd.Flags().StringSliceVar(&graphExcludeStatus, "exclude-status", []string{"completed"}, "exclude tasks with status (completed, pending, in-progress, blocked)")
+	graphCmd.Flags().StringSliceVar(&graphExcludeStatus, "exclude-status", []string{"completed"}, "exclude tasks with status (completed, pending, in-progress, blocked, cancelled)")
 	graphCmd.Flags().BoolVar(&graphAll, "all", false, "include all tasks (overrides --exclude-status)")
 	graphCmd.Flags().StringVarP(&graphOut, "out", "o", "", "write output to file instead of stdout")
 }
