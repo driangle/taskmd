@@ -1,7 +1,7 @@
 ---
 id: "054"
 title: "Add FAQ.md documentation file"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: []
@@ -24,51 +24,51 @@ Users often have similar questions when starting with a new tool. An FAQ documen
 
 ## Tasks
 
-- [ ] Create `docs/FAQ.md` file with proper structure
-- [ ] Add installation and setup questions
+- [x] Create `docs/FAQ.md` file with proper structure
+- [x] Add installation and setup questions
   - How do I install taskmd?
   - What are the system requirements?
   - How do I verify my installation?
   - Can I install without Homebrew?
-- [ ] Add task format questions
+- [x] Add task format questions
   - What is the task file format?
   - What frontmatter fields are required?
   - How do I create my first task?
   - What are valid status values?
   - How do priorities work?
-- [ ] Add CLI usage questions
+- [x] Add CLI usage questions
   - How do I list all tasks?
   - How do I filter tasks by status?
   - What output formats are supported?
   - How do I visualize task dependencies?
   - Can I export task data?
-- [ ] Add web UI questions
+- [x] Add web UI questions
   - How do I start the web interface?
   - What port does the web server use?
   - Does the web UI auto-refresh?
   - Can I use the web UI in production?
-- [ ] Add dependency management questions
+- [x] Add dependency management questions
   - How do I add task dependencies?
   - What happens if dependencies are circular?
   - Can I see a dependency graph?
   - How do dependencies affect task status?
-- [ ] Add troubleshooting questions
+- [x] Add troubleshooting questions
   - Why won't my task file parse?
   - Why is my task not showing up?
   - How do I fix validation errors?
   - Why is the graph command failing?
-- [ ] Add integration questions
+- [x] Add integration questions
   - Can I use taskmd with Git?
   - How do I integrate with CI/CD?
   - Can I use taskmd in a monorepo?
   - Does taskmd work with other task systems?
-- [ ] Add best practices questions
+- [x] Add best practices questions
   - How should I organize task files?
   - What's a good task naming convention?
   - How granular should tasks be?
   - When should I use subtasks vs separate tasks?
-- [ ] Link FAQ from main README.md
-- [ ] Review for clarity and completeness
+- [x] Link FAQ from main README.md
+- [x] Review for clarity and completeness
 
 ## Acceptance Criteria
 

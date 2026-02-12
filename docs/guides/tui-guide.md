@@ -624,15 +624,20 @@ taskmd tui
 
 ## Configuration
 
-### Config File
+### Config File (Coming Soon)
 
-TUI-specific settings in `~/.taskmd.yaml`:
+Configuration file support is **planned but not yet implemented**. See [task 056](../../tasks/056-implement-taskmd-yaml-config.md).
 
-```yaml
-tui:
-  readonly: false
-  group_by: status  # Default grouping (future)
-  theme: dark       # Color theme (future)
+### Current Options
+
+Use command-line flags:
+
+```bash
+# Specify directory
+taskmd tui --dir ./tasks
+
+# Or create a shell alias
+alias tmtui='taskmd tui --dir ./tasks'
 ```
 
 ### Environment Variables

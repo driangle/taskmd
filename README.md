@@ -135,6 +135,7 @@ The web interface provides:
 ## Documentation
 
 - **[Quick Start Guide](docs/guides/quickstart.md)** - Get productive in 5 minutes
+- **[FAQ](docs/FAQ.md)** - Frequently asked questions and quick answers
 - **[CLI User Guide](docs/guides/cli-guide.md)** - Comprehensive CLI reference
 - **[TUI User Guide](docs/guides/tui-guide.md)** - Interactive terminal interface guide
 - **[Web User Guide](docs/guides/web-guide.md)** - Web interface walkthrough
@@ -179,22 +180,11 @@ See the [Task Specification](docs/taskmd_specification.md) for complete format d
 
 ## Configuration
 
-Create `~/.taskmd.yaml` to set default options:
+Configuration file support (`.taskmd.yaml`) is planned but not yet fully implemented. For now, use command-line flags or shell aliases:
 
-```yaml
-# Default task directory
-dir: ./tasks
-
-# Default output format (table, json, yaml)
-format: table
-
-# Enable verbose logging by default
-verbose: false
-
-# Default web server port
-web:
-  port: 8080
-  open: true
+```bash
+# Set up a shell alias with your preferred defaults
+alias tm='taskmd --dir ./tasks'
 ```
 
 ## Project Structure

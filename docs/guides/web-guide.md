@@ -762,15 +762,20 @@ curl http://localhost:8080/api/stats
 
 ## Configuration
 
-### Config File
+### Config File (Coming Soon)
 
-Create `.taskmd.yaml` in project root:
+Configuration file support is **planned but not yet implemented**. See [task 056](../../tasks/056-implement-taskmd-yaml-config.md).
 
-```yaml
-web:
-  port: 8080
-  open: true  # Auto-open browser
-  dev: false  # Development mode
+### Current Options
+
+Use command-line flags:
+
+```bash
+# Set port and auto-open
+taskmd web start --port 3000 --open --dir ./tasks
+
+# Or create a shell alias
+alias tmweb='taskmd web start --port 8080 --open --dir ./tasks'
 ```
 
 ### Environment Variables

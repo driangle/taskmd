@@ -799,54 +799,41 @@ taskmd graph --format ascii > task-tree.txt
 
 ## Configuration
 
-### Config File Location
+### Config File Support (Coming Soon)
 
-taskmd looks for configuration in:
-1. `--config` flag value
-2. `.taskmd.yaml` in current directory
-3. `~/.taskmd.yaml` in home directory
+Configuration file support (`.taskmd.yaml`) is **planned but not yet fully implemented**. See [task 056](../../tasks/056-implement-taskmd-yaml-config.md) for implementation status.
 
-### Config File Format
-
-Create `~/.taskmd.yaml`:
+When implemented, the config file will support:
 
 ```yaml
-# Default task directory
-dir: ./tasks
-
-# Default output format
-format: table
-
-# Verbose logging
-verbose: false
-
-# Quiet mode
-quiet: false
-
-# Web server defaults
+# .taskmd.yaml (planned)
+dir: ./tasks      # Default task directory
 web:
-  port: 8080
-  open: true  # Auto-open browser
-  dev: false  # Development mode
+  port: 8080     # Default web server port
+  open: true     # Auto-open browser on web start
+```
 
-# List command defaults
-list:
-  columns: id,title,status,priority
-  sort: priority
+### Current Workarounds
 
-# Next command defaults
-next:
-  limit: 5
+Until config file support is implemented, use these approaches:
 
-# Graph defaults
-graph:
-  format: ascii
-  exclude_status:
-    - completed
+**1. Shell Aliases:**
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+alias tm='taskmd --dir ./tasks'
+alias tmw='taskmd web start --port 8080 --open'
+```
 
-# Validate defaults
-validate:
-  strict: false
+**2. Environment Variables:**
+```bash
+export TASKMD_DIR=./tasks
+```
+
+**3. Project Scripts:**
+```bash
+# In project root: taskmd.sh
+#!/bin/bash
+taskmd --dir ./tasks "$@"
 ```
 
 ### Command-Line Flags
