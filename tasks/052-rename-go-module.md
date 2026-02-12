@@ -1,7 +1,7 @@
 ---
 id: "052"
 title: "Rename Go module to github.com/driangle/taskmd"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: []
@@ -24,16 +24,16 @@ The project was originally named `md-task-tracker` but the CLI tool and branding
 
 ## Tasks
 
-- [ ] Rename GitHub repository from `md-task-tracker` to `taskmd`
-- [ ] Update `go.mod` module path in `apps/cli/go.mod`
-- [ ] Update all Go import paths across the codebase
-- [ ] Update LDFLAGS in release workflow (`.github/workflows/release.yml`)
-- [ ] Update LDFLAGS in Makefile (`apps/cli/Makefile`)
-- [ ] Update all references in documentation (`README.md`, `CLAUDE.md`, etc.)
-- [ ] Update `go install` commands in docs
-- [ ] Run `go mod tidy` and verify build
-- [ ] Run full test suite
-- [ ] Tag a new release after rename
+- [x] Rename GitHub repository from `md-task-tracker` to `taskmd` (already done)
+- [x] Update `go.mod` module path in `apps/cli/go.mod`
+- [x] Update all Go import paths across the codebase
+- [x] Update LDFLAGS in release workflow (`.github/workflows/release.yml`)
+- [x] Update LDFLAGS in Makefile (`apps/cli/Makefile`) (no LDFLAGS in Makefile)
+- [x] Update all references in documentation (`README.md`, `CLAUDE.md`, etc.)
+- [x] Update `go install` commands in docs
+- [x] Run `go mod tidy` and verify build
+- [x] Run full test suite
+- [ ] Tag a new release after rename (requires user action)
 
 ## Acceptance Criteria
 

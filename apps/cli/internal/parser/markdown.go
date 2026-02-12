@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
 const (

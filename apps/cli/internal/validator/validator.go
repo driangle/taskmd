@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
 // ValidationLevel represents the severity of a validation issue

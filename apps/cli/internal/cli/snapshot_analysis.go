@@ -1,6 +1,6 @@
 package cli
 
-import "github.com/driangle/md-task-tracker/apps/cli/internal/model"
+import "github.com/driangle/taskmd/apps/cli/internal/model"
 
 // buildTaskMap creates a map of task ID to task
 func buildTaskMap(tasks []*model.Task) map[string]*model.Task {

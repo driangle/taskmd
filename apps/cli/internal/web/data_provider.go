@@ -3,8 +3,8 @@ package web
 import (
 	"sync"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 )
 
 // DataProvider caches scan results and invalidates on file changes.

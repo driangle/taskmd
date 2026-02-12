@@ -1,6 +1,6 @@
-# Development Guidelines for md-task-tracker
+# Development Guidelines for taskmd
 
-This document provides guidelines and conventions for developing the md-task-tracker project. These instructions are designed to help maintain code quality, consistency, and reliability across the codebase.
+This document provides guidelines and conventions for developing the taskmd project. These instructions are designed to help maintain code quality, consistency, and reliability across the codebase.
 
 ## Prerequisites
 
@@ -414,4 +414,4 @@ os.WriteFile(path, data, 0644)
 ---
 
 **Last Updated**: 2026-02-08
-**Maintained By**: md-task-tracker contributors
+**Maintained By**: taskmd contributors

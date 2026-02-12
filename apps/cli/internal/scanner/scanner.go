@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/parser"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/parser"
 )
 
 // Scanner scans directories for markdown task files

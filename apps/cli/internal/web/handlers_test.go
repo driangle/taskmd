@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/metrics"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/validator"
+	"github.com/driangle/taskmd/apps/cli/internal/board"
+	"github.com/driangle/taskmd/apps/cli/internal/metrics"
+	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
 func createTestTaskDir(t *testing.T) string {

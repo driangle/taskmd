@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
 // Metrics contains computed statistics about a task set

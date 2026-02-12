@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
 func TestMatchesFilter(t *testing.T) {

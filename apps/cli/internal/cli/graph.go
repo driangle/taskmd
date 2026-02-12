@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/graph"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
+	"github.com/driangle/taskmd/apps/cli/internal/graph"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 )
 
 var (

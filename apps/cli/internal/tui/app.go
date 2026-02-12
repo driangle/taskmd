@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
 const (

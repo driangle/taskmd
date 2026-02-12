@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
+	"github.com/driangle/taskmd/apps/cli/internal/board"
 )
 
 // createBoardTestFiles creates test task files with varied statuses, priorities, tags, and efforts.

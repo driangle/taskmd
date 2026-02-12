@@ -6,8 +6,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/scanner"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/tui"
+	"github.com/driangle/taskmd/apps/cli/internal/scanner"
+	"github.com/driangle/taskmd/apps/cli/internal/tui"
 )
 
 var (

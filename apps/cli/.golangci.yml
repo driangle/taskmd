@@ -35,7 +35,7 @@ linters-settings:
 
   # Import ordering
   goimports:
-    local-prefixes: github.com/driangle/md-task-tracker
+    local-prefixes: github.com/driangle/taskmd
 
   # Error checking
   errcheck:

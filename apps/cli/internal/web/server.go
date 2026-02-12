@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/watcher"
+	"github.com/driangle/taskmd/apps/cli/internal/watcher"
 )
 
 // Config holds server configuration.

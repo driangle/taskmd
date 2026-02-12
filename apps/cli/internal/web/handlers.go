@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/board"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/graph"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/metrics"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
-	"github.com/driangle/md-task-tracker/apps/cli/internal/validator"
+	"github.com/driangle/taskmd/apps/cli/internal/board"
+	"github.com/driangle/taskmd/apps/cli/internal/graph"
+	"github.com/driangle/taskmd/apps/cli/internal/metrics"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
 func writeJSON(w http.ResponseWriter, v any) {

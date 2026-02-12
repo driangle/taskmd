@@ -73,9 +73,9 @@ jobs:
 
           # Build flags with version info
           LDFLAGS="-s -w \
-            -X 'github.com/driangle/md-task-tracker/apps/cli/internal/cli.Version=${VERSION}' \
-            -X 'github.com/driangle/md-task-tracker/apps/cli/internal/cli.GitCommit=${GIT_COMMIT}' \
-            -X 'github.com/driangle/md-task-tracker/apps/cli/internal/cli.BuildDate=${BUILD_DATE}'"
+            -X 'github.com/driangle/taskmd/apps/cli/internal/cli.Version=${VERSION}' \
+            -X 'github.com/driangle/taskmd/apps/cli/internal/cli.GitCommit=${GIT_COMMIT}' \
+            -X 'github.com/driangle/taskmd/apps/cli/internal/cli.BuildDate=${BUILD_DATE}'"
 
           # Build for Linux AMD64
           echo "Building for linux/amd64..."

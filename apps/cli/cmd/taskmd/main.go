@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/cli"
+	"github.com/driangle/taskmd/apps/cli/internal/cli"
 )
 
 func main() {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/web"
+	"github.com/driangle/taskmd/apps/cli/internal/web"
 )
 
 var (

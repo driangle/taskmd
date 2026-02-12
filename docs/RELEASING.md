@@ -157,9 +157,9 @@ VERSION="1.0.0"
 GIT_COMMIT=$(git rev-parse HEAD)
 BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-LDFLAGS="-X 'github.com/driangle/md-task-tracker/apps/cli/internal/cli.Version=${VERSION}' \
-         -X 'github.com/driangle/md-task-tracker/apps/cli/internal/cli.GitCommit=${GIT_COMMIT}' \
-         -X 'github.com/driangle/md-task-tracker/apps/cli/internal/cli.BuildDate=${BUILD_DATE}'"
+LDFLAGS="-X 'github.com/driangle/taskmd/apps/cli/internal/cli.Version=${VERSION}' \
+         -X 'github.com/driangle/taskmd/apps/cli/internal/cli.GitCommit=${GIT_COMMIT}' \
+         -X 'github.com/driangle/taskmd/apps/cli/internal/cli.BuildDate=${BUILD_DATE}'"
 
 GOOS=linux GOARCH=amd64 go build -tags embed_web -ldflags="$LDFLAGS" -o taskmd-linux-amd64 ./cmd/taskmd
 # ... repeat for other platforms

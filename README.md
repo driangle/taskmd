@@ -25,13 +25,13 @@ A powerful task management system that stores tasks as markdown files with YAML 
 
 **Option 2: Install with Go**
 ```bash
-go install github.com/yourusername/md-task-tracker/cmd/taskmd@latest
+go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
 ```
 
 **Option 3: Build from Source**
 ```bash
-git clone https://github.com/yourusername/md-task-tracker.git
-cd md-task-tracker/apps/cli
+git clone https://github.com/driangle/taskmd.git
+cd taskmd/apps/cli
 make build-full
 ```
 
@@ -203,8 +203,8 @@ Contributions are welcome! For development guidelines, see:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/md-task-tracker.git
-cd md-task-tracker
+git clone https://github.com/driangle/taskmd.git
+cd taskmd
 
 # Build CLI (from apps/cli directory)
 cd apps/cli
@@ -235,7 +235,7 @@ All new CLI features must include comprehensive tests. See [CLAUDE.md](CLAUDE.md
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/md-task-tracker/issues)
+- **Issues**: [GitHub Issues](https://github.com/driangle/taskmd/issues)
 - **Documentation**: [docs/guides/](docs/guides/)
 - **Specification**: [taskmd_specification.md](docs/taskmd_specification.md)
 

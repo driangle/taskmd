@@ -19,7 +19,7 @@ A local web-based task management interface where tasks are stored as markdown f
 ```
 
 - **API layer:** Next.js Route Handlers for CRUD on tasks and project config
-- **Config:** `~/.md-task-tracker/config.json` stores project folder paths
+- **Config:** `~/.taskmd/config.json` stores project folder paths
 - **Parsing:** gray-matter for round-trip frontmatter read/write preserving markdown body
 - **Table:** TanStack Table with client-side sort/filter (all tasks loaded at once)
 - **Editing:** Optimistic inline updates → PATCH API → write back to `.md` file

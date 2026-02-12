@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/driangle/md-task-tracker/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
 // createNextTestTaskFiles creates a set of 10 task files designed to exercise
