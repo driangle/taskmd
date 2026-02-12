@@ -1,5 +1,5 @@
 ---
-id: "054"
+id: "066"
 title: "Add color to board command titles and IDs"
 status: pending
 priority: medium

@@ -1,7 +1,7 @@
 ---
 id: "025"
 title: "export command - Multi-artifact export"
-status: cancelled
+status: completed
 priority: low
 effort: medium
 dependencies: ["021", "022", "023", "024"]

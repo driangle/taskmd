@@ -1,5 +1,5 @@
 ---
-id: "055"
+id: "064"
 title: "Remove completion CLI command"
 status: pending
 priority: low
