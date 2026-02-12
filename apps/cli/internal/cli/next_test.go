@@ -242,6 +242,97 @@ func TestNext_BlockedTasksExcluded(t *testing.T) {
 	}
 }
 
+func TestNext_CancelledTasksExcluded(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create test tasks including cancelled ones
+	tasks := map[string]string{
+		"001-active.md": `---
+id: "001"
+title: "Active pending task"
+status: pending
+priority: high
+effort: small
+dependencies: []
+tags: ["active"]
+created: 2026-02-12
+---`,
+		"002-cancelled.md": `---
+id: "002"
+title: "Cancelled task"
+status: cancelled
+priority: critical
+effort: small
+dependencies: []
+tags: ["old"]
+created: 2026-02-10
+---`,
+		"003-completed.md": `---
+id: "003"
+title: "Completed task"
+status: completed
+priority: high
+effort: medium
+dependencies: []
+tags: ["done"]
+created: 2026-02-11
+---`,
+		"004-another-active.md": `---
+id: "004"
+title: "Another active task"
+status: in-progress
+priority: medium
+effort: small
+dependencies: []
+tags: ["active"]
+created: 2026-02-12
+---`,
+	}
+
+	for filename, content := range tasks {
+		path := filepath.Join(tmpDir, filename)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+
+	resetNextFlags()
+	format = "json"
+	nextLimit = 20
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Verify no cancelled or completed tasks in recommendations
+	for _, rec := range recs {
+		if rec.ID == "002" {
+			t.Errorf("Cancelled task 002 should NOT appear in recommendations")
+		}
+		if rec.ID == "003" {
+			t.Errorf("Completed task 003 should NOT appear in recommendations")
+		}
+	}
+
+	// Verify only actionable tasks (pending/in-progress) are included
+	expectedIDs := map[string]bool{"001": true, "004": true}
+	if len(recs) != len(expectedIDs) {
+		t.Errorf("Expected %d actionable tasks, got %d", len(expectedIDs), len(recs))
+	}
+
+	for _, rec := range recs {
+		if !expectedIDs[rec.ID] {
+			t.Errorf("Unexpected task %s in recommendations", rec.ID)
+		}
+	}
+}
+
 func TestNext_LimitFlag(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 

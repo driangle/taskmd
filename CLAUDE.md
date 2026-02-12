@@ -206,7 +206,11 @@ func runMyCommand(cmd *cobra.Command, args []string) error {
 
 ## Task Management
 
-Assume `taskmd` CLI is installed globally. You can run with `taskmd --help` for usage instructions.
+When working on tasks, use the CLI to manage task status and dependencies.
+
+**During development:** Use `taskmd-dev` to test your changes (see Building and Deployment section).
+**For stable operations:** Use `taskmd` (the Homebrew-installed version).
+
 ### Task File Conventions
 
 When working on tasks:
@@ -214,6 +218,8 @@ When working on tasks:
 1. **Check task status** before starting:
    ```bash
    taskmd list tasks/cli
+   # Or during development:
+   taskmd-dev list tasks/cli
    ```
 
 2. **Update task status** as you work:
@@ -221,8 +227,14 @@ When working on tasks:
    - Mark as `completed` when done
    - Check off subtasks `- [x]` as you complete them
 
+   ```bash
+   taskmd update --task-id 042 --status in-progress
+   # Or during development:
+   taskmd-dev update --task-id 042 --status in-progress
+   ```
+
 3. **Reference the task specification** document:
-   - See `docs/TASKMD_SPEC.md` for task format conventions
+   - See `docs/taskmd_specification.md` for task format conventions
    - Follow the defined frontmatter schema
 
 ### Task Dependencies
@@ -232,22 +244,72 @@ When working on tasks:
 - Use the graph command to visualize dependencies:
   ```bash
   taskmd graph --format ascii --exclude-status completed
+  # Or during development:
+  taskmd-dev graph --format ascii --exclude-status completed
   ```
 
 ## Building and Deployment
 
-### Building the CLI
+### Development Workflow
+
+When working on the CLI, use the development build to test your changes while keeping the Homebrew-installed stable version available.
+
+#### Install Development Binary
 
 ```bash
 cd apps/cli
-make build-full
+make install-dev
 ```
 
-### Build Flags
+This installs the binary as `taskmd-dev` in `~/bin/`, keeping your stable `taskmd` (from Homebrew) available.
 
-For release builds, use version information:
+**Note:** Ensure `~/bin` is in your PATH. It should already be configured in `~/.zshrc`.
+
+#### Testing Your Changes
+
+**ALWAYS use `taskmd-dev` when testing changes you've made to the source code:**
 
 ```bash
+# After making code changes
+cd apps/cli
+make install-dev
+
+# Test your changes
+taskmd-dev list
+taskmd-dev next
+taskmd-dev update --task-id 042 --status completed
+
+# Compare with stable version if needed
+taskmd list  # Uses Homebrew version
+```
+
+#### Quick Build for Testing
+
+For rapid iteration without installing:
+
+```bash
+cd apps/cli
+make build
+
+# Run directly
+./taskmd list
+```
+
+#### Build Options
+
+| Command | Output | Use Case |
+|---------|--------|----------|
+| `make build` | `apps/cli/taskmd` | Quick local testing |
+| `make install-dev` | `~/bin/taskmd-dev` | Development (recommended) |
+| `make install` | `$GOPATH/bin/taskmd` | Replace system binary |
+| `make build-full` | `apps/cli/taskmd` (with web) | Full build with embedded web assets |
+
+### Production Builds
+
+For release builds with version information:
+
+```bash
+cd apps/cli
 go build -ldflags="-X 'main.Version=1.0.0' -X 'main.GitCommit=$(git rev-parse HEAD)' -X 'main.BuildDate=$(date)'" -o bin/taskmd ./cmd/taskmd
 ```
 
@@ -339,12 +401,18 @@ Types:
 
 ### Before Committing
 
-1. Run tests: `make test` or `go test ./...`
-2. Run linter: `make lint` or `golangci-lint run`
-3. Build successfully: `make build` or `go build ./...`
-4. Update relevant documentation
+1. **Run tests:** `make test` or `go test ./...`
+2. **Run linter:** `make lint` or `golangci-lint run`
+3. **Build successfully:** `make build` or `go build ./...`
+4. **Test with development binary:** Install and test your changes
+   ```bash
+   make install-dev
+   taskmd-dev list    # Test basic functionality
+   taskmd-dev next    # Test your specific changes
+   ```
+5. **Update relevant documentation**
 
-All three checks (test, lint, build) should pass before committing.
+All checks (test, lint, build, manual testing) should pass before committing.
 
 ## Troubleshooting
 

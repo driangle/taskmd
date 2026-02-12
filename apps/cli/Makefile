@@ -1,4 +1,4 @@
-.PHONY: build run clean install install-full test lint lint-fix tidy check web-build web-embed build-full
+.PHONY: build run clean install install-full install-dev test lint lint-fix tidy check web-build web-embed build-full
 
 # Build the binary
 build:
@@ -20,6 +20,12 @@ install:
 # Install with embedded web assets
 install-full: web-embed
 	go install -tags embed_web ./cmd/taskmd
+
+# Install as taskmd-dev (keeps Homebrew version available)
+install-dev:
+	go build -o ~/bin/taskmd-dev ./cmd/taskmd
+	@echo "Installed development binary to ~/bin/taskmd-dev"
+	@echo "Usage: taskmd-dev [command]"
 
 # Run tests
 test:
