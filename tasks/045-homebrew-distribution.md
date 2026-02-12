@@ -1,7 +1,7 @@
 ---
 id: "045"
 title: "Publish taskmd via Homebrew"
-status: in-progress
+status: completed
 priority: critical
 effort: medium
 dependencies: ["052", "053"]
@@ -47,7 +47,7 @@ For this task, we'll start with a Homebrew tap to maintain control and iterate q
   - Extract version, commit, and checksums
   - Generate/update formula file
   - Commit formula to tap repository
-- [ ] Test formula installation locally
+- [x] Test formula installation locally
   - Test on macOS (Intel and Apple Silicon)
   - Test on Linux (AMD64)
   - Verify `taskmd --version` works
@@ -57,7 +57,7 @@ For this task, we'll start with a Homebrew tap to maintain control and iterate q
   - Include tap command: `brew tap driangle/tap`
   - Include install command: `brew install taskmd`
   - Document upgrade process: `brew upgrade taskmd`
-- [ ] Test the full release cycle
+- [x] Test the full release cycle
   - Create a test release tag
   - Verify formula is auto-generated
   - Test installation from tap
