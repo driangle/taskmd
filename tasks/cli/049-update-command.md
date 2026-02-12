@@ -1,7 +1,7 @@
 ---
 id: "049"
 title: "Add update command to change task status from the CLI"
-status: pending
+status: completed
 priority: high
 effort: medium
 dependencies: ["016"]
