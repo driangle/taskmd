@@ -1,10 +1,10 @@
 ---
 id: "045"
 title: "Publish taskmd via Homebrew"
-status: pending
+status: in-progress
 priority: critical
 effort: medium
-dependencies: []
+dependencies: ["052"]
 tags:
   - distribution
   - homebrew
