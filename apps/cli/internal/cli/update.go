@@ -122,7 +122,7 @@ func validateUpdateFlags(cmd *cobra.Command) ([]fieldUpdate, *tagUpdate, error) 
 
 	if updateStatus != "" {
 		if !validStatuses[updateStatus] {
-			return nil, nil, fmt.Errorf("invalid status: %q (valid: pending, in-progress, completed, blocked)", updateStatus)
+			return nil, nil, fmt.Errorf("invalid status: %q (valid: pending, in-progress, completed, blocked, cancelled)", updateStatus)
 		}
 		updates = append(updates, fieldUpdate{key: "status", newValue: updateStatus})
 	}

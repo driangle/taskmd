@@ -258,7 +258,7 @@ func TestUpdate_MultipleFields(t *testing.T) {
 }
 
 func TestUpdate_AllValidStatuses(t *testing.T) {
-	statuses := []string{"pending", "in-progress", "completed", "blocked"}
+	statuses := []string{"pending", "in-progress", "completed", "blocked", "cancelled"}
 	for _, status := range statuses {
 		t.Run(status, func(t *testing.T) {
 			tmpDir := createUpdateTestFiles(t)
@@ -277,6 +277,28 @@ func TestUpdate_AllValidStatuses(t *testing.T) {
 				t.Errorf("Expected file to contain status: %s", status)
 			}
 		})
+	}
+}
+
+func TestUpdate_CancelledStatus(t *testing.T) {
+	tmpDir := createUpdateTestFiles(t)
+	resetUpdateFlags()
+	dir = tmpDir
+	updateTaskID = "002"
+	updateStatus = "cancelled"
+
+	output, err := captureUpdateOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error when setting status to cancelled: %v", err)
+	}
+
+	if !strings.Contains(output, "status: in-progress -> cancelled") {
+		t.Errorf("Expected status change to cancelled in output, got: %s", output)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	if !strings.Contains(string(content), "status: cancelled") {
+		t.Error("Expected file to contain status: cancelled")
 	}
 }
 
