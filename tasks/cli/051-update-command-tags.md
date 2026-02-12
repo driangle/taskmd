@@ -1,7 +1,7 @@
 ---
 id: "051"
 title: "Support adding and removing tags via the update command"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["049"]
