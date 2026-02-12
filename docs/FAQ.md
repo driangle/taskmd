@@ -20,6 +20,10 @@ Quick answers to common questions about taskmd.
 
 **A:** Yes! Download pre-built binaries from the [GitHub releases page](https://github.com/driangle/taskmd/releases), use `go install`, or clone the repository and run `make build-full` in the `apps/cli` directory. See the [README installation section](../README.md#installation) for detailed instructions.
 
+### Q: How do I set up agent configuration files?
+
+**A:** Run `taskmd agents init` to create configuration files for AI coding assistants. By default, this creates `CLAUDE.md` with taskmd documentation for Claude Code. Use `--gemini` to create `GEMINI.md` for Gemini, or `--codex` to create `AGENTS.md` for Codex. You can create multiple configs at once: `taskmd agents init --claude --gemini`. These files help AI assistants understand your taskmd workflow and provide better assistance.
+
 ## Task Format
 
 ### Q: What is the task file format?

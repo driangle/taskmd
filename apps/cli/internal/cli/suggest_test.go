@@ -88,6 +88,8 @@ func TestSuggestFor_AllAliasesRegistered(t *testing.T) {
 
 func TestSuggestFor_CobraSuggestsCorrectCommand(t *testing.T) {
 	// Verify that cobra actually suggests the right command when given an alias.
+	// Note: Deprecated commands may not appear in cobra's SuggestionsFor results,
+	// so we skip testing those.
 	tests := []commandSuggestion{
 		{alias: "set", command: "update"},
 		{alias: "view", command: "show"},
@@ -98,7 +100,7 @@ func TestSuggestFor_CobraSuggestsCorrectCommand(t *testing.T) {
 		{alias: "kanban", command: "board"},
 		{alias: "pick", command: "next"},
 		{alias: "backup", command: "snapshot"},
-		{alias: "setup", command: "init"},
+		// init is deprecated, so we don't test its suggestions here
 		{alias: "ui", command: "tui"},
 		{alias: "serve", command: "web"},
 	}

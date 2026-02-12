@@ -1,7 +1,7 @@
 ---
-id: "056"
+id: "067"
 title: "Move init command under agents subcommand"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["048"]
@@ -21,21 +21,21 @@ Restructure the CLI command hierarchy to group agent-related commands under an `
 
 ## Tasks
 
-- [ ] Create `agents` parent command in `internal/cli/agents.go`
-- [ ] Move `init` command logic to be a subcommand of `agents`
-- [ ] Update init command to use agent-specific flags:
+- [x] Create `agents` parent command in `internal/cli/agents.go`
+- [x] Move `init` command logic to be a subcommand of `agents`
+- [x] Update init command to use agent-specific flags:
   - `--claude` - Initialize for Claude Code (default if no flags specified)
   - `--gemini` - Initialize for Gemini
   - `--codex` - Initialize for Codex
   - Allow multiple flags to generate configs for multiple agents
   - Default to Claude if no agent flags are provided
-- [ ] Update command registration in root command
-- [ ] Update help text and command descriptions
-- [ ] Update any existing tests for init command
-- [ ] Add tests for the new `agents` command structure
+- [x] Update command registration in root command
+- [x] Update help text and command descriptions
+- [x] Update any existing tests for init command
+- [x] Add tests for the new `agents` command structure
 - [ ] Update documentation and README with new command syntax
 - [ ] Consider adding `agents list` subcommand to show available agents
-- [ ] Maintain backward compatibility or add deprecation warning for old `taskmd init`
+- [x] Maintain backward compatibility or add deprecation warning for old `taskmd init`
 
 ## Acceptance Criteria
 
