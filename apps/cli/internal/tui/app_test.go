@@ -670,3 +670,195 @@ func TestDetailView_EnterWithNoTasks(t *testing.T) {
 		t.Error("expected viewMode to stay viewList when no tasks")
 	}
 }
+
+// Live Reload Tests
+
+func TestFileChangeMsg_TriggersRefresh(t *testing.T) {
+	m := initApp(sampleTasks())
+
+	// Send file change message
+	msg := fileChangeMsg{}
+	_, cmd := m.Update(msg)
+
+	if cmd == nil {
+		t.Error("expected refresh command after file change")
+	}
+}
+
+func TestTasksRefreshedMsg_UpdatesTasks(t *testing.T) {
+	m := initApp(sampleTasks())
+
+	// Original tasks
+	if len(m.tasks) != 4 {
+		t.Fatalf("expected 4 initial tasks, got %d", len(m.tasks))
+	}
+
+	// Send refresh with new tasks
+	newTasks := []*model.Task{
+		{ID: "001", Title: "Updated Task A", Status: model.StatusPending},
+		{ID: "005", Title: "New Task E", Status: model.StatusPending},
+	}
+	msg := tasksRefreshedMsg{tasks: newTasks}
+	updated, cmd := m.Update(msg)
+	m = updated.(App)
+
+	if len(m.tasks) != 2 {
+		t.Errorf("expected 2 tasks after refresh, got %d", len(m.tasks))
+	}
+	if m.tasks[0].Title != "Updated Task A" {
+		t.Errorf("expected updated title, got %s", m.tasks[0].Title)
+	}
+	if cmd == nil {
+		t.Error("expected command to continue listening for file changes")
+	}
+}
+
+func TestTasksRefreshedMsg_ShowsIndicator(t *testing.T) {
+	m := initApp(sampleTasks())
+
+	msg := tasksRefreshedMsg{tasks: sampleTasks()}
+	updated, _ := m.Update(msg)
+	m = updated.(App)
+
+	if !m.showRefreshIndicator {
+		t.Error("expected showRefreshIndicator to be true after refresh")
+	}
+}
+
+func TestHideRefreshIndicatorMsg_HidesIndicator(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.showRefreshIndicator = true
+
+	msg := hideRefreshIndicatorMsg{}
+	updated, _ := m.Update(msg)
+	m = updated.(App)
+
+	if m.showRefreshIndicator {
+		t.Error("expected showRefreshIndicator to be false after hide message")
+	}
+}
+
+func TestUpdateTasksPreservingState_PreservesSelection(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.selectedIndex = 2 // Select task 003
+
+	// Refresh with same tasks (simulating file edit)
+	newTasks := []*model.Task{
+		{ID: "001", Title: "Task A Updated", Status: model.StatusPending},
+		{ID: "002", Title: "Task B Updated", Status: model.StatusInProgress},
+		{ID: "003", Title: "Task C Updated", Status: model.StatusCompleted},
+		{ID: "004", Title: "Task D Updated", Status: model.StatusBlocked},
+	}
+
+	m.updateTasksPreservingState(newTasks)
+
+	if m.selectedIndex != 2 {
+		t.Errorf("expected selectedIndex to be preserved at 2, got %d", m.selectedIndex)
+	}
+	if m.tasks[2].ID != "003" {
+		t.Errorf("expected task 003 at index 2, got %s", m.tasks[2].ID)
+	}
+	if m.tasks[2].Title != "Task C Updated" {
+		t.Errorf("expected updated title, got %s", m.tasks[2].Title)
+	}
+}
+
+func TestUpdateTasksPreservingState_TaskRemoved(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.selectedIndex = 2 // Select task 003
+
+	// Refresh with task 003 removed
+	newTasks := []*model.Task{
+		{ID: "001", Title: "Task A", Status: model.StatusPending},
+		{ID: "002", Title: "Task B", Status: model.StatusInProgress},
+		{ID: "004", Title: "Task D", Status: model.StatusBlocked},
+	}
+
+	m.updateTasksPreservingState(newTasks)
+
+	// Selection should be clamped to valid range
+	if m.selectedIndex >= len(newTasks) {
+		t.Errorf("expected selectedIndex to be clamped to <%d, got %d", len(newTasks), m.selectedIndex)
+	}
+	if m.selectedIndex < 0 {
+		t.Errorf("expected selectedIndex to be non-negative, got %d", m.selectedIndex)
+	}
+}
+
+func TestUpdateTasksPreservingState_TaskAddedBefore(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.selectedIndex = 1 // Select task 002
+
+	// Add a new task at the beginning
+	newTasks := []*model.Task{
+		{ID: "000", Title: "New Task", Status: model.StatusPending},
+		{ID: "001", Title: "Task A", Status: model.StatusPending},
+		{ID: "002", Title: "Task B", Status: model.StatusInProgress},
+		{ID: "003", Title: "Task C", Status: model.StatusCompleted},
+		{ID: "004", Title: "Task D", Status: model.StatusBlocked},
+	}
+
+	m.updateTasksPreservingState(newTasks)
+
+	// Should still select task 002 (now at index 2)
+	if m.tasks[m.selectedIndex].ID != "002" {
+		t.Errorf("expected task 002 to still be selected, got %s", m.tasks[m.selectedIndex].ID)
+	}
+}
+
+func TestUpdateTasksPreservingState_WithFilter(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.searchQuery = "Task C"
+	filteredTasks := m.getFilteredTasks()
+	if len(filteredTasks) != 1 {
+		t.Fatalf("expected 1 filtered task, got %d", len(filteredTasks))
+	}
+	m.selectedIndex = 0 // Select the only filtered task (003)
+
+	// Refresh with task 003 updated
+	newTasks := []*model.Task{
+		{ID: "001", Title: "Task A", Status: model.StatusPending},
+		{ID: "002", Title: "Task B", Status: model.StatusInProgress},
+		{ID: "003", Title: "Task C Modified", Status: model.StatusCompleted},
+		{ID: "004", Title: "Task D", Status: model.StatusBlocked},
+	}
+
+	m.updateTasksPreservingState(newTasks)
+
+	// Should still select task 003 in filtered view
+	filteredTasks = m.getFilteredTasks()
+	if len(filteredTasks) == 0 {
+		t.Fatal("expected at least one filtered task")
+	}
+	// Check if selection is valid and points to the right task
+	if m.selectedIndex >= len(filteredTasks) {
+		t.Fatalf("selectedIndex %d out of range for %d filtered tasks", m.selectedIndex, len(filteredTasks))
+	}
+	if filteredTasks[m.selectedIndex].ID != "003" {
+		t.Errorf("expected task 003 to be selected, got %s", filteredTasks[m.selectedIndex].ID)
+	}
+}
+
+func TestRenderHeader_ShowsRefreshIndicator(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.showRefreshIndicator = true
+
+	header := m.renderHeader()
+
+	// Check for refresh indicator (⟳)
+	if !strings.Contains(header, "⟳") && !strings.Contains(header, "refresh") {
+		t.Error("expected header to contain refresh indicator when showRefreshIndicator is true")
+	}
+}
+
+func TestRenderHeader_HidesRefreshIndicator(t *testing.T) {
+	m := initApp(sampleTasks())
+	m.showRefreshIndicator = false
+
+	header := m.renderHeader()
+
+	// Should not contain refresh indicator
+	if strings.Contains(header, "⟳") {
+		t.Error("expected header to not contain refresh indicator when showRefreshIndicator is false")
+	}
+}

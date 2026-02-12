@@ -3,12 +3,15 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/scanner"
+	"github.com/driangle/taskmd/apps/cli/internal/watcher"
 )
 
 const (
@@ -16,31 +19,47 @@ const (
 	viewDetail = 1
 )
 
+// fileChangeMsg signals that task files have changed on disk.
+type fileChangeMsg struct{}
+
+// tasksRefreshedMsg contains the newly scanned tasks after a file change.
+type tasksRefreshedMsg struct {
+	tasks []*model.Task
+}
+
+// hideRefreshIndicatorMsg signals to hide the refresh indicator.
+type hideRefreshIndicatorMsg struct{}
+
 // Options holds configuration options for the TUI.
 type Options struct {
 	FocusTaskID string
 	Filter      string
 	GroupBy     string
 	ReadOnly    bool
+	Verbose     bool
 }
 
 // App is the root bubbletea model for the TUI shell.
 type App struct {
-	width              int
-	height             int
-	scanDir            string
-	tasks              []*model.Task
-	ready              bool
-	showHelp           bool
-	selectedIndex      int
-	scrollOffset       int
-	searchMode         bool
-	searchQuery        string
-	groupBy            string
-	readonly           bool
-	viewMode           int
-	detailScrollOffset int
-	renderedDetail     string
+	width                int
+	height               int
+	scanDir              string
+	tasks                []*model.Task
+	ready                bool
+	showHelp             bool
+	selectedIndex        int
+	scrollOffset         int
+	searchMode           bool
+	searchQuery          string
+	groupBy              string
+	readonly             bool
+	viewMode             int
+	detailScrollOffset   int
+	renderedDetail       string
+	watcher              *watcher.Watcher
+	verbose              bool
+	showRefreshIndicator bool
+	fileChangeChan       chan struct{}
 }
 
 // New creates a new TUI app shell.
@@ -51,10 +70,12 @@ func New(scanDir string, tasks []*model.Task) App {
 // NewWithOptions creates a new TUI app shell with configuration options.
 func NewWithOptions(scanDir string, tasks []*model.Task, opts Options) App {
 	app := App{
-		scanDir:  scanDir,
-		tasks:    tasks,
-		groupBy:  opts.GroupBy,
-		readonly: opts.ReadOnly,
+		scanDir:        scanDir,
+		tasks:          tasks,
+		groupBy:        opts.GroupBy,
+		readonly:       opts.ReadOnly,
+		verbose:        opts.Verbose,
+		fileChangeChan: make(chan struct{}, 1),
 	}
 
 	// Apply initial filter if provided
@@ -88,7 +109,32 @@ func parseFilter(filter string) string {
 }
 
 func (m App) Init() tea.Cmd {
-	return nil
+	// Start the file watcher and begin listening for changes
+	go m.startWatcher()
+	return m.waitForFileChange()
+}
+
+// startWatcher initializes and runs the file watcher in a goroutine.
+func (m App) startWatcher() {
+	m.watcher = watcher.New(m.scanDir, func() {
+		// Send notification through channel when files change
+		select {
+		case m.fileChangeChan <- struct{}{}:
+		default:
+			// Channel full, skip (already have a pending change)
+		}
+	}, 200*time.Millisecond)
+
+	// Start watching (blocks until stopped)
+	_ = m.watcher.Start()
+}
+
+// waitForFileChange creates a command that waits for file change notifications.
+func (m App) waitForFileChange() tea.Cmd {
+	return func() tea.Msg {
+		<-m.fileChangeChan
+		return fileChangeMsg{}
+	}
 }
 
 func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -97,6 +143,23 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+
+	case fileChangeMsg:
+		// Files changed, trigger re-scan
+		return m, m.refreshTasks()
+
+	case tasksRefreshedMsg:
+		// New tasks have been scanned, update the model
+		m.updateTasksPreservingState(msg.tasks)
+		m.showRefreshIndicator = true
+		return m, tea.Batch(
+			m.waitForFileChange(), // Continue listening for changes
+			m.hideRefreshIndicator(),
+		)
+
+	case hideRefreshIndicatorMsg:
+		m.showRefreshIndicator = false
+		return m, nil
 
 	case tea.KeyMsg:
 		if m.searchMode {
@@ -109,6 +172,59 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleListKey(msg)
 	}
 	return m, nil
+}
+
+// refreshTasks triggers a re-scan of task files.
+func (m App) refreshTasks() tea.Cmd {
+	return func() tea.Msg {
+		taskScanner := scanner.NewScanner(m.scanDir, m.verbose)
+		result, err := taskScanner.Scan()
+		if err != nil {
+			// On error, return current tasks (no change)
+			return tasksRefreshedMsg{tasks: m.tasks}
+		}
+		return tasksRefreshedMsg{tasks: result.Tasks}
+	}
+}
+
+// updateTasksPreservingState updates tasks while preserving selection and scroll.
+func (m *App) updateTasksPreservingState(newTasks []*model.Task) {
+	// Save currently selected task ID
+	var selectedTaskID string
+	filteredTasks := m.getFilteredTasks()
+	if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks) {
+		selectedTaskID = filteredTasks[m.selectedIndex].ID
+	}
+
+	// Update tasks
+	m.tasks = newTasks
+
+	// Try to restore selection
+	if selectedTaskID != "" {
+		filteredTasks = m.getFilteredTasks()
+		for i, task := range filteredTasks {
+			if task.ID == selectedTaskID {
+				m.selectedIndex = i
+				return
+			}
+		}
+	}
+
+	// If we couldn't restore selection, clamp to valid range
+	filteredTasks = m.getFilteredTasks()
+	if m.selectedIndex >= len(filteredTasks) {
+		m.selectedIndex = len(filteredTasks) - 1
+	}
+	if m.selectedIndex < 0 {
+		m.selectedIndex = 0
+	}
+}
+
+// hideRefreshIndicator returns a command that hides the refresh indicator after a delay.
+func (m App) hideRefreshIndicator() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
+		return hideRefreshIndicatorMsg{}
+	})
 }
 
 func (m *App) handleSearchKey(msg tea.KeyMsg) {
@@ -251,6 +367,13 @@ func (m App) renderHeader() string {
 	title := "taskmd"
 	dir := m.scanDir
 	text := fmt.Sprintf(" %s  %s", title, dir)
+
+	if m.showRefreshIndicator {
+		refreshIcon := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("green")).
+			Render(" ⟳")
+		text += refreshIcon
+	}
 
 	return headerStyle.Width(m.width).Render(text)
 }

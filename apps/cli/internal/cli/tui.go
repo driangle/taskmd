@@ -51,6 +51,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		Filter:      tuiFilter,
 		GroupBy:     tuiGroupBy,
 		ReadOnly:    tuiReadonly,
+		Verbose:     flags.Verbose,
 	}
 
 	app := tui.NewWithOptions(scanDir, result.Tasks, opts)
