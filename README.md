@@ -1,6 +1,8 @@
 # taskmd
 
-A powerful task management system that stores tasks as markdown files with YAML frontmatter. Manage your projects with the flexibility of plain text files and the power of structured metadata.
+A CLI tool for managing tasks and projects using markdown files. Store your tasks as human-readable `.md` files with YAML frontmatter, and use the CLI or web interface to manage, visualize, and track your work.
+
+It's made to be LLM-friendly, so you can easily integrate it into your workflows and automate task management with AI.
 
 ## Features
 
@@ -9,9 +11,6 @@ A powerful task management system that stores tasks as markdown files with YAML 
 - **📊 Dependency Tracking**: Visualize task dependencies with interactive graphs
 - **✅ Validation**: Built-in linting ensures task files follow conventions
 - **🎯 Smart Filtering**: Find tasks by status, priority, tags, and dependencies
-- **📈 Analytics**: Track project progress with statistics and metrics
-- **🔄 Live Reload**: Web interface updates automatically when task files change
-- **🎨 Multiple Views**: List, board (kanban), graph, and interactive TUI modes
 
 ## Quick Start
 
