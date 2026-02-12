@@ -1,5 +1,5 @@
 ---
-id: "052"
+id: "059"
 title: "TUI grouped view mode"
 status: pending
 priority: low
