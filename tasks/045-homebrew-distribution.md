@@ -4,7 +4,7 @@ title: "Publish taskmd via Homebrew"
 status: in-progress
 priority: critical
 effort: medium
-dependencies: ["052"]
+dependencies: ["052", "053"]
 tags:
   - distribution
   - homebrew
@@ -37,13 +37,13 @@ For this task, we'll start with a Homebrew tap to maintain control and iterate q
 
 ## Tasks
 
-- [ ] Create a Homebrew tap repository (`homebrew-tap` or similar)
-- [ ] Create Homebrew formula (`taskmd.rb`)
+- [x] Create a Homebrew tap repository (`homebrew-tap` or similar)
+- [x] Create Homebrew formula (`taskmd.rb`)
   - Define download URLs for binaries
   - Include SHA256 checksums
   - Set up installation paths and symlinks
   - Add test blocks to verify installation
-- [ ] Update release workflow to generate formula automatically
+- [x] Update release workflow to generate formula automatically
   - Extract version, commit, and checksums
   - Generate/update formula file
   - Commit formula to tap repository
@@ -52,9 +52,9 @@ For this task, we'll start with a Homebrew tap to maintain control and iterate q
   - Test on Linux (AMD64)
   - Verify `taskmd --version` works
   - Verify `taskmd` commands function correctly
-- [ ] Document Homebrew installation in README
+- [x] Document Homebrew installation in README
   - Add installation instructions
-  - Include tap command: `brew tap <org>/tap`
+  - Include tap command: `brew tap driangle/tap`
   - Include install command: `brew install taskmd`
   - Document upgrade process: `brew upgrade taskmd`
 - [ ] Test the full release cycle
@@ -149,6 +149,88 @@ taskmd web --port 3000
 # Uninstall
 brew uninstall taskmd
 brew untap <org>/tap
+```
+
+## Testing the Release Cycle
+
+### Step 1: Create a Test Release
+
+```bash
+# Make sure all changes are committed
+git add .
+git commit -m "feat: add Homebrew distribution support"
+
+# Create and push a version tag (e.g., v0.1.0)
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+### Step 2: Monitor the Release Workflow
+
+1. Go to https://github.com/driangle/taskmd/actions
+2. Watch the "Release" workflow run
+3. Verify all steps complete successfully, including "Update Homebrew Formula"
+4. Check that the release is created at https://github.com/driangle/taskmd/releases
+
+### Step 3: Verify the Formula Update
+
+1. Go to https://github.com/driangle/homebrew-tap
+2. Check that `Formula/taskmd.rb` was updated with the new version
+3. Verify the checksums are real (not placeholders)
+4. Check the commit message shows the correct version
+
+### Step 4: Test Installation Locally
+
+```bash
+# If you already have the tap, update it
+brew update
+
+# If not, add the tap
+brew tap driangle/tap
+
+# Install taskmd
+brew install taskmd
+
+# Verify installation
+taskmd --version  # Should show v0.1.0
+which taskmd      # Should show /usr/local/bin/taskmd or similar
+
+# Test basic commands
+taskmd list tasks/
+taskmd stats tasks/
+taskmd web start --help
+
+# Test the embedded web UI works
+taskmd web start --port 3000
+# Open http://localhost:3000 and verify it loads
+```
+
+### Step 5: Test Upgrade Path
+
+```bash
+# Create another release (e.g., v0.1.1)
+git tag v0.1.1
+git push origin v0.1.1
+
+# Wait for workflow to complete, then upgrade
+brew update
+brew upgrade taskmd
+
+# Verify new version
+taskmd --version  # Should show v0.1.1
+```
+
+### Step 6: Optional - Audit the Formula
+
+```bash
+# Check formula follows Homebrew guidelines
+brew audit --strict taskmd
+
+# Test installation from scratch
+brew uninstall taskmd
+brew untap driangle/tap
+brew tap driangle/tap
+brew install taskmd
 ```
 
 ## References

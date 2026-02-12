@@ -17,18 +17,36 @@ A powerful task management system that stores tasks as markdown files with YAML 
 
 ### Installation
 
-**Option 1: Download Pre-built Binary**
+**Option 1: Homebrew (macOS and Linux)**
 ```bash
-# Download from releases page (coming soon)
-# Extract and add to PATH
+# Add the tap
+brew tap driangle/tap
+
+# Install taskmd
+brew install taskmd
+
+# Verify installation
+taskmd --version
 ```
 
-**Option 2: Install with Go**
+**Option 2: Download Pre-built Binary**
+```bash
+# Download from the releases page
+# https://github.com/driangle/taskmd/releases
+
+# Extract the archive
+tar -xzf taskmd-v*.tar.gz  # or unzip for Windows
+
+# Move to PATH
+sudo mv taskmd /usr/local/bin/  # macOS/Linux
+```
+
+**Option 3: Install with Go**
 ```bash
 go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
 ```
 
-**Option 3: Build from Source**
+**Option 4: Build from Source**
 ```bash
 git clone https://github.com/driangle/taskmd.git
 cd taskmd/apps/cli
@@ -241,7 +259,7 @@ All new CLI features must include comprehensive tests. See [CLAUDE.md](CLAUDE.md
 
 ## Roadmap
 
-- [ ] Homebrew installation (see [tasks/045](tasks/045-publish-homebrew.md))
+- [x] Homebrew installation - Available via `brew tap driangle/tap`
 - [ ] GitHub Pages documentation site (see [tasks/046](tasks/046-documentation-site.md))
 - [ ] Task templates and scaffolding
 - [ ] Git integration features
