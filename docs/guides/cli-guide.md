@@ -799,23 +799,56 @@ taskmd graph --format ascii > task-tree.txt
 
 ## Configuration
 
-### Config File Support (Coming Soon)
+### Config File Support
 
-Configuration file support (`.taskmd.yaml`) is **planned but not yet fully implemented**. See [task 056](../../tasks/056-implement-taskmd-yaml-config.md) for implementation status.
+taskmd supports `.taskmd.yaml` configuration files to set default options without repeating command-line flags.
 
-When implemented, the config file will support:
+**Supported Config Options:**
 
 ```yaml
-# .taskmd.yaml (planned)
-dir: ./tasks      # Default task directory
+# .taskmd.yaml
+dir: ./tasks                    # Default task directory
 web:
-  port: 8080     # Default web server port
-  open: true     # Auto-open browser on web start
+  port: 8080                   # Default web server port
+  auto_open_browser: true      # Auto-open browser on web start
 ```
 
-### Current Workarounds
+**Config File Locations:**
 
-Until config file support is implemented, use these approaches:
+1. **Project-level**: `./.taskmd.yaml` (in current directory)
+2. **Global**: `~/.taskmd.yaml` (in home directory)
+3. **Custom**: Use `--config path/to/config.yaml`
+
+**Precedence Order** (highest to lowest):
+
+1. Command-line flags (explicit user intent)
+2. Project-level `.taskmd.yaml` (project-specific defaults)
+3. Global `~/.taskmd.yaml` (user-wide defaults)
+4. Built-in defaults (fallback)
+
+**Example Usage:**
+
+```bash
+# Create project config
+cat > .taskmd.yaml <<EOF
+dir: ./tasks
+web:
+  port: 3000
+  auto_open_browser: true
+EOF
+
+# Now these commands use config defaults
+taskmd list              # Uses ./tasks directory
+taskmd web start        # Uses port 3000 and opens browser
+
+# CLI flags still override config
+taskmd list --dir ./other-tasks  # Overrides config dir
+taskmd web start --port 8080     # Overrides config port
+```
+
+See [docs/.taskmd.yaml.example](../.taskmd.yaml.example) for a complete example with comments.
+
+### Alternative Configuration Methods
 
 **1. Shell Aliases:**
 ```bash
@@ -827,13 +860,6 @@ alias tmw='taskmd web start --port 8080 --open'
 **2. Environment Variables:**
 ```bash
 export TASKMD_DIR=./tasks
-```
-
-**3. Project Scripts:**
-```bash
-# In project root: taskmd.sh
-#!/bin/bash
-taskmd --dir ./tasks "$@"
 ```
 
 ### Command-Line Flags
@@ -851,12 +877,17 @@ Global flags (available for all commands):
 
 ### Environment Variables
 
+taskmd supports environment variables with the `TASKMD_` prefix:
+
 ```bash
 # Override default directory
 export TASKMD_DIR=./tasks
 
-# Override config location
-export TASKMD_CONFIG=~/.config/taskmd.yaml
+# Override verbose flag
+export TASKMD_VERBOSE=true
+
+# All flags can be set via TASKMD_FLAGNAME
+# Environment variables have lower precedence than config files and CLI flags
 ```
 
 ## Tips and Best Practices

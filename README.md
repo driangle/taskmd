@@ -180,12 +180,22 @@ See the [Task Specification](docs/taskmd_specification.md) for complete format d
 
 ## Configuration
 
-Configuration file support (`.taskmd.yaml`) is planned but not yet fully implemented. For now, use command-line flags or shell aliases:
+taskmd supports `.taskmd.yaml` configuration files for setting default options:
 
-```bash
-# Set up a shell alias with your preferred defaults
-alias tm='taskmd --dir ./tasks'
+```yaml
+# .taskmd.yaml - Place in project root or home directory
+dir: ./tasks                    # Default task directory
+web:
+  port: 8080                   # Default web server port
+  auto_open_browser: true      # Auto-open browser on web start
 ```
+
+**Config file locations** (in order of precedence):
+1. `./.taskmd.yaml` - Project-specific settings
+2. `~/.taskmd.yaml` - User-wide defaults
+3. Command-line flags always override config values
+
+See [docs/.taskmd.yaml.example](docs/.taskmd.yaml.example) for a complete example with all supported options.
 
 ## Project Structure
 

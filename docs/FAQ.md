@@ -196,11 +196,30 @@ Always use the task ID (from the `id` field), not the filename. Dependencies ind
 
 ### Q: Can I set default options?
 
-**A:** Currently, you must use command-line flags for each invocation. Config file support is planned but not yet fully implemented. Use shell aliases to set your preferred defaults: `alias tm='taskmd --dir ./tasks --format table'`.
+**A:** Yes! Create a `.taskmd.yaml` file in your project directory or home directory. Supported options include `dir` (default task directory), `web.port` (web server port), and `web.auto_open_browser` (auto-open browser on web start). See the [example config file](/.taskmd.yaml.example) for a complete template. Command-line flags always override config file values.
+
+### Q: Where should I put my config file?
+
+**A:** You have two options:
+1. **Project-level**: Create `.taskmd.yaml` in your project root for project-specific defaults
+2. **Global**: Create `~/.taskmd.yaml` in your home directory for user-wide defaults
+
+Project-level config takes precedence over global config, and command-line flags override both.
+
+### Q: What can I configure in .taskmd.yaml?
+
+**A:** The config file supports three options:
+```yaml
+dir: ./tasks                    # Default task directory
+web:
+  port: 8080                   # Default web server port
+  auto_open_browser: true      # Auto-open browser on web start
+```
+Other flags like `format`, `verbose`, and `quiet` are intentionally CLI-only to keep config files focused on project settings.
 
 ### Q: How do I change the default task directory?
 
-**A:** Use the `--dir` flag: `taskmd list --dir my-tasks/` or `-d` for short: `taskmd list -d my-tasks/`. You can also use environment variables with the `TASKMD_` prefix if needed: `export TASKMD_DIR=./my-tasks`.
+**A:** Set `dir: ./my-tasks` in your `.taskmd.yaml` file, or use the `--dir` flag: `taskmd list --dir my-tasks/` (or `-d` for short). You can also use environment variables: `export TASKMD_DIR=./my-tasks`. Precedence: CLI flags > project config > global config > env vars > defaults.
 
 ## Need More Help?
 

@@ -1,0 +1,3 @@
+dir: ./tasks
+web:
+  auto_open_browser: false

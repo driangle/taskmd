@@ -1,7 +1,7 @@
 ---
 id: "056"
 title: "Implement .taskmd.yaml configuration file support"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: []
@@ -24,7 +24,7 @@ The CLI currently has Viper set up and binds flags, but the code reads flag vari
 
 1. Fix `GetGlobalFlags()` to read from Viper instead of flag variables
 2. Add support for project-level `.taskmd.yaml` (not just `~/.taskmd.yaml`)
-3. Support only essential config options: `dir`, `web.port`, and `web.open`
+3. Support only essential config options: `dir`, `web.port`, and `web.auto_open_browser`
 
 **Current Code Location:** `apps/cli/internal/cli/root.go`
 
@@ -39,7 +39,7 @@ The CLI currently has Viper set up and binds flags, but the code reads flag vari
   - Ensure command-line flags override config file values (current behavior preserved)
 - [ ] Add web server config support
   - Read `web.port` from config if not specified via flag
-  - Read `web.open` from config if not specified via flag
+  - Read `web.auto_open_browser` from config if not specified via flag
   - Update `webStartCmd` flag initialization to use viper defaults
 - [ ] Add tests for config file loading
   - Test global config (`~/.taskmd.yaml`)
@@ -130,7 +130,7 @@ func init() {
 
     webStartCmd.Flags().IntVar(&webPort, "port", defaultPort, "server port")
     webStartCmd.Flags().BoolVar(&webDev, "dev", false, "enable dev mode")
-    webStartCmd.Flags().BoolVar(&webOpen, "open", viper.GetBool("web.open"), "open browser on start")
+    webStartCmd.Flags().BoolVar(&webOpen, "open", viper.GetBool("web.auto_open_browser"), "open browser on start")
 }
 ```
 
@@ -141,7 +141,7 @@ func init() {
 - [ ] Command-line flags override config file values
 - [ ] `dir` option works from config file
 - [ ] `web.port` option works from config file
-- [ ] `web.open` option works from config file
+- [ ] `web.auto_open_browser` option works from config file
 - [ ] Tests verify config loading and precedence
 - [ ] Documentation updated to reflect working config support
 - [ ] Example config file provided in `docs/` directory
@@ -174,6 +174,6 @@ Create `internal/cli/config_test.go` with tests for:
 
 ## Notes
 
-- We're deliberately limiting config options to `dir`, `web.port`, and `web.open` only
+- We're deliberately limiting config options to `dir`, `web.port`, and `web.auto_open_browser` only
 - Other flags like `format`, `verbose`, `quiet` should remain CLI-only for simplicity
 - This keeps config files focused on project-specific settings, not per-invocation preferences

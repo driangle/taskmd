@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/apps/cli/internal/web"
 )
@@ -54,6 +55,10 @@ func init() {
 	webStartCmd.Flags().IntVar(&webPort, "port", 8080, "server port")
 	webStartCmd.Flags().BoolVar(&webDev, "dev", false, "enable dev mode (CORS for Vite dev server)")
 	webStartCmd.Flags().BoolVar(&webOpen, "open", false, "open browser on start")
+
+	// Bind flags to viper for config file support
+	viper.BindPFlag("web.port", webStartCmd.Flags().Lookup("port"))
+	viper.BindPFlag("web.auto_open_browser", webStartCmd.Flags().Lookup("open"))
 }
 
 func runWebStart(cmd *cobra.Command, _ []string) error {
@@ -67,11 +72,16 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("not a valid directory: %s", absDir)
 	}
 
+	// Read from viper to support config file values
+	port := viper.GetInt("web.port")
+	open := viper.GetBool("web.auto_open_browser")
+	flags := GetGlobalFlags()
+
 	srv := web.NewServer(web.Config{
-		Port:    webPort,
+		Port:    port,
 		ScanDir: absDir,
 		Dev:     webDev,
-		Verbose: verbose,
+		Verbose: flags.Verbose,
 	})
 
 	ctx, cancel := signal.NotifyContext(
@@ -80,8 +90,8 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 	)
 	defer cancel()
 
-	if webOpen {
-		go openBrowser(fmt.Sprintf("http://localhost:%d", webPort))
+	if open {
+		go openBrowser(fmt.Sprintf("http://localhost:%d", port))
 	}
 
 	return srv.Start(ctx)

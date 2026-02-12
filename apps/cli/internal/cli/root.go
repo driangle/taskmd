@@ -69,17 +69,15 @@ func initConfig() {
 		// Use config file from the flag
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory
+		// Add current directory (project-level config takes precedence)
+		viper.AddConfigPath(".")
+
+		// Add home directory (global config)
 		home, err := os.UserHomeDir()
-		if err != nil {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
-			}
-			return
+		if err == nil {
+			viper.AddConfigPath(home)
 		}
 
-		// Search config in home directory with name ".taskmd" (without extension)
-		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".taskmd")
 	}
@@ -96,12 +94,28 @@ func initConfig() {
 
 // GetGlobalFlags returns a struct with all global flag values
 func GetGlobalFlags() GlobalFlags {
+	// Try to get from viper first (supports config files)
+	// Fall back to flag variables if viper doesn't have the value (for tests)
+	dirVal := viper.GetString("dir")
+	if dirVal == "" && dir != "" {
+		dirVal = dir
+	} else if dirVal == "" {
+		dirVal = "."
+	}
+
+	formatVal := viper.GetString("format")
+	if formatVal == "" && format != "" {
+		formatVal = format
+	} else if formatVal == "" {
+		formatVal = "table"
+	}
+
 	return GlobalFlags{
-		Stdin:   stdin,
-		Format:  format,
-		Quiet:   quiet,
-		Verbose: verbose,
-		Dir:     dir,
+		Stdin:   viper.GetBool("stdin") || stdin,
+		Format:  formatVal,
+		Quiet:   viper.GetBool("quiet") || quiet,
+		Verbose: viper.GetBool("verbose") || verbose,
+		Dir:     dirVal,
 	}
 }
 

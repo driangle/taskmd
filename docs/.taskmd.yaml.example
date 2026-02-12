@@ -1,0 +1,30 @@
+# Example .taskmd.yaml configuration file
+#
+# This file can be placed in:
+#   - Project directory (./.taskmd.yaml) - for project-specific settings
+#   - Home directory (~/.taskmd.yaml) - for global user settings
+#
+# Precedence order (highest to lowest):
+#   1. Command-line flags (explicit user intent)
+#   2. Project-level .taskmd.yaml (project-specific defaults)
+#   3. Global ~/.taskmd.yaml (user-wide defaults)
+#   4. Built-in defaults (fallback)
+
+# Default directory to search for task files
+# This sets the default value for the --dir flag
+dir: ./tasks
+
+# Web server configuration
+web:
+  # Default port for the web dashboard server
+  # This sets the default value for the --port flag in 'taskmd web start'
+  port: 8080
+
+  # Automatically open browser when starting the web server
+  # This sets the default value for the --open flag in 'taskmd web start'
+  auto_open_browser: false
+
+# Note: Only 'dir', 'web.port', and 'web.auto_open_browser' are supported in config files.
+# Other flags like 'format', 'verbose', and 'quiet' are intentionally CLI-only
+# to keep config files focused on project-specific settings rather than
+# per-invocation preferences.
