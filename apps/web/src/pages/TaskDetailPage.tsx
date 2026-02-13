@@ -122,12 +122,13 @@ export function TaskDetailPage() {
                 </h3>
                 <div className="flex gap-1 flex-wrap">
                   {task.tags.map((t) => (
-                    <span
+                    <Link
                       key={t}
-                      className="px-1.5 py-0.5 text-xs bg-gray-100 rounded"
+                      to={`/tasks?tag=${encodeURIComponent(t)}`}
+                      className="px-1.5 py-0.5 text-xs bg-gray-100 rounded cursor-pointer hover:bg-gray-200 transition-colors duration-150"
                     >
                       {t}
-                    </span>
+                    </Link>
                   ))}
                 </div>
               </div>

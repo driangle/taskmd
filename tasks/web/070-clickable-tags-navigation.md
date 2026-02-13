@@ -1,7 +1,7 @@
 ---
 id: "070"
 title: "Clickable tags navigate to filtered list view"
-status: pending
+status: completed
 priority: high
 effort: small
 dependencies:

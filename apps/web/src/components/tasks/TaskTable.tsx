@@ -6,7 +6,8 @@ import {
   useReactTable,
   type SortingState,
 } from "@tanstack/react-table";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { Task } from "../../api/types.ts";
 import { STATUSES, PRIORITIES } from "./TaskTable/constants.ts";
 import { FilterBar } from "./TaskTable/FilterBar.tsx";
@@ -15,9 +16,11 @@ import { toggleInSet } from "./TaskTable/utils.ts";
 
 interface TaskTableProps {
   tasks: Task[];
+  initialTags?: string[];
 }
 
-export function TaskTable({ tasks }: TaskTableProps) {
+export function TaskTable({ tasks, initialTags }: TaskTableProps) {
+  const [, setSearchParams] = useSearchParams();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
@@ -26,7 +29,9 @@ export function TaskTable({ tasks }: TaskTableProps) {
   const [selectedPriorities, setSelectedPriorities] = useState<Set<string>>(
     new Set(PRIORITIES),
   );
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(
+    () => new Set(initialTags),
+  );
 
   const hasActiveFilters =
     selectedStatuses.size !== STATUSES.length ||
@@ -34,15 +39,34 @@ export function TaskTable({ tasks }: TaskTableProps) {
     selectedTags.size > 0 ||
     globalFilter !== "";
 
+  const syncTagsToUrl = useCallback(
+    (tags: Set<string>) => {
+      setSearchParams(
+        (prev) => {
+          prev.delete("tag");
+          tags.forEach((t) => prev.append("tag", t));
+          return prev;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   function clearFilters() {
     setSelectedStatuses(new Set(STATUSES));
     setSelectedPriorities(new Set(PRIORITIES));
     setSelectedTags(new Set());
+    syncTagsToUrl(new Set());
     setGlobalFilter("");
   }
 
   function toggleTag(tag: string) {
-    setSelectedTags((prev) => toggleInSet(prev, tag));
+    setSelectedTags((prev) => {
+      const next = toggleInSet(prev, tag);
+      syncTagsToUrl(next);
+      return next;
+    });
   }
 
   const filteredTasks = useMemo(() => {
