@@ -10,6 +10,7 @@ tags:
   - user-experience
   - cli
   - web
+  - mvp
 created: 2026-02-08
 ---
 

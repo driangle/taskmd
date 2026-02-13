@@ -10,6 +10,7 @@ tags:
   - go
   - ux
   - consistency
+  - mvp
 created: 2026-02-08
 ---
 

@@ -9,6 +9,7 @@ tags:
   - cli
   - configuration
   - enhancement
+  - mvp
 created: 2026-02-12
 ---
 

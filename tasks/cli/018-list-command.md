@@ -9,6 +9,7 @@ tags:
   - cli
   - go
   - commands
+  - mvp
 created: 2026-02-08
 ---
 

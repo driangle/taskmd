@@ -9,6 +9,7 @@ tags:
   - ci
   - infrastructure
   - cli
+  - mvp
 created: 2026-02-08
 completed: 2026-02-08
 ---

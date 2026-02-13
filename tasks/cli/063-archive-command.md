@@ -10,6 +10,7 @@ tags:
   - go
   - commands
   - feature
+  - mvp
 created: 2026-02-12
 ---
 

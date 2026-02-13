@@ -10,6 +10,7 @@ tags:
   - go
   - commands
   - validation
+  - mvp
 created: 2026-02-08
 ---
 

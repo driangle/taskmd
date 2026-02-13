@@ -10,6 +10,7 @@ tags:
   - frontend
   - feature
   - editing
+  - mvp
 created: 2026-02-12
 ---
 

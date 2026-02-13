@@ -10,6 +10,7 @@ tags:
   - go
   - core
   - infrastructure
+  - mvp
 created: 2026-02-08
 ---
 

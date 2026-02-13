@@ -9,6 +9,7 @@ tags:
   - documentation
   - spec
   - ux
+  - mvp
 created: 2026-02-12
 ---
 

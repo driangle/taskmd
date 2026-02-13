@@ -9,6 +9,7 @@ tags:
   - documentation
   - specification
   - core
+  - mvp
 created: 2026-02-08
 ---
 

@@ -9,6 +9,7 @@ tags:
   - cli
   - go
   - core
+  - mvp
 created: 2026-02-08
 ---
 

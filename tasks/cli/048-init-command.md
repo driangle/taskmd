@@ -9,6 +9,7 @@ tags:
   - cli
   - dx
   - claude-integration
+  - mvp
 created: 2026-02-10
 ---
 
