@@ -1000,6 +1000,71 @@ func TestGraphCommand_DefaultFormat_IsASCII(t *testing.T) {
 	}
 }
 
+// resetGraphFlags resets all graph command flags to defaults before each test.
+func resetGraphFlags() {
+	graphFormat = "json"
+	graphExcludeStatus = []string{}
+	graphAll = false
+	graphRoot = ""
+	graphFocus = ""
+	graphUpstream = false
+	graphDownstream = false
+	graphOut = ""
+	graphFilters = []string{}
+}
+
+// captureGraphOutput runs runGraph and captures stdout, returning the output string.
+func captureGraphOutput(t *testing.T, args []string) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := runGraph(graphCmd, args)
+	if err != nil {
+		w.Close()
+		os.Stdout = oldStdout
+		t.Fatalf("runGraph failed: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	return buf.String()
+}
+
+// parseGraphJSON parses JSON graph output and returns the result map.
+func parseGraphJSON(t *testing.T, output string) map[string]any {
+	t.Helper()
+
+	var result map[string]any
+	err := json.Unmarshal([]byte(output), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+	return result
+}
+
+// graphNodeIDs extracts node IDs from parsed graph JSON.
+func graphNodeIDs(t *testing.T, result map[string]any) []string {
+	t.Helper()
+
+	nodes, ok := result["nodes"].([]any)
+	if !ok {
+		t.Fatal("Expected 'nodes' to be an array")
+	}
+
+	ids := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		nodeMap := node.(map[string]any)
+		ids = append(ids, nodeMap["id"].(string))
+	}
+	return ids
+}
+
 func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
 	tmpDir := createTestTaskFiles(t)
 
@@ -1040,5 +1105,153 @@ func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
 	// All 5 tasks should be included when --all is used
 	if len(nodes) != 5 {
 		t.Errorf("Expected 5 nodes with --all flag, got %d", len(nodes))
+	}
+}
+
+func TestGraphCommand_Filter_ByPriority(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	resetGraphFlags()
+	graphFilters = []string{"priority=high"}
+
+	output := captureGraphOutput(t, []string{tmpDir})
+	result := parseGraphJSON(t, output)
+	ids := graphNodeIDs(t, result)
+
+	// Tasks with priority=high: 001 (completed), 003 (pending)
+	if len(ids) != 2 {
+		t.Errorf("Expected 2 high-priority nodes, got %d: %v", len(ids), ids)
+	}
+
+	idSet := make(map[string]bool)
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	if !idSet["001"] || !idSet["003"] {
+		t.Errorf("Expected tasks 001 and 003, got %v", ids)
+	}
+}
+
+func TestGraphCommand_Filter_ByTag(t *testing.T) {
+	// Create tasks with different tags
+	tmpDir := t.TempDir()
+
+	tasks := map[string]string{
+		"001-cli.md": `---
+id: "001"
+title: "CLI Task"
+status: pending
+priority: high
+tags: ["cli"]
+created: 2026-02-08
+---`,
+		"002-api.md": `---
+id: "002"
+title: "API Task"
+status: pending
+priority: medium
+tags: ["api"]
+created: 2026-02-08
+---`,
+		"003-both.md": `---
+id: "003"
+title: "Both Tags"
+status: pending
+priority: low
+tags: ["cli", "api"]
+created: 2026-02-08
+---`,
+	}
+
+	for filename, content := range tasks {
+		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+
+	resetGraphFlags()
+	graphFilters = []string{"tag=cli"}
+
+	output := captureGraphOutput(t, []string{tmpDir})
+	result := parseGraphJSON(t, output)
+	ids := graphNodeIDs(t, result)
+
+	// Tasks with tag=cli: 001, 003
+	if len(ids) != 2 {
+		t.Errorf("Expected 2 nodes with tag=cli, got %d: %v", len(ids), ids)
+	}
+
+	idSet := make(map[string]bool)
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	if !idSet["001"] || !idSet["003"] {
+		t.Errorf("Expected tasks 001 and 003, got %v", ids)
+	}
+}
+
+func TestGraphCommand_Filter_Combined(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	resetGraphFlags()
+	// AND: priority=high AND status=pending => only 003
+	graphFilters = []string{"priority=high", "status=pending"}
+
+	output := captureGraphOutput(t, []string{tmpDir})
+	result := parseGraphJSON(t, output)
+	ids := graphNodeIDs(t, result)
+
+	if len(ids) != 1 {
+		t.Errorf("Expected 1 node matching both filters, got %d: %v", len(ids), ids)
+	}
+	if len(ids) > 0 && ids[0] != "003" {
+		t.Errorf("Expected task 003, got %v", ids)
+	}
+}
+
+func TestGraphCommand_Filter_WithExcludeStatus(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	resetGraphFlags()
+	// Filter to high priority, then also exclude completed
+	graphFilters = []string{"priority=high"}
+	graphExcludeStatus = []string{"completed"}
+
+	output := captureGraphOutput(t, []string{tmpDir})
+	result := parseGraphJSON(t, output)
+	ids := graphNodeIDs(t, result)
+
+	// priority=high: 001, 003; then exclude completed: only 003
+	if len(ids) != 1 {
+		t.Errorf("Expected 1 node (high priority, not completed), got %d: %v", len(ids), ids)
+	}
+	if len(ids) > 0 && ids[0] != "003" {
+		t.Errorf("Expected task 003, got %v", ids)
+	}
+
+	// Dependencies to filtered-out tasks should be cleaned
+	edges, ok := result["edges"].([]any)
+	if !ok {
+		t.Fatal("Expected 'edges' to be an array")
+	}
+	if len(edges) != 0 {
+		t.Errorf("Expected 0 edges after filtering, got %d", len(edges))
+	}
+}
+
+func TestGraphCommand_Filter_InvalidFormat(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	resetGraphFlags()
+	graphFilters = []string{"invalid-no-equals"}
+
+	err := runGraph(graphCmd, []string{tmpDir})
+	if err == nil {
+		t.Fatal("Expected error for invalid filter format")
+	}
+
+	if !strings.Contains(err.Error(), "invalid filter format") {
+		t.Errorf("Expected 'invalid filter format' error, got: %v", err)
 	}
 }

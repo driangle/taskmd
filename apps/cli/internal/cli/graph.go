@@ -21,6 +21,7 @@ var (
 	graphOut           string
 	graphExcludeStatus []string
 	graphAll           bool
+	graphFilters       []string
 )
 
 // graphCmd represents the graph command
@@ -36,6 +37,8 @@ Supported formats:
   - ascii: ASCII art tree
   - json: JSON graph structure
 
+Multiple --filter flags are combined with AND logic.
+
 Examples:
   taskmd graph > deps.mmd
   taskmd graph --format dot | dot -Tpng > graph.png
@@ -43,7 +46,9 @@ Examples:
   taskmd graph --root 022 --downstream
   taskmd graph --focus 022 --format mermaid
   taskmd graph --all --format ascii
-  cat tasks.md | taskmd graph --stdin --format mermaid
+  taskmd graph --filter priority=high
+  taskmd graph --filter priority=high --filter effort=small
+  taskmd graph --filter tag=cli --exclude-status completed
 
 By default, completed tasks are excluded. Use --all to include them.`,
 	Args: cobra.MaximumNArgs(1),
@@ -61,6 +66,7 @@ func init() {
 	graphCmd.Flags().StringSliceVar(&graphExcludeStatus, "exclude-status", []string{"completed"}, "exclude tasks with status (completed, pending, in-progress, blocked, cancelled)")
 	graphCmd.Flags().BoolVar(&graphAll, "all", false, "include all tasks (overrides --exclude-status)")
 	graphCmd.Flags().StringVarP(&graphOut, "out", "o", "", "write output to file instead of stdout")
+	graphCmd.Flags().StringArrayVar(&graphFilters, "filter", []string{}, "filter tasks (can specify multiple times for AND conditions, e.g., --filter priority=high --filter effort=small)")
 }
 
 //nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
@@ -97,6 +103,17 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(os.Stderr)
 	}
 
+	filtered := false
+
+	// Apply --filter flags
+	if len(graphFilters) > 0 {
+		tasks, err = applyFilters(tasks, graphFilters)
+		if err != nil {
+			return fmt.Errorf("filter error: %w", err)
+		}
+		filtered = true
+	}
+
 	// Filter tasks by status if requested
 	if len(graphExcludeStatus) > 0 {
 		excludeMap := make(map[string]bool)
@@ -111,14 +128,16 @@ func runGraph(cmd *cobra.Command, args []string) error {
 			}
 		}
 		tasks = filteredTasks
+		filtered = true
+	}
 
-		// Build a map of remaining task IDs for dependency cleanup
+	// Clean up dependencies that reference filtered-out tasks
+	if filtered {
 		remainingTaskIDs := make(map[string]bool)
 		for _, task := range tasks {
 			remainingTaskIDs[task.ID] = true
 		}
 
-		// Clean up dependencies that reference filtered-out tasks
 		for _, task := range tasks {
 			if len(task.Dependencies) > 0 {
 				cleanedDeps := make([]string, 0, len(task.Dependencies))
