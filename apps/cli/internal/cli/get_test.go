@@ -11,7 +11,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
-func createShowTestFiles(t *testing.T) string {
+func createGetTestFiles(t *testing.T) string {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -74,25 +74,25 @@ Create reusable component library.
 	return tmpDir
 }
 
-func resetShowFlags() {
-	showFormat = "text"
-	showExact = false
-	showThreshold = 0.6
+func resetGetFlags() {
+	getFormat = "text"
+	getExact = false
+	getThreshold = 0.6
 	dir = "."
 }
 
-func captureShowOutput(t *testing.T, query string) string {
+func captureGetOutput(t *testing.T, query string) string {
 	t.Helper()
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	err := runShow(showCmd, []string{query})
+	err := runGet(getCmd, []string{query})
 	if err != nil {
 		w.Close()
 		os.Stdout = oldStdout
-		t.Fatalf("runShow failed: %v", err)
+		t.Fatalf("runGet failed: %v", err)
 	}
 
 	w.Close()
@@ -103,12 +103,12 @@ func captureShowOutput(t *testing.T, query string) string {
 	return buf.String()
 }
 
-func TestShow_ExactMatchByID(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_ExactMatchByID(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
-	output := captureShowOutput(t, "001")
+	output := captureGetOutput(t, "001")
 
 	if !strings.Contains(output, "Task: 001") {
 		t.Error("Expected output to contain 'Task: 001'")
@@ -118,31 +118,31 @@ func TestShow_ExactMatchByID(t *testing.T) {
 	}
 }
 
-func TestShow_ExactMatchByTitle(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_ExactMatchByTitle(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
-	output := captureShowOutput(t, "Setup project")
+	output := captureGetOutput(t, "Setup project")
 
 	if !strings.Contains(output, "Task: 001") {
 		t.Error("Expected output to contain 'Task: 001'")
 	}
 }
 
-func TestShow_ExactMatchByTitle_CaseInsensitive(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_ExactMatchByTitle_CaseInsensitive(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
-	output := captureShowOutput(t, "setup PROJECT")
+	output := captureGetOutput(t, "setup PROJECT")
 
 	if !strings.Contains(output, "Task: 001") {
 		t.Error("Expected case-insensitive title match to find task 001")
 	}
 }
 
-func TestShow_IDPrecedenceOverTitle(t *testing.T) {
+func TestGet_IDPrecedenceOverTitle(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a task whose title matches another task's ID
@@ -173,10 +173,10 @@ created: 2026-02-08
 	os.WriteFile(filepath.Join(tmpDir, "task1.md"), []byte(task1), 0644)
 	os.WriteFile(filepath.Join(tmpDir, "task2.md"), []byte(task2), 0644)
 
-	resetShowFlags()
+	resetGetFlags()
 	dir = tmpDir
 
-	output := captureShowOutput(t, "abc")
+	output := captureGetOutput(t, "abc")
 
 	// Should match by ID (task1), not by title (task2)
 	if !strings.Contains(output, "Title: First task") {
@@ -184,13 +184,13 @@ created: 2026-02-08
 	}
 }
 
-func TestShow_TaskNotFound_ExactMode(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_TaskNotFound_ExactMode(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
-	showExact = true
+	getExact = true
 
-	err := runShow(showCmd, []string{"nonexistent"})
+	err := runGet(getCmd, []string{"nonexistent"})
 	if err == nil {
 		t.Fatal("Expected error for non-matching query in exact mode")
 	}
@@ -199,13 +199,13 @@ func TestShow_TaskNotFound_ExactMode(t *testing.T) {
 	}
 }
 
-func TestShow_TaskNotFound_NoMatches(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_TaskNotFound_NoMatches(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
-	showThreshold = 0.99 // very high threshold so nothing matches
+	getThreshold = 0.99 // very high threshold so nothing matches
 
-	err := runShow(showCmd, []string{"zzzzzzzzzzzzzzz"})
+	err := runGet(getCmd, []string{"zzzzzzzzzzzzzzz"})
 	if err == nil {
 		t.Fatal("Expected error for garbage query")
 	}
@@ -214,12 +214,12 @@ func TestShow_TaskNotFound_NoMatches(t *testing.T) {
 	}
 }
 
-func TestShow_TextFormat(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_TextFormat(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
-	output := captureShowOutput(t, "002")
+	output := captureGetOutput(t, "002")
 
 	expected := []string{
 		"Task: 002",
@@ -243,15 +243,15 @@ func TestShow_TextFormat(t *testing.T) {
 	}
 }
 
-func TestShow_JSONFormat(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_JSONFormat(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
-	showFormat = "json"
+	getFormat = "json"
 
-	output := captureShowOutput(t, "002")
+	output := captureGetOutput(t, "002")
 
-	var result showOutput
+	var result getOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
 	}
@@ -273,13 +273,13 @@ func TestShow_JSONFormat(t *testing.T) {
 	}
 }
 
-func TestShow_YAMLFormat(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_YAMLFormat(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
-	showFormat = "yaml"
+	getFormat = "yaml"
 
-	output := captureShowOutput(t, "001")
+	output := captureGetOutput(t, "001")
 
 	expected := []string{"id: \"001\"", "title: Setup project", "status: completed"}
 	for _, exp := range expected {
@@ -289,13 +289,13 @@ func TestShow_YAMLFormat(t *testing.T) {
 	}
 }
 
-func TestShow_UnsupportedFormat(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_UnsupportedFormat(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
-	showFormat = "csv"
+	getFormat = "csv"
 
-	err := runShow(showCmd, []string{"001"})
+	err := runGet(getCmd, []string{"001"})
 	if err == nil {
 		t.Fatal("Expected error for unsupported format")
 	}
@@ -304,48 +304,48 @@ func TestShow_UnsupportedFormat(t *testing.T) {
 	}
 }
 
-func TestShow_FuzzyMatch_Substring(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_FuzzyMatch_Substring(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
 	// "auth" is a substring of "Implement authentication" — should fuzzy match
 	// Simulate selecting option 1
-	showStdinReader = strings.NewReader("1\n")
-	defer func() { showStdinReader = os.Stdin }()
+	getStdinReader = strings.NewReader("1\n")
+	defer func() { getStdinReader = os.Stdin }()
 
-	output := captureShowOutput(t, "auth")
+	output := captureGetOutput(t, "auth")
 
 	if !strings.Contains(output, "Task: 002") {
 		t.Error("Expected fuzzy substring match to find task 002")
 	}
 }
 
-func TestShow_FuzzyMatch_Selection(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_FuzzyMatch_Selection(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
 	// "ui" should fuzzy match "Build UI components"
-	showStdinReader = strings.NewReader("1\n")
-	defer func() { showStdinReader = os.Stdin }()
+	getStdinReader = strings.NewReader("1\n")
+	defer func() { getStdinReader = os.Stdin }()
 
-	output := captureShowOutput(t, "ui")
+	output := captureGetOutput(t, "ui")
 
 	if !strings.Contains(output, "Task: 003") {
 		t.Error("Expected fuzzy match selection to return task 003")
 	}
 }
 
-func TestShow_FuzzyMatch_Cancel(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_FuzzyMatch_Cancel(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
-	showStdinReader = strings.NewReader("0\n")
-	defer func() { showStdinReader = os.Stdin }()
+	getStdinReader = strings.NewReader("0\n")
+	defer func() { getStdinReader = os.Stdin }()
 
-	err := runShow(showCmd, []string{"auth"})
+	err := runGet(getCmd, []string{"auth"})
 	if err == nil {
 		t.Fatal("Expected error when user cancels selection")
 	}
@@ -354,13 +354,13 @@ func TestShow_FuzzyMatch_Cancel(t *testing.T) {
 	}
 }
 
-func TestShow_Threshold(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_Threshold(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
-	showThreshold = 0.95 // very high threshold
+	getThreshold = 0.95 // very high threshold
 
-	err := runShow(showCmd, []string{"aut"})
+	err := runGet(getCmd, []string{"aut"})
 	if err == nil {
 		t.Fatal("Expected error when threshold filters out matches")
 	}
@@ -369,12 +369,12 @@ func TestShow_Threshold(t *testing.T) {
 	}
 }
 
-func TestShow_EmptyDirectory(t *testing.T) {
+func TestGet_EmptyDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
-	resetShowFlags()
+	resetGetFlags()
 	dir = tmpDir
 
-	err := runShow(showCmd, []string{"anything"})
+	err := runGet(getCmd, []string{"anything"})
 	if err == nil {
 		t.Fatal("Expected error for empty directory")
 	}
@@ -383,20 +383,20 @@ func TestShow_EmptyDirectory(t *testing.T) {
 	}
 }
 
-func TestShow_Dependencies(t *testing.T) {
-	tmpDir := createShowTestFiles(t)
-	resetShowFlags()
+func TestGet_Dependencies(t *testing.T) {
+	tmpDir := createGetTestFiles(t)
+	resetGetFlags()
 	dir = tmpDir
 
 	// Task 003 depends on 002, and 002 blocks 003
-	output := captureShowOutput(t, "003")
+	output := captureGetOutput(t, "003")
 
 	if !strings.Contains(output, "Depends on: 002 (Implement authentication)") {
 		t.Error("Expected depends-on info for task 003")
 	}
 
 	// Check that task 002 shows it blocks 003
-	output = captureShowOutput(t, "002")
+	output = captureGetOutput(t, "002")
 	if !strings.Contains(output, "Blocks: 003 (Build UI components)") {
 		t.Error("Expected blocks info for task 002")
 	}

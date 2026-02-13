@@ -12,49 +12,62 @@ import (
 )
 
 var (
-	updateTaskID     string
-	updateStatus     string
-	updatePriority   string
-	updateEffort     string
-	updateDone       bool
-	updateAddTags    []string
-	updateRemoveTags []string
+	setTaskID     string
+	setStatus     string
+	setPriority   string
+	setEffort     string
+	setDone       bool
+	setAddTags    []string
+	setRemoveTags []string
 )
 
-var updateCmd = &cobra.Command{
-	Use:        "update",
-	SuggestFor: []string{"set", "edit", "modify", "change"},
-	Short:      "Update a task's frontmatter fields",
-	Long: `Update modifies frontmatter fields (status, priority, effort, tags) of a task file.
+var setCmd = &cobra.Command{
+	Use:        "set",
+	SuggestFor: []string{"edit", "modify", "change"},
+	Short:      "Set a task's frontmatter fields",
+	Long: `Set modifies frontmatter fields (status, priority, effort, tags) of a task file.
 
 The task is identified by --task-id (exact match only).
 
 Examples:
-  taskmd update --task-id cli-049 --status completed
-  taskmd update --task-id cli-049 --priority high --effort large
-  taskmd update --task-id cli-049 --done
-  taskmd update --task-id cli-049 --add-tag backend --add-tag api
-  taskmd update --task-id cli-049 --remove-tag deprecated`,
+  taskmd set --task-id cli-049 --status completed
+  taskmd set --task-id cli-049 --priority high --effort large
+  taskmd set --task-id cli-049 --done
+  taskmd set --task-id cli-049 --add-tag backend --add-tag api
+  taskmd set --task-id cli-049 --remove-tag deprecated`,
 	Args: cobra.NoArgs,
-	RunE: runUpdate,
+	RunE: runSet,
+}
+
+// Deprecated: use "set" instead.
+var updateCmd = &cobra.Command{
+	Use:        "update",
+	Short:      "Update a task's frontmatter fields (deprecated: use 'set')",
+	Args:       cobra.NoArgs,
+	RunE:       runSet,
+	Hidden:     true,
+	Deprecated: "use 'set' instead",
 }
 
 func init() {
+	rootCmd.AddCommand(setCmd)
 	rootCmd.AddCommand(updateCmd)
 
-	updateCmd.Flags().StringVar(&updateTaskID, "task-id", "", "task ID to update (required)")
-	updateCmd.Flags().StringVar(&updateStatus, "status", "", "new status (pending, in-progress, completed, blocked, cancelled)")
-	updateCmd.Flags().StringVar(&updatePriority, "priority", "", "new priority (low, medium, high, critical)")
-	updateCmd.Flags().StringVar(&updateEffort, "effort", "", "new effort (small, medium, large)")
-	updateCmd.Flags().BoolVar(&updateDone, "done", false, "mark task as completed (alias for --status completed)")
-	updateCmd.Flags().StringArrayVar(&updateAddTags, "add-tag", nil, "add a tag (repeatable)")
-	updateCmd.Flags().StringArrayVar(&updateRemoveTags, "remove-tag", nil, "remove a tag (repeatable)")
+	for _, cmd := range []*cobra.Command{setCmd, updateCmd} {
+		cmd.Flags().StringVar(&setTaskID, "task-id", "", "task ID to update (required)")
+		cmd.Flags().StringVar(&setStatus, "status", "", "new status (pending, in-progress, completed, blocked, cancelled)")
+		cmd.Flags().StringVar(&setPriority, "priority", "", "new priority (low, medium, high, critical)")
+		cmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large)")
+		cmd.Flags().BoolVar(&setDone, "done", false, "mark task as completed (alias for --status completed)")
+		cmd.Flags().StringArrayVar(&setAddTags, "add-tag", nil, "add a tag (repeatable)")
+		cmd.Flags().StringArrayVar(&setRemoveTags, "remove-tag", nil, "remove a tag (repeatable)")
 
-	_ = updateCmd.MarkFlagRequired("task-id")
+		_ = cmd.MarkFlagRequired("task-id")
+	}
 }
 
-func runUpdate(cmd *cobra.Command, _ []string) error {
-	req, err := buildUpdateRequest(cmd)
+func runSet(cmd *cobra.Command, _ []string) error {
+	req, err := buildSetRequest(cmd)
 	if err != nil {
 		return err
 	}
@@ -68,9 +81,9 @@ func runUpdate(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	task := findExactMatch(updateTaskID, result.Tasks)
+	task := findExactMatch(setTaskID, result.Tasks)
 	if task == nil {
-		return fmt.Errorf("task not found: %s", updateTaskID)
+		return fmt.Errorf("task not found: %s", setTaskID)
 	}
 
 	changes := buildChangeLog(task, req)
@@ -79,35 +92,35 @@ func runUpdate(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	printUpdateConfirmation(task, changes)
+	printSetConfirmation(task, changes)
 	return nil
 }
 
-func buildUpdateRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
-	if updateDone && cmd.Flags().Changed("status") {
+func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
+	if setDone && cmd.Flags().Changed("status") {
 		return taskfile.UpdateRequest{}, fmt.Errorf("--done and --status are mutually exclusive")
 	}
 
-	if updateDone {
-		updateStatus = string(model.StatusCompleted)
+	if setDone {
+		setStatus = string(model.StatusCompleted)
 	}
 
 	var req taskfile.UpdateRequest
 
-	if updateStatus != "" {
-		req.Status = &updateStatus
+	if setStatus != "" {
+		req.Status = &setStatus
 	}
-	if updatePriority != "" {
-		req.Priority = &updatePriority
+	if setPriority != "" {
+		req.Priority = &setPriority
 	}
-	if updateEffort != "" {
-		req.Effort = &updateEffort
+	if setEffort != "" {
+		req.Effort = &setEffort
 	}
-	if len(updateAddTags) > 0 {
-		req.AddTags = updateAddTags
+	if len(setAddTags) > 0 {
+		req.AddTags = setAddTags
 	}
-	if len(updateRemoveTags) > 0 {
-		req.RemTags = updateRemoveTags
+	if len(setRemoveTags) > 0 {
+		req.RemTags = setRemoveTags
 	}
 
 	// Validate enum values
@@ -162,7 +175,7 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 	return changes
 }
 
-func printUpdateConfirmation(task *model.Task, changes []changeEntry) {
+func printSetConfirmation(task *model.Task, changes []changeEntry) {
 	fmt.Printf("Updated task %s (%s):\n", task.ID, task.Title)
 	for _, c := range changes {
 		old := c.oldValue

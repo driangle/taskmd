@@ -1,7 +1,7 @@
 ---
 id: "057"
 title: "Rename show command to get"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies: ["037"]

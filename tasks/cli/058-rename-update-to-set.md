@@ -1,7 +1,7 @@
 ---
 id: "058"
 title: "Rename update command to set"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies: ["049"]

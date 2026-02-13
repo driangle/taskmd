@@ -228,9 +228,9 @@ When working on tasks:
    - Check off subtasks `- [x]` as you complete them
 
    ```bash
-   taskmd update --task-id 042 --status in-progress
+   taskmd set --task-id 042 --status in-progress
    # Or during development:
-   taskmd-dev update --task-id 042 --status in-progress
+   taskmd-dev set --task-id 042 --status in-progress
    ```
 
 3. **Reference the task specification** document:
@@ -277,7 +277,7 @@ make install-dev
 # Test your changes
 taskmd-dev list
 taskmd-dev next
-taskmd-dev update --task-id 042 --status completed
+taskmd-dev set --task-id 042 --status completed
 
 # Compare with stable version if needed
 taskmd list  # Uses Homebrew version

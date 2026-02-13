@@ -12,18 +12,16 @@ type commandSuggestion struct {
 
 func TestSuggestFor_AllAliasesRegistered(t *testing.T) {
 	tests := []commandSuggestion{
-		// update
-		{alias: "set", command: "update"},
-		{alias: "edit", command: "update"},
-		{alias: "modify", command: "update"},
-		{alias: "change", command: "update"},
-		// show
-		{alias: "view", command: "show"},
-		{alias: "info", command: "show"},
-		{alias: "detail", command: "show"},
-		{alias: "details", command: "show"},
-		{alias: "describe", command: "show"},
-		{alias: "get", command: "show"},
+		// set
+		{alias: "edit", command: "set"},
+		{alias: "modify", command: "set"},
+		{alias: "change", command: "set"},
+		// get
+		{alias: "view", command: "get"},
+		{alias: "info", command: "get"},
+		{alias: "detail", command: "get"},
+		{alias: "details", command: "get"},
+		{alias: "describe", command: "get"},
 		// list
 		{alias: "ls", command: "list"},
 		{alias: "tasks", command: "list"},
@@ -91,8 +89,8 @@ func TestSuggestFor_CobraSuggestsCorrectCommand(t *testing.T) {
 	// Note: Deprecated commands may not appear in cobra's SuggestionsFor results,
 	// so we skip testing those.
 	tests := []commandSuggestion{
-		{alias: "set", command: "update"},
-		{alias: "view", command: "show"},
+		{alias: "edit", command: "set"},
+		{alias: "view", command: "get"},
 		{alias: "ls", command: "list"},
 		{alias: "deps", command: "graph"},
 		{alias: "summary", command: "stats"},

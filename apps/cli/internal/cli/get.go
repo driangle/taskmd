@@ -18,20 +18,20 @@ import (
 )
 
 var (
-	showFormat    string
-	showExact     bool
-	showThreshold float64
+	getFormat    string
+	getExact     bool
+	getThreshold float64
 )
 
-// showStdinReader is the reader used for interactive selection prompts.
+// getStdinReader is the reader used for interactive selection prompts.
 // Override in tests to simulate user input.
-var showStdinReader io.Reader = os.Stdin
+var getStdinReader io.Reader = os.Stdin
 
-var showCmd = &cobra.Command{
-	Use:        "show <query>",
-	SuggestFor: []string{"view", "info", "detail", "details", "describe", "get"},
-	Short:      "Show detailed information about a specific task",
-	Long: `Show displays detailed information about a specific task, identified by ID or title.
+var getCmd = &cobra.Command{
+	Use:        "get <query>",
+	SuggestFor: []string{"view", "info", "detail", "details", "describe"},
+	Short:      "Get detailed information about a specific task",
+	Long: `Get displays detailed information about a specific task, identified by ID or title.
 
 Matching priority:
   1. Exact match by task ID (case-sensitive)
@@ -39,25 +39,40 @@ Matching priority:
   3. Fuzzy match across IDs and titles (unless --exact is set)
 
 Examples:
-  taskmd show cli-037
-  taskmd show "Add show command"
-  taskmd show sho                    # fuzzy match
-  taskmd show sho --exact            # no fuzzy, returns "task not found"
-  taskmd show cli-037 --format json
-  taskmd show cli-037 --format yaml`,
+  taskmd get cli-037
+  taskmd get "Add show command"
+  taskmd get sho                    # fuzzy match
+  taskmd get sho --exact            # no fuzzy, returns "task not found"
+  taskmd get cli-037 --format json
+  taskmd get cli-037 --format yaml`,
 	Args: cobra.ExactArgs(1),
-	RunE: runShow,
+	RunE: runGet,
+}
+
+// Deprecated: use "get" instead.
+var showCmd = &cobra.Command{
+	Use:        "show <query>",
+	Short:      "Show detailed information about a specific task (deprecated: use 'get')",
+	Args:       cobra.ExactArgs(1),
+	RunE:       runGet,
+	Hidden:     true,
+	Deprecated: "use 'get' instead",
 }
 
 func init() {
+	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(showCmd)
 
-	showCmd.Flags().StringVar(&showFormat, "format", "text", "output format (text, json, yaml)")
-	showCmd.Flags().BoolVar(&showExact, "exact", false, "disable fuzzy matching, exact only")
-	showCmd.Flags().Float64Var(&showThreshold, "threshold", 0.6, "fuzzy match sensitivity (0.0-1.0)")
+	getCmd.Flags().StringVar(&getFormat, "format", "text", "output format (text, json, yaml)")
+	getCmd.Flags().BoolVar(&getExact, "exact", false, "disable fuzzy matching, exact only")
+	getCmd.Flags().Float64Var(&getThreshold, "threshold", 0.6, "fuzzy match sensitivity (0.0-1.0)")
+
+	showCmd.Flags().StringVar(&getFormat, "format", "text", "output format (text, json, yaml)")
+	showCmd.Flags().BoolVar(&getExact, "exact", false, "disable fuzzy matching, exact only")
+	showCmd.Flags().Float64Var(&getThreshold, "threshold", 0.6, "fuzzy match sensitivity (0.0-1.0)")
 }
 
-func runShow(cmd *cobra.Command, args []string) error {
+func runGet(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	query := args[0]
 
@@ -72,14 +87,14 @@ func runShow(cmd *cobra.Command, args []string) error {
 	tasks := result.Tasks
 	makeFilePathsRelative(tasks, scanDir)
 
-	task, err := resolveTask(query, tasks, showExact, showThreshold)
+	task, err := resolveTask(query, tasks, getExact, getThreshold)
 	if err != nil {
 		return err
 	}
 
 	depInfo := buildDependencyInfo(task, tasks)
 
-	return outputShow(task, depInfo, showFormat)
+	return outputGet(task, depInfo, getFormat)
 }
 
 // dependencyInfo holds resolved dependency information for display.
@@ -226,7 +241,7 @@ func promptSelection(query string, matches []fuzzyMatch) (*model.Task, error) {
 	}
 	fmt.Fprintf(os.Stderr, "\nEnter selection (1-%d), or 0 to cancel: ", len(matches))
 
-	reader := bufio.NewReader(showStdinReader)
+	reader := bufio.NewReader(getStdinReader)
 	var choice int
 	line, _ := reader.ReadString('\n')
 	line = strings.TrimSpace(line)
@@ -262,21 +277,21 @@ func buildDependencyInfo(task *model.Task, allTasks []*model.Task) dependencyInf
 	return info
 }
 
-// outputShow routes to the appropriate formatter.
-func outputShow(task *model.Task, deps dependencyInfo, format string) error {
+// outputGet routes to the appropriate formatter.
+func outputGet(task *model.Task, deps dependencyInfo, format string) error {
 	switch format {
 	case "text":
-		return outputShowText(task, deps, os.Stdout)
+		return outputGetText(task, deps, os.Stdout)
 	case "json":
-		return outputShowJSON(task, deps, os.Stdout)
+		return outputGetJSON(task, deps, os.Stdout)
 	case "yaml":
-		return outputShowYAML(task, deps, os.Stdout)
+		return outputGetYAML(task, deps, os.Stdout)
 	default:
 		return fmt.Errorf("unsupported format: %s (supported: text, json, yaml)", format)
 	}
 }
 
-func outputShowText(task *model.Task, deps dependencyInfo, w io.Writer) error {
+func outputGetText(task *model.Task, deps dependencyInfo, w io.Writer) error {
 	fmt.Fprintf(w, "Task: %s\n", task.ID)
 	fmt.Fprintf(w, "Title: %s\n", task.Title)
 	fmt.Fprintf(w, "Status: %s\n", task.Status)
@@ -337,31 +352,31 @@ func formatDepList(entries []depEntry) string {
 	return strings.Join(parts, ", ")
 }
 
-// showOutput is the struct for JSON/YAML output (includes body unlike model.Task).
-type showOutput struct {
-	ID           string       `json:"id" yaml:"id"`
-	Title        string       `json:"title" yaml:"title"`
-	Status       string       `json:"status" yaml:"status"`
-	Priority     string       `json:"priority,omitempty" yaml:"priority,omitempty"`
-	Effort       string       `json:"effort,omitempty" yaml:"effort,omitempty"`
-	Tags         []string     `json:"tags" yaml:"tags"`
-	Created      string       `json:"created,omitempty" yaml:"created,omitempty"`
-	FilePath     string       `json:"file_path" yaml:"file_path"`
-	Content      string       `json:"content" yaml:"content"`
-	Dependencies showDepsJSON `json:"dependencies" yaml:"dependencies"`
+// getOutput is the struct for JSON/YAML output (includes body unlike model.Task).
+type getOutput struct {
+	ID           string      `json:"id" yaml:"id"`
+	Title        string      `json:"title" yaml:"title"`
+	Status       string      `json:"status" yaml:"status"`
+	Priority     string      `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Effort       string      `json:"effort,omitempty" yaml:"effort,omitempty"`
+	Tags         []string    `json:"tags" yaml:"tags"`
+	Created      string      `json:"created,omitempty" yaml:"created,omitempty"`
+	FilePath     string      `json:"file_path" yaml:"file_path"`
+	Content      string      `json:"content" yaml:"content"`
+	Dependencies getDepsJSON `json:"dependencies" yaml:"dependencies"`
 }
 
-type showDepsJSON struct {
+type getDepsJSON struct {
 	DependsOn []depEntry `json:"depends_on" yaml:"depends_on"`
 	Blocks    []depEntry `json:"blocks" yaml:"blocks"`
 }
 
-func buildShowOutput(task *model.Task, deps dependencyInfo) showOutput {
+func buildGetOutput(task *model.Task, deps dependencyInfo) getOutput {
 	created := ""
 	if !task.Created.IsZero() {
 		created = task.Created.Format("2006-01-02")
 	}
-	return showOutput{
+	return getOutput{
 		ID:           task.ID,
 		Title:        task.Title,
 		Status:       string(task.Status),
@@ -371,19 +386,19 @@ func buildShowOutput(task *model.Task, deps dependencyInfo) showOutput {
 		Created:      created,
 		FilePath:     task.FilePath,
 		Content:      strings.TrimSpace(task.Body),
-		Dependencies: showDepsJSON(deps),
+		Dependencies: getDepsJSON(deps),
 	}
 }
 
-func outputShowJSON(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	out := buildShowOutput(task, deps)
+func outputGetJSON(task *model.Task, deps dependencyInfo, w io.Writer) error {
+	out := buildGetOutput(task, deps)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)
 }
 
-func outputShowYAML(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	out := buildShowOutput(task, deps)
+func outputGetYAML(task *model.Task, deps dependencyInfo, w io.Writer) error {
+	out := buildGetOutput(task, deps)
 	enc := yaml.NewEncoder(w)
 	defer enc.Close()
 	return enc.Encode(out)

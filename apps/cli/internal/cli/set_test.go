@@ -10,7 +10,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
 )
 
-func createUpdateTestFiles(t *testing.T) string {
+func createSetTestFiles(t *testing.T) string {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -103,25 +103,25 @@ Task with multiline YAML tags.
 	return tmpDir
 }
 
-func resetUpdateFlags() {
-	updateTaskID = ""
-	updateStatus = ""
-	updatePriority = ""
-	updateEffort = ""
-	updateDone = false
-	updateAddTags = nil
-	updateRemoveTags = nil
+func resetSetFlags() {
+	setTaskID = ""
+	setStatus = ""
+	setPriority = ""
+	setEffort = ""
+	setDone = false
+	setAddTags = nil
+	setRemoveTags = nil
 	dir = "."
 }
 
-func captureUpdateOutput(t *testing.T) (string, error) {
+func captureSetOutput(t *testing.T) (string, error) {
 	t.Helper()
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	err := runUpdate(updateCmd, nil)
+	err := runSet(setCmd, nil)
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -131,14 +131,14 @@ func captureUpdateOutput(t *testing.T) (string, error) {
 	return buf.String(), err
 }
 
-func TestUpdate_Status(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_Status(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateStatus = "completed"
+	setTaskID = "001"
+	setStatus = "completed"
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,14 +156,14 @@ func TestUpdate_Status(t *testing.T) {
 	}
 }
 
-func TestUpdate_Priority(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_Priority(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updatePriority = "low"
+	setTaskID = "001"
+	setPriority = "low"
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,14 +178,14 @@ func TestUpdate_Priority(t *testing.T) {
 	}
 }
 
-func TestUpdate_Effort(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_Effort(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateEffort = "small"
+	setTaskID = "002"
+	setEffort = "small"
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,14 +200,14 @@ func TestUpdate_Effort(t *testing.T) {
 	}
 }
 
-func TestUpdate_DoneFlag(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_DoneFlag(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateDone = true
+	setTaskID = "001"
+	setDone = true
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,16 +222,16 @@ func TestUpdate_DoneFlag(t *testing.T) {
 	}
 }
 
-func TestUpdate_MultipleFields(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_MultipleFields(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "003"
-	updateStatus = "in-progress"
-	updatePriority = "critical"
-	updateEffort = "large"
+	setTaskID = "003"
+	setStatus = "in-progress"
+	setPriority = "critical"
+	setEffort = "large"
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -259,17 +259,17 @@ func TestUpdate_MultipleFields(t *testing.T) {
 	}
 }
 
-func TestUpdate_AllValidStatuses(t *testing.T) {
+func TestSet_AllValidStatuses(t *testing.T) {
 	statuses := []string{"pending", "in-progress", "completed", "blocked", "cancelled"}
 	for _, status := range statuses {
 		t.Run(status, func(t *testing.T) {
-			tmpDir := createUpdateTestFiles(t)
-			resetUpdateFlags()
+			tmpDir := createSetTestFiles(t)
+			resetSetFlags()
 			dir = tmpDir
-			updateTaskID = "001"
-			updateStatus = status
+			setTaskID = "001"
+			setStatus = status
 
-			_, err := captureUpdateOutput(t)
+			_, err := captureSetOutput(t)
 			if err != nil {
 				t.Fatalf("unexpected error for status %q: %v", status, err)
 			}
@@ -282,14 +282,14 @@ func TestUpdate_AllValidStatuses(t *testing.T) {
 	}
 }
 
-func TestUpdate_CancelledStatus(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_CancelledStatus(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateStatus = "cancelled"
+	setTaskID = "002"
+	setStatus = "cancelled"
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error when setting status to cancelled: %v", err)
 	}
@@ -304,17 +304,17 @@ func TestUpdate_CancelledStatus(t *testing.T) {
 	}
 }
 
-func TestUpdate_AllValidPriorities(t *testing.T) {
+func TestSet_AllValidPriorities(t *testing.T) {
 	priorities := []string{"low", "medium", "high", "critical"}
 	for _, priority := range priorities {
 		t.Run(priority, func(t *testing.T) {
-			tmpDir := createUpdateTestFiles(t)
-			resetUpdateFlags()
+			tmpDir := createSetTestFiles(t)
+			resetSetFlags()
 			dir = tmpDir
-			updateTaskID = "001"
-			updatePriority = priority
+			setTaskID = "001"
+			setPriority = priority
 
-			_, err := captureUpdateOutput(t)
+			_, err := captureSetOutput(t)
 			if err != nil {
 				t.Fatalf("unexpected error for priority %q: %v", priority, err)
 			}
@@ -327,17 +327,17 @@ func TestUpdate_AllValidPriorities(t *testing.T) {
 	}
 }
 
-func TestUpdate_AllValidEfforts(t *testing.T) {
+func TestSet_AllValidEfforts(t *testing.T) {
 	efforts := []string{"small", "medium", "large"}
 	for _, effort := range efforts {
 		t.Run(effort, func(t *testing.T) {
-			tmpDir := createUpdateTestFiles(t)
-			resetUpdateFlags()
+			tmpDir := createSetTestFiles(t)
+			resetSetFlags()
 			dir = tmpDir
-			updateTaskID = "002"
-			updateEffort = effort
+			setTaskID = "002"
+			setEffort = effort
 
-			_, err := captureUpdateOutput(t)
+			_, err := captureSetOutput(t)
 			if err != nil {
 				t.Fatalf("unexpected error for effort %q: %v", effort, err)
 			}
@@ -350,14 +350,14 @@ func TestUpdate_AllValidEfforts(t *testing.T) {
 	}
 }
 
-func TestUpdate_InvalidStatus(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_InvalidStatus(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateStatus = "invalid"
+	setTaskID = "001"
+	setStatus = "invalid"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err == nil {
 		t.Fatal("Expected error for invalid status")
 	}
@@ -366,14 +366,14 @@ func TestUpdate_InvalidStatus(t *testing.T) {
 	}
 }
 
-func TestUpdate_InvalidPriority(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_InvalidPriority(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updatePriority = "urgent"
+	setTaskID = "001"
+	setPriority = "urgent"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err == nil {
 		t.Fatal("Expected error for invalid priority")
 	}
@@ -382,14 +382,14 @@ func TestUpdate_InvalidPriority(t *testing.T) {
 	}
 }
 
-func TestUpdate_InvalidEffort(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_InvalidEffort(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateEffort = "huge"
+	setTaskID = "001"
+	setEffort = "huge"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err == nil {
 		t.Fatal("Expected error for invalid effort")
 	}
@@ -398,14 +398,14 @@ func TestUpdate_InvalidEffort(t *testing.T) {
 	}
 }
 
-func TestUpdate_TaskNotFound(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_TaskNotFound(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "nonexistent"
-	updateStatus = "completed"
+	setTaskID = "nonexistent"
+	setStatus = "completed"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err == nil {
 		t.Fatal("Expected error for non-existent task")
 	}
@@ -414,13 +414,13 @@ func TestUpdate_TaskNotFound(t *testing.T) {
 	}
 }
 
-func TestUpdate_NoFlagsProvided(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_NoFlagsProvided(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
+	setTaskID = "001"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err == nil {
 		t.Fatal("Expected error when no update flags provided")
 	}
@@ -429,22 +429,22 @@ func TestUpdate_NoFlagsProvided(t *testing.T) {
 	}
 }
 
-func TestUpdate_DoneWithStatusMutuallyExclusive(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_DoneWithStatusMutuallyExclusive(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateDone = true
-	updateStatus = "blocked"
+	setTaskID = "001"
+	setDone = true
+	setStatus = "blocked"
 
 	// Mark the --status flag as changed to simulate CLI usage
-	updateCmd.Flags().Set("status", "blocked")
+	setCmd.Flags().Set("status", "blocked")
 	defer func() {
 		// Reset the changed state by creating a fresh flag set lookup
-		updateCmd.Flags().Set("status", "")
+		setCmd.Flags().Set("status", "")
 	}()
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err == nil {
 		t.Fatal("Expected error when --done and --status are both set")
 	}
@@ -453,14 +453,14 @@ func TestUpdate_DoneWithStatusMutuallyExclusive(t *testing.T) {
 	}
 }
 
-func TestUpdate_BodyPreserved(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_BodyPreserved(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateStatus = "completed"
+	setTaskID = "002"
+	setStatus = "completed"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -476,14 +476,14 @@ func TestUpdate_BodyPreserved(t *testing.T) {
 	}
 }
 
-func TestUpdate_OtherFieldsPreserved(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_OtherFieldsPreserved(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateStatus = "completed"
+	setTaskID = "002"
+	setStatus = "completed"
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -509,7 +509,7 @@ func TestUpdate_OtherFieldsPreserved(t *testing.T) {
 	}
 }
 
-func TestUpdate_FrontmatterBounds(t *testing.T) {
+func TestSet_FrontmatterBounds(t *testing.T) {
 	tests := []struct {
 		name      string
 		lines     []string
@@ -547,14 +547,14 @@ func TestUpdate_FrontmatterBounds(t *testing.T) {
 	}
 }
 
-func TestUpdate_MatchByTitle(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_MatchByTitle(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "Setup project"
-	updateStatus = "completed"
+	setTaskID = "Setup project"
+	setStatus = "completed"
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -564,14 +564,14 @@ func TestUpdate_MatchByTitle(t *testing.T) {
 	}
 }
 
-func TestUpdate_AddSingleTag(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_AddSingleTag(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateAddTags = []string{"new-tag"}
+	setTaskID = "001"
+	setAddTags = []string{"new-tag"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -586,14 +586,14 @@ func TestUpdate_AddSingleTag(t *testing.T) {
 	}
 }
 
-func TestUpdate_AddMultipleTags(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_AddMultipleTags(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateAddTags = []string{"tag-a", "tag-b"}
+	setTaskID = "001"
+	setAddTags = []string{"tag-a", "tag-b"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -608,14 +608,14 @@ func TestUpdate_AddMultipleTags(t *testing.T) {
 	}
 }
 
-func TestUpdate_RemoveTag(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_RemoveTag(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateRemoveTags = []string{"security"}
+	setTaskID = "002"
+	setRemoveTags = []string{"security"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -630,15 +630,15 @@ func TestUpdate_RemoveTag(t *testing.T) {
 	}
 }
 
-func TestUpdate_AddAndRemoveTag(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_AddAndRemoveTag(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateAddTags = []string{"new-feature"}
-	updateRemoveTags = []string{"security"}
+	setTaskID = "002"
+	setAddTags = []string{"new-feature"}
+	setRemoveTags = []string{"security"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -653,14 +653,14 @@ func TestUpdate_AddAndRemoveTag(t *testing.T) {
 	}
 }
 
-func TestUpdate_AddDuplicateTag(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_AddDuplicateTag(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateAddTags = []string{"infra"}
+	setTaskID = "001"
+	setAddTags = []string{"infra"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -676,14 +676,14 @@ func TestUpdate_AddDuplicateTag(t *testing.T) {
 	}
 }
 
-func TestUpdate_RemoveNonexistentTag(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_RemoveNonexistentTag(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateRemoveTags = []string{"nonexistent"}
+	setTaskID = "001"
+	setRemoveTags = []string{"nonexistent"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -699,29 +699,29 @@ func TestUpdate_RemoveNonexistentTag(t *testing.T) {
 	}
 }
 
-func TestUpdate_TagOnlyUpdate(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_TagOnlyUpdate(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateAddTags = []string{"new-tag"}
+	setTaskID = "001"
+	setAddTags = []string{"new-tag"}
 
 	// Should NOT produce "nothing to update" error.
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("tag-only update should succeed, got error: %v", err)
 	}
 }
 
-func TestUpdate_TagsWithOtherFlags(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_TagsWithOtherFlags(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateStatus = "completed"
-	updateAddTags = []string{"done-tag"}
+	setTaskID = "001"
+	setStatus = "completed"
+	setAddTags = []string{"done-tag"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -743,14 +743,14 @@ func TestUpdate_TagsWithOtherFlags(t *testing.T) {
 	}
 }
 
-func TestUpdate_TagsPreservedFormat(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_TagsPreservedFormat(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "001"
-	updateAddTags = []string{"extra"}
+	setTaskID = "001"
+	setAddTags = []string{"extra"}
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -772,14 +772,14 @@ func TestUpdate_TagsPreservedFormat(t *testing.T) {
 	}
 }
 
-func TestUpdate_MultilineTagFormat(t *testing.T) {
+func TestSet_MultilineTagFormat(t *testing.T) {
 	tmpDir := createMultilineTagTestFile(t)
-	resetUpdateFlags()
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "010"
-	updateAddTags = []string{"new-tag"}
+	setTaskID = "010"
+	setAddTags = []string{"new-tag"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -805,14 +805,14 @@ func TestUpdate_MultilineTagFormat(t *testing.T) {
 	}
 }
 
-func TestUpdate_MultilineTagRemove(t *testing.T) {
+func TestSet_MultilineTagRemove(t *testing.T) {
 	tmpDir := createMultilineTagTestFile(t)
-	resetUpdateFlags()
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "010"
-	updateRemoveTags = []string{"api"}
+	setTaskID = "010"
+	setRemoveTags = []string{"api"}
 
-	_, err := captureUpdateOutput(t)
+	_, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -825,15 +825,15 @@ func TestUpdate_MultilineTagRemove(t *testing.T) {
 	}
 }
 
-func TestUpdate_TagConfirmationOutput(t *testing.T) {
-	tmpDir := createUpdateTestFiles(t)
-	resetUpdateFlags()
+func TestSet_TagConfirmationOutput(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
 	dir = tmpDir
-	updateTaskID = "002"
-	updateAddTags = []string{"feature"}
-	updateRemoveTags = []string{"security"}
+	setTaskID = "002"
+	setAddTags = []string{"feature"}
+	setRemoveTags = []string{"security"}
 
-	output, err := captureUpdateOutput(t)
+	output, err := captureSetOutput(t)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
