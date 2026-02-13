@@ -1,7 +1,7 @@
 ---
 id: "071"
 title: "Add --filter flag to graph command"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies:

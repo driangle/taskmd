@@ -1,7 +1,7 @@
 ---
 id: "072"
 title: "Add spec command to generate task specification file"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies:

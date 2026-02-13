@@ -1,0 +1,209 @@
+# taskmd Specification
+
+**Version:** 1.1
+**Last Updated:** 2026-02-13
+
+## Quick Reference
+
+Each task is a `.md` file with YAML frontmatter and a markdown body.
+
+```yaml
+---
+id: "001"
+title: "Task title"
+status: pending
+---
+
+# Task Title
+
+Description and subtasks go here.
+```
+
+### Field Summary
+
+| Field | Type | Required | Values / Format |
+|-------|------|----------|-----------------|
+| `id` | string | **Yes** | Zero-padded number (e.g., `"001"`, `"042"`) |
+| `title` | string | **Yes** | Brief, descriptive text |
+| `status` | enum | Recommended | `pending`, `in-progress`, `completed`, `blocked`, `cancelled` |
+| `priority` | enum | No | `low`, `medium`, `high`, `critical` |
+| `effort` | enum | No | `small`, `medium`, `large` |
+| `dependencies` | array | No | List of task ID strings (e.g., `["001", "015"]`) |
+| `tags` | array | No | Lowercase, hyphen-separated strings |
+| `group` | string | No | Logical grouping (derived from directory if omitted) |
+| `created` | date | No | `YYYY-MM-DD` |
+
+## Frontmatter Schema
+
+### Required Fields
+
+**`id`** — Unique identifier for the task. Use zero-padded numeric IDs (e.g., `"001"`, `"042"`). Must be unique across all tasks in the project.
+
+**`title`** — Brief, action-oriented description of the task.
+
+### Optional Fields
+
+**`status`** — Current state of the task (recommended for all tasks):
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Not started (initial state) |
+| `in-progress` | Currently being worked on |
+| `completed` | Finished and verified |
+| `blocked` | Cannot proceed due to a blocker |
+| `cancelled` | Will not be completed |
+
+```
+pending → in-progress → completed
+   ↓            ↓            ↓
+   ↓         blocked        ↓
+   ↓            ↓           ↓
+   └──→ cancelled ←─────────┘
+```
+
+**`priority`** — Importance level:
+
+| Priority | Use Case |
+|----------|----------|
+| `low` | Nice to have, can be deferred |
+| `medium` | Standard work items (default) |
+| `high` | Important for project success |
+| `critical` | Urgent, must address immediately |
+
+**`effort`** — Estimated complexity:
+
+| Effort | Typical Duration |
+|--------|------------------|
+| `small` | < 2 hours |
+| `medium` | 2–8 hours |
+| `large` | > 8 hours / multi-day |
+
+**`dependencies`** — List of task IDs that must be completed before this task can start. Always reference by ID, always use array format:
+
+```yaml
+dependencies: ["001", "015"]
+```
+
+**`tags`** — Labels for categorization and filtering. Use lowercase, hyphen-separated strings:
+
+```yaml
+tags:
+  - core
+  - api
+```
+
+**`group`** — Logical grouping. If omitted, derived from the parent directory name. Root-level tasks have no group.
+
+**`created`** — Date when the task was created, in `YYYY-MM-DD` format.
+
+Unknown frontmatter fields are preserved during read/write operations.
+
+## File Organization
+
+### File Naming
+
+Task files follow this pattern:
+
+```
+NNN-descriptive-title.md
+```
+
+Where `NNN` is the zero-padded task ID and `descriptive-title` is a lowercase hyphen-separated slug. Examples:
+
+- `001-project-scaffolding.md`
+- `042-implement-user-auth.md`
+
+The ID prefix may be omitted if the `id` field in frontmatter is the sole identifier.
+
+### Directory Structure
+
+Tasks can be organized into subdirectories for grouping:
+
+```
+tasks/
+├── 001-taskmd-specification.md     # No group
+├── web/                             # Group: "web"
+│   ├── 001-project-scaffolding.md
+│   └── 002-typescript-types.md
+└── cli/                             # Group: "cli"
+    ├── 015-go-cli-scaffolding.md
+    └── 016-task-model-parsing.md
+```
+
+Group resolution priority:
+1. Explicit `group` in frontmatter
+2. Parent directory name
+3. No group (root-level tasks)
+
+## Validation
+
+A valid taskmd file **must**:
+
+1. Have YAML frontmatter enclosed in `---` delimiters
+2. Include required fields: `id`, `title`
+3. Use valid enum values for `status`, `priority`, `effort`
+4. Have unique IDs across the project
+5. Reference only existing tasks in `dependencies`
+6. Have no circular dependency chains
+
+A valid taskmd file **should**:
+
+1. Follow the `NNN-task-name.md` naming pattern
+2. Include a creation date
+3. Have a descriptive markdown body
+
+## Examples
+
+### Minimal Task
+
+```markdown
+---
+id: "001"
+title: "Fix login button alignment"
+status: pending
+---
+
+# Fix Login Button Alignment
+
+The login button on the homepage is misaligned. Update the CSS to center it.
+```
+
+### Full Task
+
+```markdown
+---
+id: "015"
+title: "Implement user authentication"
+status: in-progress
+priority: high
+effort: large
+dependencies: ["012", "013"]
+tags:
+  - auth
+  - security
+  - api
+created: 2026-02-08
+---
+
+# Implement User Authentication
+
+## Objective
+
+Add JWT-based authentication to the API.
+
+## Tasks
+
+- [x] Design authentication flow
+- [x] Implement JWT signing and verification
+- [ ] Create login endpoint
+- [ ] Create logout endpoint
+- [ ] Add authentication middleware
+- [ ] Write integration tests
+
+## Acceptance Criteria
+
+- Users can log in with email and password
+- JWT tokens expire after 24 hours
+- Protected routes require valid JWT
+- All endpoints have > 90% test coverage
+```
