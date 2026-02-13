@@ -1,7 +1,7 @@
 ---
 id: "063"
 title: "Implement archive command to hide completed/cancelled tasks"
-status: pending
+status: completed
 priority: medium
 effort: large
 dependencies: ["060"]

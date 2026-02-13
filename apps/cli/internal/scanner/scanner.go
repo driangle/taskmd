@@ -136,6 +136,7 @@ func shouldSkipDirectory(name string) bool {
 		"out",
 		"target",
 		"__pycache__",
+		"archive",
 	}
 
 	for _, skip := range skipDirs {
