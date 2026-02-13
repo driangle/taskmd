@@ -1,7 +1,7 @@
 ---
 id: "061"
 title: "Simplify task specification document"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["001"]
@@ -21,22 +21,22 @@ Simplify and clarify the taskmd specification to make it easier to understand, i
 
 ## Tasks
 
-- [ ] Review current specification document (`docs/TASKMD_SPEC.md` or `tasks/001-taskmd-specification.md`)
-- [ ] Identify areas of complexity or redundancy
-- [ ] Simplify frontmatter schema:
+- [x] Review current specification document (`docs/TASKMD_SPEC.md` or `tasks/001-taskmd-specification.md`)
+- [x] Identify areas of complexity or redundancy
+- [x] Simplify frontmatter schema:
   - Mark truly optional fields clearly
   - Remove rarely-used or unnecessary fields
   - Consolidate similar fields
   - Clarify required vs optional fields
-- [ ] Reduce number of examples (keep only the most illustrative ones)
-- [ ] Consolidate sections that cover similar topics
-- [ ] Simplify language and remove verbose explanations
-- [ ] Create a "quick reference" section at the top
-- [ ] Move advanced/edge-case content to appendix or separate document
-- [ ] Update any code that references removed/changed fields
-- [ ] Update validation logic to match simplified spec
-- [ ] Update tests to reflect simplified spec
-- [ ] Review with fresh eyes (or ask for feedback)
+- [x] Reduce number of examples (keep only the most illustrative ones)
+- [x] Consolidate sections that cover similar topics
+- [x] Simplify language and remove verbose explanations
+- [x] Create a "quick reference" section at the top
+- [x] Move advanced/edge-case content to appendix or separate document
+- [x] Update any code that references removed/changed fields
+- [x] Update validation logic to match simplified spec
+- [x] Update tests to reflect simplified spec
+- [x] Review with fresh eyes (or ask for feedback)
 
 ## Acceptance Criteria
 
