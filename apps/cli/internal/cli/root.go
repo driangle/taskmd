@@ -20,6 +20,8 @@ var (
 	format  string
 	quiet   bool
 	verbose bool
+	debug   bool
+	noColor bool
 	dir     string
 )
 
@@ -29,7 +31,12 @@ var rootCmd = &cobra.Command{
 	Short: "A markdown-based task tracker CLI",
 	Long: `taskmd is a command-line tool for managing tasks stored in markdown files.
 It supports reading from files or stdin, multiple output formats, and various
-commands for listing, validating, and visualizing your tasks.`,
+commands for listing, validating, and visualizing your tasks.
+
+Exit codes:
+  0 - Success
+  1 - Error (invalid input, scan failure, etc.)
+  2 - Validation warnings (with --strict)`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Version:       Version,
@@ -53,6 +60,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format (table, json, yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output (prints to stderr)")
+	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory to scan")
 
 	// Bind flags to viper
@@ -60,6 +69,8 @@ func init() {
 	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
 }
 
@@ -115,6 +126,8 @@ func GetGlobalFlags() GlobalFlags {
 		Format:  formatVal,
 		Quiet:   viper.GetBool("quiet") || quiet,
 		Verbose: viper.GetBool("verbose") || verbose,
+		Debug:   viper.GetBool("debug") || debug,
+		NoColor: viper.GetBool("no-color") || noColor,
 		Dir:     dirVal,
 	}
 }
@@ -125,6 +138,8 @@ type GlobalFlags struct {
 	Format  string
 	Quiet   bool
 	Verbose bool
+	Debug   bool
+	NoColor bool
 	Dir     string
 }
 

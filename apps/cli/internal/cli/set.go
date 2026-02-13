@@ -17,6 +17,7 @@ var (
 	setPriority   string
 	setEffort     string
 	setDone       bool
+	setDryRun     bool
 	setAddTags    []string
 	setRemoveTags []string
 )
@@ -59,6 +60,7 @@ func init() {
 		cmd.Flags().StringVar(&setPriority, "priority", "", "new priority (low, medium, high, critical)")
 		cmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large)")
 		cmd.Flags().BoolVar(&setDone, "done", false, "mark task as completed (alias for --status completed)")
+		cmd.Flags().BoolVar(&setDryRun, "dry-run", false, "preview changes without writing to disk")
 		cmd.Flags().StringArrayVar(&setAddTags, "add-tag", nil, "add a tag (repeatable)")
 		cmd.Flags().StringArrayVar(&setRemoveTags, "remove-tag", nil, "remove a tag (repeatable)")
 
@@ -81,12 +83,21 @@ func runSet(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
+	debugLog("scan directory: %s", scanDir)
+	debugLog("found %d task(s)", len(result.Tasks))
+
 	task := findExactMatch(setTaskID, result.Tasks)
 	if task == nil {
 		return fmt.Errorf("task not found: %s", setTaskID)
 	}
 
 	changes := buildChangeLog(task, req)
+
+	if setDryRun {
+		printSetConfirmation(task, changes)
+		fmt.Println("\nDry run — no changes made.")
+		return nil
+	}
 
 	if err := taskfile.UpdateTaskFile(task.FilePath, req); err != nil {
 		return err
@@ -123,10 +134,9 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 		req.RemTags = setRemoveTags
 	}
 
-	// Validate enum values
-	errs := taskfile.ValidateUpdateRequest(req)
-	if len(errs) > 0 {
-		return taskfile.UpdateRequest{}, fmt.Errorf("%s", errs[0])
+	// Validate enum values with suggestions
+	if err := validateSetEnums(req); err != nil {
+		return taskfile.UpdateRequest{}, err
 	}
 
 	hasScalar := req.Status != nil || req.Priority != nil || req.Effort != nil

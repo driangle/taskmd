@@ -1,7 +1,7 @@
 ---
 id: "029"
 title: "CLI polish & error handling"
-status: pending
+status: completed
 priority: low
 effort: medium
 dependencies: ["018", "019", "020", "021", "022", "023", "024", "025", "026"]

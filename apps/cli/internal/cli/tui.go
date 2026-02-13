@@ -21,9 +21,17 @@ var tuiCmd = &cobra.Command{
 	Use:        "tui",
 	SuggestFor: []string{"ui", "interactive", "dashboard"},
 	Short:      "Launch interactive TUI (Terminal User Interface)",
-	Long:       "Launch an interactive terminal UI for browsing and managing tasks",
-	Args:       cobra.MaximumNArgs(1),
-	RunE:       runTUI,
+	Long: `Launch an interactive terminal UI for browsing and managing tasks.
+
+Examples:
+  taskmd tui
+  taskmd tui ./tasks
+  taskmd tui --focus 042
+  taskmd tui --filter status=pending
+  taskmd tui --group-by priority
+  taskmd tui --readonly`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runTUI,
 }
 
 func init() {

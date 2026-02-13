@@ -17,7 +17,6 @@ var (
 	boardGroupBy string
 	boardFormat  string
 	boardOut     string
-	boardNoColor bool
 )
 
 var boardCmd = &cobra.Command{
@@ -53,7 +52,6 @@ func init() {
 	boardCmd.Flags().StringVar(&boardGroupBy, "group-by", "status", "field to group by (status, priority, effort, group, tag)")
 	boardCmd.Flags().StringVar(&boardFormat, "format", "md", "output format (md, txt, json)")
 	boardCmd.Flags().StringVarP(&boardOut, "out", "o", "", "write output to file instead of stdout")
-	boardCmd.Flags().BoolVar(&boardNoColor, "no-color", false, "disable colored output")
 }
 
 func runBoard(cmd *cobra.Command, args []string) error {
@@ -105,7 +103,7 @@ func runBoard(cmd *cobra.Command, args []string) error {
 }
 
 func outputBoardMarkdown(gr *board.GroupResult, w io.Writer) error {
-	r := getRenderer(boardNoColor)
+	r := getRenderer()
 	for i, key := range gr.Keys {
 		tasks := gr.Groups[key]
 		if i > 0 {
@@ -127,7 +125,7 @@ func outputBoardMarkdown(gr *board.GroupResult, w io.Writer) error {
 }
 
 func outputBoardText(gr *board.GroupResult, w io.Writer) error {
-	r := getRenderer(boardNoColor)
+	r := getRenderer()
 	for i, key := range gr.Keys {
 		tasks := gr.Groups[key]
 		if i > 0 {

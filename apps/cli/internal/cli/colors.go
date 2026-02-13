@@ -8,9 +8,9 @@ import (
 	"github.com/muesli/termenv"
 )
 
-// colorsEnabled checks if color output should be enabled based on a flag and NO_COLOR env var.
-func colorsEnabled(noColorFlag bool) bool {
-	if noColorFlag {
+// colorsEnabled checks if color output should be enabled based on the global --no-color flag and NO_COLOR env var.
+func colorsEnabled() bool {
+	if noColor {
 		return false
 	}
 	if os.Getenv("NO_COLOR") != "" {
@@ -20,9 +20,9 @@ func colorsEnabled(noColorFlag bool) bool {
 }
 
 // getRenderer returns a lipgloss renderer with the appropriate color profile.
-func getRenderer(noColorFlag bool) *lipgloss.Renderer {
+func getRenderer() *lipgloss.Renderer {
 	r := lipgloss.NewRenderer(os.Stdout)
-	if colorsEnabled(noColorFlag) {
+	if colorsEnabled() {
 		r.SetColorProfile(termenv.ANSI256)
 	} else {
 		r.SetColorProfile(termenv.Ascii)

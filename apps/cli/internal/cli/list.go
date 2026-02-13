@@ -21,7 +21,6 @@ var (
 	listFilters []string
 	listSort    string
 	listColumns string
-	listNoColor bool
 )
 
 // listCmd represents the list command
@@ -54,13 +53,13 @@ func init() {
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", []string{}, "filter tasks (can specify multiple times for AND conditions, e.g., --filter status=pending --filter priority=high)")
 	listCmd.Flags().StringVar(&listSort, "sort", "", "sort by field (id, title, status, priority, effort, created)")
 	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority,file", "comma-separated list of columns to display")
-	listCmd.Flags().BoolVar(&listNoColor, "no-color", false, "disable colored output")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
 	scanDir := ResolveScanDir(args)
+	debugLog("scan directory: %s", scanDir)
 
 	// Create scanner and scan for tasks
 	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
@@ -70,6 +69,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	tasks := result.Tasks
+	debugLog("found %d task(s)", len(tasks))
 
 	// Make file paths relative to scan directory
 	makeFilePathsRelative(tasks, scanDir)
@@ -82,6 +82,8 @@ func runList(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintln(os.Stderr)
 	}
+
+	debugLog("format: %s, sort: %q, filters: %v", flags.Format, listSort, listFilters)
 
 	// Apply filters (multiple filters are AND'ed together)
 	if len(listFilters) > 0 {
@@ -150,7 +152,7 @@ func sortTasks(tasks []*model.Task, sortField string) error {
 			return tasks[i].Created.Before(tasks[j].Created)
 		})
 	default:
-		return fmt.Errorf("unsupported sort field: %s (supported: id, title, status, priority, effort, created)", sortField)
+		return invalidValueError("sort field", sortField, validSortFields)
 	}
 
 	return nil
@@ -183,7 +185,7 @@ func outputTable(tasks []*model.Task, columnsStr string) error {
 		columns[i] = strings.TrimSpace(col)
 	}
 
-	r := getRenderer(listNoColor)
+	r := getRenderer()
 
 	// Create tab writer
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)

@@ -94,9 +94,9 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	// Determine exit code
 	if !validationResult.IsValid() {
-		os.Exit(1)
+		os.Exit(ExitError)
 	} else if validateStrict && validationResult.HasWarnings() {
-		os.Exit(2)
+		os.Exit(ExitValidationWarning)
 	}
 
 	return nil

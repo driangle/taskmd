@@ -95,7 +95,7 @@ func resetListFlags() {
 	listFilters = []string{}
 	listSort = ""
 	listColumns = "id,title,status,priority,file"
-	listNoColor = true
+	noColor = true
 }
 
 // captureListTableOutput runs outputTable and captures stdout.
@@ -123,7 +123,7 @@ func captureListTableOutput(t *testing.T, tasks []*model.Task, columns string) s
 
 func TestListCommand_TableColorEnabled(t *testing.T) {
 	resetListFlags()
-	listNoColor = false
+	noColor = false
 	os.Unsetenv("NO_COLOR")
 
 	tasks := []*model.Task{
@@ -148,7 +148,7 @@ func TestListCommand_TableColorEnabled(t *testing.T) {
 
 func TestListCommand_TableNoColorFlag(t *testing.T) {
 	resetListFlags()
-	// listNoColor is already true from resetListFlags
+	// noColor is already true from resetListFlags
 	os.Unsetenv("NO_COLOR")
 
 	tasks := []*model.Task{
@@ -173,7 +173,7 @@ func TestListCommand_TableNoColorFlag(t *testing.T) {
 
 func TestListCommand_TableNoColorEnvVar(t *testing.T) {
 	resetListFlags()
-	listNoColor = false // enable via flag, but env var should override
+	noColor = false // enable via flag, but env var should override
 
 	os.Setenv("NO_COLOR", "1")
 	defer os.Unsetenv("NO_COLOR")
@@ -192,7 +192,7 @@ func TestListCommand_TableNoColorEnvVar(t *testing.T) {
 
 func TestListCommand_TableColorColumns(t *testing.T) {
 	resetListFlags()
-	listNoColor = false
+	noColor = false
 	os.Unsetenv("NO_COLOR")
 
 	tasks := []*model.Task{

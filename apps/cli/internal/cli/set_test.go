@@ -109,6 +109,7 @@ func resetSetFlags() {
 	setPriority = ""
 	setEffort = ""
 	setDone = false
+	setDryRun = false
 	setAddTags = nil
 	setRemoveTags = nil
 	dir = "."

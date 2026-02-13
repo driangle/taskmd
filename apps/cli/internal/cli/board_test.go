@@ -117,12 +117,12 @@ created: 2026-02-08
 
 // resetBoardFlags resets board command flags to defaults before each test.
 // Colors are disabled by default so content-checking tests aren't affected by ANSI codes.
-// Tests that verify color output should explicitly set boardNoColor = false.
+// Tests that verify color output should explicitly set noColor = false.
 func resetBoardFlags() {
 	boardGroupBy = "status"
 	boardFormat = "md"
 	boardOut = ""
-	boardNoColor = true
+	noColor = true
 }
 
 // captureBoardOutput runs the board command and captures stdout.
@@ -427,7 +427,7 @@ func TestBoardCommand_ColorEnabled(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "txt"
-	boardNoColor = false
+	noColor = false
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -445,7 +445,7 @@ func TestBoardCommand_NoColorFlag(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "txt"
-	boardNoColor = true
+	noColor = true
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -467,7 +467,7 @@ func TestBoardCommand_NoColorEnvVar(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "txt"
-	boardNoColor = false // explicitly enable color, then let env var override
+	noColor = false // explicitly enable color, then let env var override
 
 	// Set NO_COLOR environment variable
 	os.Setenv("NO_COLOR", "1")
@@ -490,7 +490,7 @@ func TestBoardCommand_ColorMarkdownFormat(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "md"
-	boardNoColor = false
+	noColor = false
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -534,7 +534,7 @@ func TestBoardCommand_ColorStatusBased(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "txt"
-	boardNoColor = false
+	noColor = false
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -566,7 +566,7 @@ func TestBoardCommand_ColorOutputToFile(t *testing.T) {
 	resetBoardFlags()
 	boardFormat = "txt"
 	boardOut = outFile
-	boardNoColor = false
+	noColor = false
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -592,7 +592,7 @@ func TestBoardCommand_HeadingColoredByStatus(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "md"
-	boardNoColor = false
+	noColor = false
 
 	os.Unsetenv("NO_COLOR")
 
@@ -614,7 +614,7 @@ func TestBoardCommand_HeadingColoredByPriority(t *testing.T) {
 	resetBoardFlags()
 	boardGroupBy = "priority"
 	boardFormat = "txt"
-	boardNoColor = false
+	noColor = false
 
 	os.Unsetenv("NO_COLOR")
 
@@ -638,7 +638,7 @@ func TestBoardCommand_HeadingNoColorFlag(t *testing.T) {
 	tmpDir := createBoardTestFiles(t)
 	resetBoardFlags()
 	boardFormat = "md"
-	// boardNoColor is already true from resetBoardFlags
+	// noColor is already true from resetBoardFlags
 
 	output := captureBoardOutput(t, tmpDir)
 
