@@ -2,12 +2,15 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/driangle/taskmd/apps/cli/internal/board"
 	"github.com/driangle/taskmd/apps/cli/internal/graph"
 	"github.com/driangle/taskmd/apps/cli/internal/metrics"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
@@ -150,4 +153,116 @@ func handleValidate(dp *DataProvider) http.HandlerFunc {
 		result := v.Validate(tasks)
 		writeJSON(w, result)
 	}
+}
+
+// TaskUpdateRequest is the JSON request body for PUT /api/tasks/{id}.
+type TaskUpdateRequest struct {
+	Title    *string   `json:"title"`
+	Status   *string   `json:"status"`
+	Priority *string   `json:"priority"`
+	Effort   *string   `json:"effort"`
+	Tags     *[]string `json:"tags"`
+	Body     *string   `json:"body"`
+}
+
+// ErrorResponse is a structured JSON error response.
+type ErrorResponse struct {
+	Error   string   `json:"error"`
+	Details []string `json:"details,omitempty"`
+}
+
+func writeError(w http.ResponseWriter, status int, msg string, details []string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(ErrorResponse{Error: msg, Details: details}) //nolint:errcheck
+}
+
+func findTaskByID(tasks []*model.Task, id string) *model.Task {
+	for _, t := range tasks {
+		if t.ID == id {
+			return t
+		}
+	}
+	return nil
+}
+
+func handleUpdateTask(dp *DataProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		taskID := r.PathValue("id")
+		if taskID == "" {
+			writeError(w, http.StatusBadRequest, "task ID is required", nil)
+			return
+		}
+
+		var body TaskUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body", []string{err.Error()})
+			return
+		}
+
+		req := toUpdateRequest(body)
+
+		if errs := taskfile.ValidateUpdateRequest(req); len(errs) > 0 {
+			writeError(w, http.StatusBadRequest, "validation failed", errs)
+			return
+		}
+
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to load tasks", nil)
+			return
+		}
+
+		found := findTaskByID(tasks, taskID)
+		if found == nil {
+			writeError(w, http.StatusNotFound, "task not found: "+taskID, nil)
+			return
+		}
+
+		if err := taskfile.UpdateTaskFile(found.FilePath, req); err != nil {
+			handleFileUpdateError(w, err)
+			return
+		}
+
+		dp.Invalidate()
+
+		updated, err := reloadTask(dp, taskID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to reload tasks", nil)
+			return
+		}
+
+		writeJSON(w, TaskDetail{Task: updated, Body: updated.Body})
+	}
+}
+
+func toUpdateRequest(body TaskUpdateRequest) taskfile.UpdateRequest {
+	return taskfile.UpdateRequest{
+		Title:    body.Title,
+		Status:   body.Status,
+		Priority: body.Priority,
+		Effort:   body.Effort,
+		Tags:     body.Tags,
+		Body:     body.Body,
+	}
+}
+
+func handleFileUpdateError(w http.ResponseWriter, err error) {
+	if strings.Contains(err.Error(), "no valid frontmatter") {
+		writeError(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+	writeError(w, http.StatusInternalServerError, "failed to update task file", []string{err.Error()})
+}
+
+func reloadTask(dp *DataProvider, taskID string) (*model.Task, error) {
+	tasks, err := dp.GetTasks()
+	if err != nil {
+		return nil, err
+	}
+	found := findTaskByID(tasks, taskID)
+	if found == nil {
+		return nil, fmt.Errorf("task not found after update: %s", taskID)
+	}
+	return found, nil
 }

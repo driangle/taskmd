@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
 )
 
 func createUpdateTestFiles(t *testing.T) string {
@@ -536,7 +538,7 @@ func TestUpdate_FrontmatterBounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			open, closeIdx := findFrontmatterBounds(tt.lines)
+			open, closeIdx := taskfile.FindFrontmatterBounds(tt.lines)
 			if open != tt.wantOpen || closeIdx != tt.wantClose {
 				t.Errorf("findFrontmatterBounds() = (%d, %d), want (%d, %d)",
 					open, closeIdx, tt.wantOpen, tt.wantClose)
@@ -893,7 +895,7 @@ func TestComputeNewTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := computeNewTags(tt.current, tt.addTags, tt.removeTags)
+			got := taskfile.ComputeNewTags(tt.current, tt.addTags, tt.removeTags)
 			if len(got) != len(tt.want) {
 				t.Fatalf("computeNewTags() = %v, want %v", got, tt.want)
 			}

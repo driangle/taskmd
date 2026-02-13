@@ -1,7 +1,7 @@
 ---
 id: "062"
 title: "Implement task editing interface in web app"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies: []

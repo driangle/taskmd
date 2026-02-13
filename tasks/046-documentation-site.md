@@ -2,7 +2,7 @@
 id: "046"
 title: "Create documentation site using GitHub Pages or similar"
 status: pending
-priority: low
+priority: medium
 effort: large
 dependencies:
   - "043"

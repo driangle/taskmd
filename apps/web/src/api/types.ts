@@ -68,3 +68,17 @@ export interface ValidationIssue {
   file_path?: string;
   message: string;
 }
+
+export interface TaskUpdateRequest {
+  title?: string;
+  status?: string;
+  priority?: string;
+  effort?: string;
+  tags?: string[];
+  body?: string;
+}
+
+export interface ApiError {
+  error: string;
+  details?: string[];
+}

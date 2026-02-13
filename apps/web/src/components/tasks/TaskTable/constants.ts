@@ -1,5 +1,6 @@
 export const STATUSES = ["pending", "in-progress", "completed", "blocked", "cancelled"];
 export const PRIORITIES = ["critical", "high", "medium", "low"];
+export const EFFORTS = ["small", "medium", "large"];
 
 export const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",

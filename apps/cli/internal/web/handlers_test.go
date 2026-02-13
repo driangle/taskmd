@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/apps/cli/internal/board"
@@ -271,5 +272,197 @@ func TestHandleValidate(t *testing.T) {
 	var result validator.ValidationResult
 	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
+	}
+}
+
+// PUT /api/tasks/{id} tests
+
+func TestHandleUpdateTask_Success(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"status":"completed"}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var task map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &task); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if task["status"] != "completed" {
+		t.Errorf("expected status completed, got %v", task["status"])
+	}
+
+	// Verify file was actually updated
+	content, _ := os.ReadFile(filepath.Join(dir, "001-task-one.md"))
+	if !strings.Contains(string(content), "status: completed") {
+		t.Error("expected file to contain updated status")
+	}
+}
+
+func TestHandleUpdateTask_NotFound(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"status":"completed"}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/999", body)
+	req.SetPathValue("id", "999")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestHandleUpdateTask_InvalidStatus(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"status":"invalid"}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if errResp.Error != "validation failed" {
+		t.Errorf("expected 'validation failed', got %q", errResp.Error)
+	}
+}
+
+func TestHandleUpdateTask_InvalidJSON(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`not json`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleUpdateTask_Title(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"title":"New Title"}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	content, _ := os.ReadFile(filepath.Join(dir, "001-task-one.md"))
+	if !strings.Contains(string(content), `title: "New Title"`) {
+		t.Errorf("expected title update in file, got:\n%s", string(content))
+	}
+}
+
+func TestHandleUpdateTask_Body(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"body":"# Updated\n\nNew body content."}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	content, _ := os.ReadFile(filepath.Join(dir, "001-task-one.md"))
+	s := string(content)
+	if !strings.Contains(s, "New body content.") {
+		t.Error("expected new body content in file")
+	}
+	if strings.Contains(s, "# Task One") {
+		t.Error("expected old body to be replaced")
+	}
+}
+
+func TestHandleUpdateTask_Tags(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"tags":["new-a","new-b"]}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var task map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &task); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	tags, ok := task["tags"].([]any)
+	if !ok {
+		t.Fatalf("expected tags array, got %T", task["tags"])
+	}
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(tags))
+	}
+}
+
+func TestHandleUpdateTask_PartialUpdate(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	// Only update priority, everything else should be preserved
+	body := strings.NewReader(`{"priority":"low"}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	content, _ := os.ReadFile(filepath.Join(dir, "001-task-one.md"))
+	s := string(content)
+	if !strings.Contains(s, "priority: low") {
+		t.Error("expected priority to be updated")
+	}
+	if !strings.Contains(s, "status: pending") {
+		t.Error("expected status to be preserved")
+	}
+	if !strings.Contains(s, "effort: small") {
+		t.Error("expected effort to be preserved")
 	}
 }
