@@ -166,6 +166,8 @@ func captureNextOutput(t *testing.T, args []string) (string, error) {
 func resetNextFlags() {
 	nextLimit = 5
 	nextFilters = []string{}
+	nextQuickWins = false
+	nextCritical = false
 	format = "table"
 }
 
@@ -1022,4 +1024,416 @@ func TestNext_DownstreamCountUsesFullGraph(t *testing.T) {
 	}
 
 	t.Error("Expected task 007 in api-filtered results")
+}
+
+func TestNext_QuickWins_HappyPath(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextQuickWins = true
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Actionable small tasks: 003, 005, 007, 008
+	// NOT included: 004 (large), blocked tasks
+	if len(recs) != 4 {
+		t.Errorf("Expected 4 quick wins, got %d", len(recs))
+		for _, r := range recs {
+			t.Logf("  %s: %s (effort=%s)", r.ID, r.Title, r.Effort)
+		}
+	}
+
+	// Verify all returned tasks have effort: small
+	for _, rec := range recs {
+		if rec.Effort != "small" {
+			t.Errorf("Quick wins should only include small effort tasks, got %s for task %s", rec.Effort, rec.ID)
+		}
+	}
+
+	// Verify expected tasks
+	expectedIDs := map[string]bool{"003": true, "005": true, "007": true, "008": true}
+	for _, rec := range recs {
+		if !expectedIDs[rec.ID] {
+			t.Errorf("Unexpected task %s in quick wins", rec.ID)
+		}
+	}
+}
+
+func TestNext_QuickWins_WithFilter(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextQuickWins = true
+	nextFilters = []string{"tag=cli"}
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// CLI-tagged, actionable, small effort: 003, 008
+	if len(recs) != 2 {
+		t.Errorf("Expected 2 CLI quick wins, got %d", len(recs))
+		for _, r := range recs {
+			t.Logf("  %s: %s (effort=%s)", r.ID, r.Title, r.Effort)
+		}
+	}
+
+	for _, rec := range recs {
+		if rec.Effort != "small" {
+			t.Errorf("Expected small effort, got %s for task %s", rec.Effort, rec.ID)
+		}
+		if rec.ID != "003" && rec.ID != "008" {
+			t.Errorf("Unexpected task %s in filtered quick wins", rec.ID)
+		}
+	}
+}
+
+func TestNext_QuickWins_WithLimit(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextQuickWins = true
+	nextLimit = 1
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if len(recs) != 1 {
+		t.Errorf("Expected 1 quick win with --limit 1, got %d", len(recs))
+	}
+
+	if len(recs) > 0 && recs[0].Effort != "small" {
+		t.Errorf("Expected small effort, got %s", recs[0].Effort)
+	}
+}
+
+func TestNext_QuickWins_NoQuickWinsAvailable(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create only medium/large effort tasks
+	tasks := map[string]string{
+		"001.md": `---
+id: "001"
+title: "Large task"
+status: pending
+priority: high
+effort: large
+dependencies: []
+created: 2026-02-01
+---`,
+		"002.md": `---
+id: "002"
+title: "Medium task"
+status: pending
+priority: medium
+effort: medium
+dependencies: []
+created: 2026-02-02
+---`,
+	}
+
+	for filename, content := range tasks {
+		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	resetNextFlags()
+	format = "table"
+	nextQuickWins = true
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	if !strings.Contains(output, "No quick wins available") {
+		t.Errorf("Expected 'No quick wins available' message, got: %s", output)
+	}
+}
+
+func TestNext_QuickWins_TableFormat(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "table"
+	nextQuickWins = true
+	nextLimit = 3
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	if !strings.Contains(output, "Recommended quick wins:") {
+		t.Error("Expected table header 'Recommended quick wins:'")
+	}
+}
+
+func TestNext_QuickWins_YAMLFormat(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "yaml"
+	nextQuickWins = true
+	nextLimit = 2
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	// Verify it's valid YAML with effort field
+	if !strings.Contains(output, "effort: small") {
+		t.Error("Expected YAML output to contain 'effort: small'")
+	}
+}
+
+func TestNext_Critical_HappyPath(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextCritical = true
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Verify all returned tasks are on critical path
+	for _, rec := range recs {
+		if !rec.OnCriticalPath {
+			t.Errorf("Critical filter should only include critical path tasks, got task %s", rec.ID)
+		}
+	}
+
+	// All tasks should have on_critical_path: true
+	if len(recs) > 0 {
+		allCritical := true
+		for _, rec := range recs {
+			if !rec.OnCriticalPath {
+				allCritical = false
+				break
+			}
+		}
+		if !allCritical {
+			t.Error("All recommendations should be on critical path")
+		}
+	}
+}
+
+func TestNext_Critical_WithFilter(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextCritical = true
+	nextFilters = []string{"tag=cli"}
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Verify all tasks are CLI-tagged AND on critical path
+	for _, rec := range recs {
+		if !rec.OnCriticalPath {
+			t.Errorf("Expected task %s to be on critical path", rec.ID)
+		}
+	}
+}
+
+func TestNext_Critical_WithLimit(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextCritical = true
+	nextLimit = 1
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if len(recs) > 1 {
+		t.Errorf("Expected at most 1 recommendation with --limit 1, got %d", len(recs))
+	}
+
+	if len(recs) > 0 && !recs[0].OnCriticalPath {
+		t.Error("Expected critical path task")
+	}
+}
+
+func TestNext_Critical_NoCriticalTasksAvailable(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a scenario where actionable tasks are NOT on critical path
+	// Critical path: 001 -> 003 (longer chain)
+	// Non-critical: 002 (shorter parallel path)
+	tasks := map[string]string{
+		"001.md": `---
+id: "001"
+title: "Root task"
+status: completed
+priority: high
+effort: large
+dependencies: []
+created: 2026-02-01
+---`,
+		"002.md": `---
+id: "002"
+title: "Short path task"
+status: pending
+priority: low
+effort: small
+dependencies: ["001"]
+created: 2026-02-02
+---`,
+		"003.md": `---
+id: "003"
+title: "Long path intermediate"
+status: completed
+priority: high
+effort: large
+dependencies: ["001"]
+created: 2026-02-03
+---`,
+		"004.md": `---
+id: "004"
+title: "Long path final"
+status: completed
+priority: high
+effort: large
+dependencies: ["003"]
+created: 2026-02-04
+---`,
+	}
+
+	for filename, content := range tasks {
+		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+	}
+
+	resetNextFlags()
+	format = "table"
+	nextCritical = true
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	// Task 002 is actionable but not on critical path (001->003->004 is longer)
+	// So filtering by --critical should show no results
+	if !strings.Contains(output, "No critical path tasks available") {
+		t.Errorf("Expected 'No critical path tasks available' message, got: %s", output)
+	}
+}
+
+func TestNext_Critical_TableFormat(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "table"
+	nextCritical = true
+	nextLimit = 3
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	if !strings.Contains(output, "Recommended critical path tasks:") {
+		t.Error("Expected table header 'Recommended critical path tasks:'")
+	}
+}
+
+func TestNext_QuickWins_Ranking(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	format = "json"
+	nextQuickWins = true
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Verify still ranked by score
+	for i := 1; i < len(recs); i++ {
+		if recs[i].Score > recs[i-1].Score {
+			t.Errorf("Quick wins not sorted by score: [%d]=%d > [%d]=%d",
+				i, recs[i].Score, i-1, recs[i-1].Score)
+		}
+	}
+
+	// Task 003 (critical+small) should rank higher than 005 (low+small)
+	recMap := make(map[string]Recommendation)
+	for _, rec := range recs {
+		recMap[rec.ID] = rec
+	}
+
+	if rec003, ok := recMap["003"]; ok {
+		if rec005, ok := recMap["005"]; ok {
+			if rec003.Rank > rec005.Rank {
+				t.Errorf("Expected task 003 (critical) to rank higher than 005 (low): rank %d > %d",
+					rec003.Rank, rec005.Rank)
+			}
+		}
+	}
 }

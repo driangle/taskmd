@@ -45,8 +45,10 @@ type Recommendation struct {
 }
 
 var (
-	nextLimit   int
-	nextFilters []string
+	nextLimit     int
+	nextFilters   []string
+	nextQuickWins bool
+	nextCritical  bool
 )
 
 var nextCmd = &cobra.Command{
@@ -64,7 +66,9 @@ Examples:
   taskmd next ./tasks
   taskmd next --limit 3
   taskmd next --filter tag=cli
-  taskmd next --filter priority=high --format json`,
+  taskmd next --filter priority=high --format json
+  taskmd next --quick-wins
+  taskmd next --critical --limit 1`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runNext,
 }
@@ -74,6 +78,8 @@ func init() {
 
 	nextCmd.Flags().IntVar(&nextLimit, "limit", 5, "maximum number of recommendations")
 	nextCmd.Flags().StringArrayVar(&nextFilters, "filter", []string{}, "filter tasks (e.g., --filter tag=cli)")
+	nextCmd.Flags().BoolVar(&nextQuickWins, "quick-wins", false, "show only quick wins (effort: small)")
+	nextCmd.Flags().BoolVar(&nextCritical, "critical", false, "show only critical path tasks")
 }
 
 // hasUnmetDependencies checks if any dependency is not completed
@@ -93,6 +99,35 @@ func isActionable(task *model.Task, taskMap map[string]*model.Task) bool {
 		return false
 	}
 	return !hasUnmetDependencies(task, taskMap)
+}
+
+// applySpecialFilters applies quick-wins and critical path filters to actionable tasks
+func applySpecialFilters(actionable []*model.Task, criticalPath map[string]bool) []*model.Task {
+	result := actionable
+
+	// Apply quick wins filter if requested
+	if nextQuickWins {
+		var quickWins []*model.Task
+		for _, task := range result {
+			if task.Effort == model.EffortSmall {
+				quickWins = append(quickWins, task)
+			}
+		}
+		result = quickWins
+	}
+
+	// Apply critical path filter if requested
+	if nextCritical {
+		var critical []*model.Task
+		for _, task := range result {
+			if criticalPath[task.ID] {
+				critical = append(critical, task)
+			}
+		}
+		result = critical
+	}
+
+	return result
 }
 
 // scoreTask computes a score and reason list for an actionable task
@@ -192,6 +227,9 @@ func runNext(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Apply special filters (quick-wins, critical)
+	actionable = applySpecialFilters(actionable, criticalPath)
+
 	// Score each candidate
 	type scored struct {
 		task    *model.Task
@@ -260,11 +298,23 @@ func outputNextYAML(recs []Recommendation) error {
 
 func outputNextTable(recs []Recommendation) error {
 	if len(recs) == 0 {
-		fmt.Println("No actionable tasks found.")
+		if nextQuickWins {
+			fmt.Println("No quick wins available.")
+		} else if nextCritical {
+			fmt.Println("No critical path tasks available.")
+		} else {
+			fmt.Println("No actionable tasks found.")
+		}
 		return nil
 	}
 
-	fmt.Println("Recommended tasks:")
+	if nextQuickWins {
+		fmt.Println("Recommended quick wins:")
+	} else if nextCritical {
+		fmt.Println("Recommended critical path tasks:")
+	} else {
+		fmt.Println("Recommended tasks:")
+	}
 	fmt.Println()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)

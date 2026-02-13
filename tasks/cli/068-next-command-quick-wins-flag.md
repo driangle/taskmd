@@ -1,7 +1,7 @@
 ---
 id: "068"
 title: "Add --quick-wins flag to next command"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["032"]
@@ -26,11 +26,11 @@ Users sometimes want to quickly identify tasks they can knock out in a short amo
 
 ## Tasks
 
-- [ ] Add `--quick-wins` boolean flag to the next command in `internal/cli/next.go`
-- [ ] When `--quick-wins` is set, filter tasks to only include those with `effort: small`
-- [ ] Update the ranking logic to prioritize quick wins within the filtered set
-- [ ] Update command help text and usage documentation
-- [ ] Add tests in `internal/cli/next_test.go` covering:
+- [x] Add `--quick-wins` boolean flag to the next command in `internal/cli/next.go`
+- [x] When `--quick-wins` is set, filter tasks to only include those with `effort: small`
+- [x] Update the ranking logic to prioritize quick wins within the filtered set
+- [x] Update command help text and usage documentation
+- [x] Add tests in `internal/cli/next_test.go` covering:
   - Happy path: `--quick-wins` returns only small effort tasks
   - Combination with `--filter` flag
   - Combination with `--limit` flag

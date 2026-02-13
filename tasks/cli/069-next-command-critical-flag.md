@@ -1,7 +1,7 @@
 ---
 id: "069"
 title: "Add --critical flag to next command"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["032"]
@@ -26,11 +26,11 @@ Users sometimes want to focus exclusively on critical path tasks to minimize pro
 
 ## Tasks
 
-- [ ] Add `--critical` boolean flag to the next command in `internal/cli/next.go`
-- [ ] When `--critical` is set, filter tasks to only include those on the critical path
-- [ ] Ensure critical path analysis is performed (may need to call graph/critical path logic)
-- [ ] Update command help text and usage documentation
-- [ ] Add tests in `internal/cli/next_test.go` covering:
+- [x] Add `--critical` boolean flag to the next command in `internal/cli/next.go`
+- [x] When `--critical` is set, filter tasks to only include those on the critical path
+- [x] Ensure critical path analysis is performed (may need to call graph/critical path logic)
+- [x] Update command help text and usage documentation
+- [x] Add tests in `internal/cli/next_test.go` covering:
   - Happy path: `--critical` returns only critical path tasks
   - Combination with `--filter` flag
   - Combination with `--limit` flag
