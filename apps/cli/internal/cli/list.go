@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -20,6 +21,7 @@ var (
 	listFilters []string
 	listSort    string
 	listColumns string
+	listNoColor bool
 )
 
 // listCmd represents the list command
@@ -52,6 +54,7 @@ func init() {
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", []string{}, "filter tasks (can specify multiple times for AND conditions, e.g., --filter status=pending --filter priority=high)")
 	listCmd.Flags().StringVar(&listSort, "sort", "", "sort by field (id, title, status, priority, effort, created)")
 	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority,file", "comma-separated list of columns to display")
+	listCmd.Flags().BoolVar(&listNoColor, "no-color", false, "disable colored output")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -254,6 +257,8 @@ func outputTable(tasks []*model.Task, columnsStr string) error {
 		columns[i] = strings.TrimSpace(col)
 	}
 
+	r := getRenderer(listNoColor)
+
 	// Create tab writer
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()
@@ -272,12 +277,27 @@ func outputTable(tasks []*model.Task, columnsStr string) error {
 	for _, task := range tasks {
 		row := make([]string, len(columns))
 		for i, col := range columns {
-			row[i] = getColumnValue(task, col)
+			row[i] = colorizeColumn(task, col, r)
 		}
 		fmt.Fprintln(w, strings.Join(row, "\t"))
 	}
 
 	return nil
+}
+
+// colorizeColumn returns the column value with color formatting applied.
+func colorizeColumn(task *model.Task, column string, r *lipgloss.Renderer) string {
+	value := getColumnValue(task, column)
+	switch column {
+	case "id":
+		return formatTaskID(value, r)
+	case "status":
+		return formatStatus(value, r)
+	case "priority":
+		return formatPriority(value, r)
+	default:
+		return value
+	}
 }
 
 // makeFilePathsRelative converts absolute task file paths to paths relative to baseDir.

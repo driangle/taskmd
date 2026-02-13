@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"bytes"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -209,5 +212,129 @@ func TestGetColumnValue(t *testing.T) {
 				t.Errorf("getColumnValue(%s) = %s, want %s", tt.column, result, tt.expected)
 			}
 		})
+	}
+}
+
+// resetListFlags resets list command flags to defaults before each test.
+func resetListFlags() {
+	listFilters = []string{}
+	listSort = ""
+	listColumns = "id,title,status,priority,file"
+	listNoColor = true
+}
+
+// captureListTableOutput runs outputTable and captures stdout.
+func captureListTableOutput(t *testing.T, tasks []*model.Task, columns string) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := outputTable(tasks, columns)
+	if err != nil {
+		w.Close()
+		os.Stdout = oldStdout
+		t.Fatalf("outputTable failed: %v", err)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	return buf.String()
+}
+
+func TestListCommand_TableColorEnabled(t *testing.T) {
+	resetListFlags()
+	listNoColor = false
+	os.Unsetenv("NO_COLOR")
+
+	tasks := []*model.Task{
+		{ID: "001", Title: "Test Task", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "test.md"},
+	}
+
+	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+
+	// With colors enabled, output should contain ANSI escape codes
+	if !strings.Contains(output, "\x1b[") {
+		t.Error("Expected colored table output to contain ANSI escape codes")
+	}
+
+	// Task data should still be present
+	if !strings.Contains(output, "001") {
+		t.Error("Expected task ID in output")
+	}
+	if !strings.Contains(output, "pending") {
+		t.Error("Expected status in output")
+	}
+}
+
+func TestListCommand_TableNoColorFlag(t *testing.T) {
+	resetListFlags()
+	// listNoColor is already true from resetListFlags
+	os.Unsetenv("NO_COLOR")
+
+	tasks := []*model.Task{
+		{ID: "001", Title: "Test Task", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "test.md"},
+	}
+
+	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+
+	// With no-color, output should NOT contain ANSI escape codes
+	if strings.Contains(output, "\x1b[") {
+		t.Error("Expected no ANSI codes in no-color table output")
+	}
+
+	// Task data should still be present
+	if !strings.Contains(output, "001") {
+		t.Error("Expected task ID in output")
+	}
+	if !strings.Contains(output, "pending") {
+		t.Error("Expected status in output")
+	}
+}
+
+func TestListCommand_TableNoColorEnvVar(t *testing.T) {
+	resetListFlags()
+	listNoColor = false // enable via flag, but env var should override
+
+	os.Setenv("NO_COLOR", "1")
+	defer os.Unsetenv("NO_COLOR")
+
+	tasks := []*model.Task{
+		{ID: "001", Title: "Test Task", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "test.md"},
+	}
+
+	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+
+	// NO_COLOR env var should disable colors
+	if strings.Contains(output, "\x1b[") {
+		t.Error("Expected no ANSI codes when NO_COLOR env var is set")
+	}
+}
+
+func TestListCommand_TableColorColumns(t *testing.T) {
+	resetListFlags()
+	listNoColor = false
+	os.Unsetenv("NO_COLOR")
+
+	tasks := []*model.Task{
+		{ID: "001", Title: "Test Task", Status: model.StatusCompleted, Priority: model.PriorityCritical, FilePath: "test.md"},
+		{ID: "002", Title: "Another", Status: model.StatusInProgress, Priority: model.PriorityLow, FilePath: "test2.md"},
+	}
+
+	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+
+	// Verify colored output contains task data
+	if !strings.Contains(output, "001") {
+		t.Error("Expected task 001 in output")
+	}
+	if !strings.Contains(output, "002") {
+		t.Error("Expected task 002 in output")
+	}
+	if !strings.Contains(output, "Test Task") {
+		t.Error("Expected title in output")
 	}
 }

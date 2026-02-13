@@ -17,6 +17,7 @@ var (
 	boardGroupBy string
 	boardFormat  string
 	boardOut     string
+	boardNoColor bool
 )
 
 var boardCmd = &cobra.Command{
@@ -52,6 +53,7 @@ func init() {
 	boardCmd.Flags().StringVar(&boardGroupBy, "group-by", "status", "field to group by (status, priority, effort, group, tag)")
 	boardCmd.Flags().StringVar(&boardFormat, "format", "md", "output format (md, txt, json)")
 	boardCmd.Flags().StringVarP(&boardOut, "out", "o", "", "write output to file instead of stdout")
+	boardCmd.Flags().BoolVar(&boardNoColor, "no-color", false, "disable colored output")
 }
 
 func runBoard(cmd *cobra.Command, args []string) error {
@@ -103,14 +105,18 @@ func runBoard(cmd *cobra.Command, args []string) error {
 }
 
 func outputBoardMarkdown(gr *board.GroupResult, w io.Writer) error {
+	r := getRenderer(boardNoColor)
 	for i, key := range gr.Keys {
 		tasks := gr.Groups[key]
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		fmt.Fprintf(w, "## %s (%d)\n\n", key, len(tasks))
+		coloredHeading := formatHeading(key, boardGroupBy, r)
+		fmt.Fprintf(w, "## %s (%d)\n\n", coloredHeading, len(tasks))
 		for _, t := range tasks {
-			fmt.Fprintf(w, "- [%s] %s", t.ID, t.Title)
+			formattedID := formatTaskID(t.ID, r)
+			formattedTitle := formatTaskTitle(t.Title, string(t.Status), r)
+			fmt.Fprintf(w, "- [%s] %s", formattedID, formattedTitle)
 			if t.Priority != "" {
 				fmt.Fprintf(w, " (priority: %s)", t.Priority)
 			}
@@ -121,16 +127,23 @@ func outputBoardMarkdown(gr *board.GroupResult, w io.Writer) error {
 }
 
 func outputBoardText(gr *board.GroupResult, w io.Writer) error {
+	r := getRenderer(boardNoColor)
 	for i, key := range gr.Keys {
 		tasks := gr.Groups[key]
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		header := fmt.Sprintf("%s (%d)", key, len(tasks))
+		coloredHeading := formatHeading(key, boardGroupBy, r)
+		countSuffix := fmt.Sprintf(" (%d)", len(tasks))
+		header := coloredHeading + countSuffix
+		// Use plain key length for the separator (not colored string length)
+		separatorLen := len(key) + len(countSuffix)
 		fmt.Fprintln(w, header)
-		fmt.Fprintln(w, strings.Repeat("-", len(header)))
+		fmt.Fprintln(w, strings.Repeat("-", separatorLen))
 		for _, t := range tasks {
-			fmt.Fprintf(w, "  %s  %s\n", t.ID, t.Title)
+			formattedID := formatTaskID(t.ID, r)
+			formattedTitle := formatTaskTitle(t.Title, string(t.Status), r)
+			fmt.Fprintf(w, "  %s  %s\n", formattedID, formattedTitle)
 		}
 	}
 	return nil

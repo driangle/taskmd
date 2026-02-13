@@ -1,7 +1,7 @@
 ---
 id: "066"
 title: "Add color to board command titles and IDs"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["023"]

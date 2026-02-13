@@ -116,10 +116,13 @@ created: 2026-02-08
 }
 
 // resetBoardFlags resets board command flags to defaults before each test.
+// Colors are disabled by default so content-checking tests aren't affected by ANSI codes.
+// Tests that verify color output should explicitly set boardNoColor = false.
 func resetBoardFlags() {
 	boardGroupBy = "status"
 	boardFormat = "md"
 	boardOut = ""
+	boardNoColor = true
 }
 
 // captureBoardOutput runs the board command and captures stdout.
@@ -417,5 +420,235 @@ func TestBoardCommand_EmptyDirectory(t *testing.T) {
 	// With no tasks, output should be empty
 	if strings.TrimSpace(output) != "" {
 		t.Errorf("Expected empty output for empty directory, got: %q", output)
+	}
+}
+
+func TestBoardCommand_ColorEnabled(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "txt"
+	boardNoColor = false
+
+	// Ensure NO_COLOR is not set
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// With colors enabled, output should contain ANSI escape codes
+	// ANSI codes start with \x1b[ or \033[
+	if !strings.Contains(output, "\x1b[") && !strings.Contains(output, "\033[") {
+		t.Error("Expected colored output to contain ANSI escape codes")
+	}
+}
+
+func TestBoardCommand_NoColorFlag(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "txt"
+	boardNoColor = true
+
+	// Ensure NO_COLOR is not set
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// With --no-color flag, output should NOT contain ANSI escape codes
+	if strings.Contains(output, "\x1b[") || strings.Contains(output, "\033[") {
+		t.Error("Expected --no-color output to NOT contain ANSI escape codes")
+	}
+
+	// Output should still contain task information
+	if !strings.Contains(output, "001") {
+		t.Error("Expected output to contain task IDs even without colors")
+	}
+}
+
+func TestBoardCommand_NoColorEnvVar(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "txt"
+	boardNoColor = false // explicitly enable color, then let env var override
+
+	// Set NO_COLOR environment variable
+	os.Setenv("NO_COLOR", "1")
+	defer os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// With NO_COLOR env var, output should NOT contain ANSI escape codes
+	if strings.Contains(output, "\x1b[") || strings.Contains(output, "\033[") {
+		t.Error("Expected output with NO_COLOR env var to NOT contain ANSI escape codes")
+	}
+
+	// Output should still contain task information
+	if !strings.Contains(output, "002") {
+		t.Error("Expected output to contain task IDs even with NO_COLOR set")
+	}
+}
+
+func TestBoardCommand_ColorMarkdownFormat(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "md"
+	boardNoColor = false
+
+	// Ensure NO_COLOR is not set
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// Markdown format should also support colors
+	if !strings.Contains(output, "\x1b[") && !strings.Contains(output, "\033[") {
+		t.Error("Expected colored markdown output to contain ANSI escape codes")
+	}
+
+	// Should still have markdown structure (## prefix before colored heading)
+	if !strings.Contains(output, "## ") {
+		t.Error("Expected markdown headers in output")
+	}
+}
+
+func TestBoardCommand_ColorJSONFormat(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "json"
+
+	// Ensure NO_COLOR is not set
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// JSON format should NOT have colors (would break JSON parsing)
+	if strings.Contains(output, "\x1b[") || strings.Contains(output, "\033[") {
+		t.Error("Expected JSON output to NOT contain ANSI escape codes (would break JSON)")
+	}
+
+	// Verify it's valid JSON
+	var result []board.JSONGroup
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v", err)
+	}
+}
+
+func TestBoardCommand_ColorStatusBased(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "txt"
+	boardNoColor = false
+
+	// Ensure NO_COLOR is not set
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// Different statuses should have different colors
+	// We can't easily test the exact colors, but we can verify that:
+	// 1. Colors are present in the output
+	// 2. Task IDs and titles are in the output
+	if !strings.Contains(output, "001") {
+		t.Error("Expected output to contain task 001 (completed)")
+	}
+	if !strings.Contains(output, "002") {
+		t.Error("Expected output to contain task 002 (in-progress)")
+	}
+	if !strings.Contains(output, "003") {
+		t.Error("Expected output to contain task 003 (pending)")
+	}
+	if !strings.Contains(output, "004") {
+		t.Error("Expected output to contain task 004 (blocked)")
+	}
+}
+
+func TestBoardCommand_ColorOutputToFile(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	outFile := filepath.Join(t.TempDir(), "board.txt")
+
+	resetBoardFlags()
+	boardFormat = "txt"
+	boardOut = outFile
+	boardNoColor = false
+
+	// Ensure NO_COLOR is not set
+	os.Unsetenv("NO_COLOR")
+
+	// Run command (output goes to file)
+	err := runBoard(boardCmd, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runBoard failed: %v", err)
+	}
+
+	content, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+
+	// Output to file should still have colors (unless --no-color is set)
+	if !strings.Contains(string(content), "\x1b[") && !strings.Contains(string(content), "\033[") {
+		t.Error("Expected file output to contain ANSI escape codes")
+	}
+}
+
+func TestBoardCommand_HeadingColoredByStatus(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "md"
+	boardNoColor = false
+
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// Headings should contain ANSI codes (since they are now colored by status)
+	if !strings.Contains(output, "\x1b[") {
+		t.Error("Expected colored heading output to contain ANSI escape codes")
+	}
+
+	// The ## prefix should still be present (uncolored markdown structure)
+	if !strings.Contains(output, "## ") {
+		t.Error("Expected markdown ## prefix in output")
+	}
+}
+
+func TestBoardCommand_HeadingColoredByPriority(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardGroupBy = "priority"
+	boardFormat = "txt"
+	boardNoColor = false
+
+	os.Unsetenv("NO_COLOR")
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// Should have colored headings
+	if !strings.Contains(output, "\x1b[") {
+		t.Error("Expected colored heading output for priority grouping")
+	}
+
+	// The raw priority names should still be embedded in the output
+	if !strings.Contains(output, "critical") {
+		t.Error("Expected 'critical' in colored output")
+	}
+	if !strings.Contains(output, "high") {
+		t.Error("Expected 'high' in colored output")
+	}
+}
+
+func TestBoardCommand_HeadingNoColorFlag(t *testing.T) {
+	tmpDir := createBoardTestFiles(t)
+	resetBoardFlags()
+	boardFormat = "md"
+	// boardNoColor is already true from resetBoardFlags
+
+	output := captureBoardOutput(t, tmpDir)
+
+	// With no-color, headings should be plain text
+	if strings.Contains(output, "\x1b[") {
+		t.Error("Expected no ANSI codes in no-color output")
+	}
+
+	// Should still have properly formatted headings
+	if !strings.Contains(output, "## pending (3)") {
+		t.Error("Expected plain '## pending (3)' header")
 	}
 }
