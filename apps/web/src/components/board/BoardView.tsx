@@ -15,7 +15,7 @@ export function BoardView({ groups, groupBy, readonly, onTaskMove }: BoardViewPr
 
   return (
     <div
-      className="flex gap-4 overflow-x-auto pb-4"
+      className="flex flex-col md:flex-row gap-4 md:overflow-x-auto pb-4"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => e.preventDefault()}
     >

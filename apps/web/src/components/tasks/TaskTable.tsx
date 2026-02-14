@@ -126,7 +126,7 @@ export function TaskTable({ tasks, initialTags }: TaskTableProps) {
                   <th
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
+                    className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none ${(header.column.columnDef.meta as Record<string, string>)?.className ?? ""}`}
                   >
                     <div className="flex items-center gap-1">
                       {flexRender(
@@ -162,7 +162,7 @@ export function TaskTable({ tasks, initialTags }: TaskTableProps) {
               table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm">
+                    <td key={cell.id} className={`px-4 py-3 text-sm ${(cell.column.columnDef.meta as Record<string, string>)?.className ?? ""}`}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

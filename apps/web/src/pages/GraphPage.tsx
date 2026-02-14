@@ -94,7 +94,7 @@ export function GraphPage() {
         </div>
       </div>
       <ReactFlowProvider>
-        <div className="relative bg-white rounded-lg border border-gray-200 h-[calc(100vh-200px)] min-h-[500px] dark:bg-gray-800 dark:border-gray-700">
+        <div className="relative bg-white rounded-lg border border-gray-200 h-[calc(100vh-160px)] md:h-[calc(100vh-200px)] min-h-[400px] md:min-h-[500px] dark:bg-gray-800 dark:border-gray-700">
           <div className="absolute top-3 left-3 z-10">
             <GraphSearch
               query={searchQuery}

@@ -39,6 +39,7 @@ export function createTaskColumns(
     columnHelper.accessor("dependencies", {
       id: "blocked",
       header: "Blocked",
+      meta: { className: "hidden md:table-cell" },
       cell: (info) => <BlockedStatusBadge dependencies={info.getValue()} />,
       sortingFn: (rowA, rowB) => {
         const aCount = rowA.original.dependencies?.length ?? 0;
@@ -55,14 +56,17 @@ export function createTaskColumns(
     }),
     columnHelper.accessor("effort", {
       header: "Effort",
+      meta: { className: "hidden md:table-cell" },
       cell: (info) => info.getValue() || "-",
     }),
     columnHelper.accessor("owner", {
       header: "Owner",
+      meta: { className: "hidden md:table-cell" },
       cell: (info) => info.getValue() || "-",
     }),
     columnHelper.accessor("tags", {
       header: "Tags",
+      meta: { className: "hidden md:table-cell" },
       cell: (info) => {
         const tags = info.getValue();
         if (!tags || tags.length === 0) return "-";

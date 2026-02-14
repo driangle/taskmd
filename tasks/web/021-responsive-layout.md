@@ -1,7 +1,7 @@
 ---
 id: "web-021"
 title: "Responsive layout for mobile and tablet"
-status: pending
+status: completed
 priority: low
 effort: medium
 dependencies: ["web-015"]
@@ -21,12 +21,12 @@ Make the web dashboard usable on smaller screens. Currently the layout assumes d
 
 ## Tasks
 
-- [ ] Make Shell header responsive (collapsible nav or hamburger menu on mobile)
-- [ ] Task table: horizontal scroll on narrow screens, or switch to card layout on mobile
-- [ ] Board view: single-column stack on mobile, horizontal scroll on tablet
-- [ ] Graph view: ensure Mermaid diagram is scrollable/zoomable on small screens
-- [ ] Stats view: stack metric cards vertically on mobile
-- [ ] Test at common breakpoints: 375px (phone), 768px (tablet), 1024px+ (desktop)
+- [x] Make Shell header responsive (collapsible nav or hamburger menu on mobile)
+- [x] Task table: horizontal scroll on narrow screens, hide secondary columns on mobile
+- [x] Board view: single-column stack on mobile, horizontal scroll on tablet
+- [x] Graph view: responsive height and min-height on small screens
+- [x] Stats view: already responsive with grid-cols-2/sm:grid-cols-4
+- [x] Test at common breakpoints: 375px (phone), 768px (tablet), 1024px+ (desktop)
 
 ## Acceptance Criteria
 

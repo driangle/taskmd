@@ -49,7 +49,7 @@ export function BoardColumn({ group, canDrag, onTaskDrop }: BoardColumnProps) {
       onDragOver={canDrag ? handleDragOver : undefined}
       onDragLeave={canDrag ? handleDragLeave : undefined}
       onDrop={canDrag ? handleDrop : undefined}
-      className={`flex-shrink-0 w-72 rounded-lg border-t-4 bg-white shadow-sm dark:bg-gray-800 transition-shadow ${
+      className={`flex-shrink-0 w-full md:w-72 rounded-lg border-t-4 bg-white shadow-sm dark:bg-gray-800 transition-shadow ${
         statusColors[group.group] ?? "border-gray-300 bg-gray-50 dark:bg-gray-800"
       } ${dragOver ? "ring-2 ring-blue-400 dark:ring-blue-500" : ""}`}
     >
