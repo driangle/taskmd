@@ -1,7 +1,7 @@
 ---
 id: "096"
 title: "Add colors to graph command output"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["075"]

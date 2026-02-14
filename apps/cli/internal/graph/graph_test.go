@@ -279,7 +279,7 @@ func TestToASCII(t *testing.T) {
 	}
 
 	g := NewGraph(tasks)
-	output := g.ToASCII("T1", true)
+	output := g.ToASCII("T1", true, nil)
 
 	if !strings.Contains(output, "T1") {
 		t.Error("Expected ASCII output to contain T1")
@@ -341,5 +341,147 @@ func TestToJSON(t *testing.T) {
 	// Check edge structure
 	if edges[0]["from"] != "T1" || edges[0]["to"] != "T2" {
 		t.Error("Expected edge from T1 to T2")
+	}
+}
+
+func TestToASCII_NilFormatter_PlainText(t *testing.T) {
+	tasks := createTestTasks()
+	g := NewGraph(tasks)
+
+	output := g.ToASCII("T1", true, nil)
+
+	// Verify plain text output (no ANSI codes)
+	if strings.Contains(output, "\033[") {
+		t.Error("Expected plain text output with nil formatter, but found ANSI escape codes")
+	}
+
+	// Verify content is present
+	if !strings.Contains(output, "[T1]") {
+		t.Error("Expected output to contain [T1]")
+	}
+	if !strings.Contains(output, "Task 1") {
+		t.Error("Expected output to contain 'Task 1'")
+	}
+	if !strings.Contains(output, "✓") {
+		t.Error("Expected output to contain completed checkmark")
+	}
+}
+
+func TestToASCII_WithFormatter(t *testing.T) {
+	tasks := []*model.Task{
+		{
+			ID:           "T1",
+			Title:        "Root",
+			Status:       model.StatusCompleted,
+			Dependencies: []string{},
+		},
+		{
+			ID:           "T2",
+			Title:        "Child",
+			Status:       model.StatusInProgress,
+			Dependencies: []string{"T1"},
+		},
+	}
+
+	g := NewGraph(tasks)
+
+	f := &ASCIIFormatter{
+		FormatID: func(id string) string {
+			return "<ID:" + id + ">"
+		},
+		FormatTitle: func(title, status string) string {
+			return "<T:" + title + ":" + status + ">"
+		},
+		FormatStatusIndicator: func(indicator, _ string) string {
+			return "<S:" + strings.TrimSpace(indicator) + ">"
+		},
+		FormatConnector: func(connector string) string {
+			return "<C:" + connector + ">"
+		},
+		FormatReference: func(text string) string {
+			return "<R:" + text + ">"
+		},
+	}
+
+	output := g.ToASCII("T1", true, f)
+
+	if !strings.Contains(output, "<ID:T1>") {
+		t.Errorf("Expected formatted ID for T1, got:\n%s", output)
+	}
+	if !strings.Contains(output, "<ID:T2>") {
+		t.Errorf("Expected formatted ID for T2, got:\n%s", output)
+	}
+	if !strings.Contains(output, "<T:Root:completed>") {
+		t.Errorf("Expected formatted title for Root, got:\n%s", output)
+	}
+	if !strings.Contains(output, "<T:Child:in-progress>") {
+		t.Errorf("Expected formatted title for Child, got:\n%s", output)
+	}
+	if !strings.Contains(output, "<S:✓>") {
+		t.Errorf("Expected formatted status indicator for completed, got:\n%s", output)
+	}
+	if !strings.Contains(output, "<S:⋯>") {
+		t.Errorf("Expected formatted status indicator for in-progress, got:\n%s", output)
+	}
+	// T2 is the only child of root T1 with empty prefix, so no connector is rendered.
+	// Test connector formatting with multiple children.
+	tasksMulti := []*model.Task{
+		{ID: "A", Title: "Root", Status: model.StatusPending, Dependencies: []string{}},
+		{ID: "B", Title: "Child1", Status: model.StatusPending, Dependencies: []string{"A"}},
+		{ID: "C", Title: "Child2", Status: model.StatusPending, Dependencies: []string{"A"}},
+	}
+	gMulti := NewGraph(tasksMulti)
+	outputMulti := gMulti.ToASCII("A", true, f)
+
+	if !strings.Contains(outputMulti, "<C:├── >") {
+		t.Errorf("Expected formatted ├── connector, got:\n%s", outputMulti)
+	}
+	if !strings.Contains(outputMulti, "<C:└── >") {
+		t.Errorf("Expected formatted └── connector, got:\n%s", outputMulti)
+	}
+}
+
+func TestToASCII_WithFormatter_Reference(t *testing.T) {
+	// Create a graph with a diamond shape so a node is visited twice
+	tasks := []*model.Task{
+		{
+			ID:           "T1",
+			Title:        "Root",
+			Status:       model.StatusPending,
+			Dependencies: []string{},
+		},
+		{
+			ID:           "T2",
+			Title:        "Left",
+			Status:       model.StatusPending,
+			Dependencies: []string{"T1"},
+		},
+		{
+			ID:           "T3",
+			Title:        "Right",
+			Status:       model.StatusPending,
+			Dependencies: []string{"T1"},
+		},
+		{
+			ID:           "T4",
+			Title:        "Bottom",
+			Status:       model.StatusPending,
+			Dependencies: []string{"T2", "T3"},
+		},
+	}
+
+	g := NewGraph(tasks)
+
+	f := &ASCIIFormatter{
+		FormatReference: func(text string) string {
+			return "<REF:" + text + ">"
+		},
+	}
+
+	output := g.ToASCII("T1", true, f)
+
+	// T4 appears under both T2 and T3, so the second occurrence should have "(see above)"
+	if !strings.Contains(output, "<REF:(see above)>") {
+		t.Errorf("Expected formatted reference text, got:\n%s", output)
 	}
 }

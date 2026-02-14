@@ -8,6 +8,51 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
+// ASCIIFormatter provides optional formatting callbacks for ASCII tree output.
+// When nil or when a field is nil, the corresponding text is returned unmodified.
+type ASCIIFormatter struct {
+	FormatID              func(id string) string
+	FormatTitle           func(title, status string) string
+	FormatStatusIndicator func(indicator, status string) string
+	FormatConnector       func(connector string) string
+	FormatReference       func(text string) string
+}
+
+func (f *ASCIIFormatter) applyID(id string) string {
+	if f != nil && f.FormatID != nil {
+		return f.FormatID(id)
+	}
+	return id
+}
+
+func (f *ASCIIFormatter) applyTitle(title, status string) string {
+	if f != nil && f.FormatTitle != nil {
+		return f.FormatTitle(title, status)
+	}
+	return title
+}
+
+func (f *ASCIIFormatter) applyStatusIndicator(indicator, status string) string {
+	if f != nil && f.FormatStatusIndicator != nil {
+		return f.FormatStatusIndicator(indicator, status)
+	}
+	return indicator
+}
+
+func (f *ASCIIFormatter) applyConnector(connector string) string {
+	if f != nil && f.FormatConnector != nil {
+		return f.FormatConnector(connector)
+	}
+	return connector
+}
+
+func (f *ASCIIFormatter) applyReference(text string) string {
+	if f != nil && f.FormatReference != nil {
+		return f.FormatReference(text)
+	}
+	return text
+}
+
 // Graph represents a task dependency graph
 type Graph struct {
 	Tasks        []*model.Task
@@ -251,10 +296,11 @@ func (g *Graph) ToDot(focusTaskID string) string {
 	return sb.String()
 }
 
-// ToASCII generates an ASCII tree representation
+// ToASCII generates an ASCII tree representation.
+// An optional ASCIIFormatter applies styling callbacks; pass nil for plain text.
 //
 //nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
-func (g *Graph) ToASCII(rootTaskID string, downstream bool) string {
+func (g *Graph) ToASCII(rootTaskID string, downstream bool, f *ASCIIFormatter) string {
 	var sb strings.Builder
 
 	visited := make(map[string]bool)
@@ -269,7 +315,10 @@ func (g *Graph) ToASCII(rootTaskID string, downstream bool) string {
 				if isLast {
 					connector = "└── "
 				}
-				sb.WriteString(fmt.Sprintf("%s%s[%s] %s (see above)\n", prefix, connector, taskID, task.Title))
+				ref := f.applyReference("(see above)")
+				sb.WriteString(fmt.Sprintf("%s%s[%s] %s %s\n",
+					prefix, f.applyConnector(connector),
+					f.applyID(taskID), f.applyTitle(task.Title, string(task.Status)), ref))
 			}
 			return
 		}
@@ -283,26 +332,28 @@ func (g *Graph) ToASCII(rootTaskID string, downstream bool) string {
 
 		// Print current node
 		connector := "├── "
-		extension := "│   "
 		if isLast {
 			connector = "└── "
-			extension = "    "
 		}
 
-		status := ""
+		statusIndicator := ""
 		switch task.Status {
 		case model.StatusCompleted:
-			status = " ✓"
+			statusIndicator = f.applyStatusIndicator(" ✓", string(task.Status))
 		case model.StatusInProgress:
-			status = " ⋯"
+			statusIndicator = f.applyStatusIndicator(" ⋯", string(task.Status))
 		case model.StatusBlocked:
-			status = " ⊗"
+			statusIndicator = f.applyStatusIndicator(" ⊗", string(task.Status))
 		}
 
+		formattedID := f.applyID(taskID)
+		formattedTitle := f.applyTitle(task.Title, string(task.Status))
+
 		if prefix == "" {
-			sb.WriteString(fmt.Sprintf("[%s] %s%s\n", taskID, task.Title, status))
+			sb.WriteString(fmt.Sprintf("[%s] %s%s\n", formattedID, formattedTitle, statusIndicator))
 		} else {
-			sb.WriteString(fmt.Sprintf("%s%s[%s] %s%s\n", prefix, connector, taskID, task.Title, status))
+			sb.WriteString(fmt.Sprintf("%s%s[%s] %s%s\n",
+				prefix, f.applyConnector(connector), formattedID, formattedTitle, statusIndicator))
 		}
 
 		// Get children based on direction
@@ -321,7 +372,11 @@ func (g *Graph) ToASCII(rootTaskID string, downstream bool) string {
 			isLastChild := i == len(children)-1
 			childPrefix := prefix
 			if prefix != "" || len(children) > 1 || i > 0 {
-				childPrefix = prefix + extension
+				if isLast {
+					childPrefix = prefix + "    "
+				} else {
+					childPrefix = prefix + f.applyConnector("│") + "   "
+				}
 			}
 			printTree(childID, childPrefix, isLastChild)
 		}

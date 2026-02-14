@@ -212,7 +212,25 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		if graphUpstream {
 			showDownstream = false
 		}
-		output = g.ToASCII(rootID, showDownstream)
+		r := getRenderer()
+		formatter := &graph.ASCIIFormatter{
+			FormatID: func(id string) string {
+				return formatTaskID(id, r)
+			},
+			FormatTitle: func(title, status string) string {
+				return formatTaskTitle(title, status, r)
+			},
+			FormatStatusIndicator: func(indicator, status string) string {
+				return getStatusColor(status, r).Render(indicator)
+			},
+			FormatConnector: func(connector string) string {
+				return formatDim(connector, r)
+			},
+			FormatReference: func(text string) string {
+				return formatDim(text, r)
+			},
+		}
+		output = g.ToASCII(rootID, showDownstream, formatter)
 	case "json":
 		jsonData := g.ToJSON()
 		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")

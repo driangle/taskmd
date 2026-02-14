@@ -1255,3 +1255,73 @@ func TestGraphCommand_Filter_InvalidFormat(t *testing.T) {
 		t.Errorf("Expected 'invalid filter format' error, got: %v", err)
 	}
 }
+
+func TestGraphCommand_ASCII_WithColors(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	// Enable colors
+	graphFormat = "ascii"
+	graphExcludeStatus = []string{}
+	graphAll = false
+	graphRoot = ""
+	graphFocus = ""
+	graphUpstream = false
+	graphDownstream = false
+	graphOut = ""
+	graphFilters = []string{}
+	noColor = false
+	forceColor = true
+	defer func() {
+		forceColor = false
+		noColor = false
+	}()
+
+	output := captureGraphOutput(t, []string{tmpDir})
+
+	// ANSI escape codes should be present when colors are enabled
+	if !strings.Contains(output, "\033[") {
+		t.Error("Expected ANSI escape codes in colored output")
+	}
+
+	// Verify task content is still present
+	if !strings.Contains(output, "001") {
+		t.Error("Expected output to contain task ID 001")
+	}
+	if !strings.Contains(output, "Root Task") {
+		t.Error("Expected output to contain task title 'Root Task'")
+	}
+}
+
+func TestGraphCommand_ASCII_NoColor_Flag(t *testing.T) {
+	tmpDir := createTestTaskFiles(t)
+
+	graphFormat = "ascii"
+	graphExcludeStatus = []string{}
+	graphAll = false
+	graphRoot = ""
+	graphFocus = ""
+	graphUpstream = false
+	graphDownstream = false
+	graphOut = ""
+	graphFilters = []string{}
+	noColor = true
+	forceColor = false
+	defer func() {
+		noColor = false
+	}()
+
+	output := captureGraphOutput(t, []string{tmpDir})
+
+	// No ANSI escape codes when --no-color is set
+	if strings.Contains(output, "\033[") {
+		t.Error("Expected no ANSI escape codes with --no-color flag")
+	}
+
+	// Verify content is still present
+	if !strings.Contains(output, "[001]") {
+		t.Error("Expected output to contain [001]")
+	}
+	if !strings.Contains(output, "Root Task") {
+		t.Error("Expected output to contain 'Root Task'")
+	}
+}
