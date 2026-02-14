@@ -337,7 +337,7 @@ func (e *Engine) scanExistingIDs(outputDir string) ([]string, error) {
 		return nil, nil
 	}
 
-	taskScanner := scanner.NewScanner(outputDir, e.Verbose)
+	taskScanner := scanner.NewScanner(outputDir, e.Verbose, nil)
 	result, err := taskScanner.Scan()
 	if err != nil {
 		return nil, err

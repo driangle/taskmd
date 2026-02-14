@@ -43,7 +43,7 @@ func (dp *DataProvider) GetTasks() ([]*model.Task, error) {
 		return dp.tasks, nil
 	}
 
-	s := scanner.NewScanner(dp.scanDir, dp.verbose)
+	s := scanner.NewScanner(dp.scanDir, dp.verbose, nil)
 	result, err := s.Scan()
 	if err != nil {
 		return nil, err

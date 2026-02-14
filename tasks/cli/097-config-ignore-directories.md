@@ -1,7 +1,7 @@
 ---
 id: "097"
 title: "Add ignore directories option to .taskmd.yaml config"
-status: pending
+status: completed
 priority: medium
 effort: small
 dependencies: ["056"]
@@ -35,13 +35,13 @@ ignore:
 
 ## Tasks
 
-- [ ] Add `ignore` field support to config loading (Viper)
-- [ ] Pass ignore list from config into the scanner
-- [ ] Update `Scanner` to skip directories matching the ignore list during `filepath.WalkDir`
-- [ ] Match on directory name (not full path) for simplicity
-- [ ] Ensure hidden directory skipping still works alongside ignore list
-- [ ] Add tests for ignore behavior (single dir, multiple dirs, nested dirs)
-- [ ] Test that config ignore works with both project-level and global config
+- [x] Add `ignore` field support to config loading (Viper)
+- [x] Pass ignore list from config into the scanner
+- [x] Update `Scanner` to skip directories matching the ignore list during `filepath.WalkDir`
+- [x] Match on directory name (not full path) for simplicity
+- [x] Ensure hidden directory skipping still works alongside ignore list
+- [x] Add tests for ignore behavior (single dir, multiple dirs, nested dirs)
+- [x] Test that config ignore works with both project-level and global config
 
 ## Acceptance Criteria
 

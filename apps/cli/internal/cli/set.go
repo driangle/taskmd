@@ -80,7 +80,7 @@ func runSet(cmd *cobra.Command, _ []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
+	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
 	result, err := taskScanner.Scan()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)

@@ -61,7 +61,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	scanDir := ResolveScanDir(args)
 
 	// Create scanner and scan for tasks
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose)
+	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
 	result, err := taskScanner.Scan()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)

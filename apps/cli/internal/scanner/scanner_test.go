@@ -53,7 +53,7 @@ missing: required fields
 	}
 
 	// Create scanner and scan
-	scanner := NewScanner(tmpDir, false)
+	scanner := NewScanner(tmpDir, false, nil)
 	result, err := scanner.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
@@ -98,7 +98,7 @@ status: pending
 		t.Fatalf("Failed to write hidden task: %v", err)
 	}
 
-	scanner := NewScanner(tmpDir, false)
+	scanner := NewScanner(tmpDir, false, nil)
 	result, err := scanner.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
@@ -107,6 +107,139 @@ status: pending
 	// Should not find any tasks (hidden directory is skipped)
 	if len(result.Tasks) != 0 {
 		t.Errorf("Expected 0 tasks (hidden dir should be skipped), got %d", len(result.Tasks))
+	}
+}
+
+func createTaskFile(t *testing.T, dir, id string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("Failed to create directory %s: %v", dir, err)
+	}
+	content := "---\nid: \"" + id + "\"\ntitle: \"Task " + id + "\"\nstatus: pending\n---\n# Task " + id
+	if err := os.WriteFile(filepath.Join(dir, id+".md"), []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write task file: %v", err)
+	}
+}
+
+func TestScanner_IgnoreConfiguredDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createTaskFile(t, filepath.Join(tmpDir, "active"), "001")
+	createTaskFile(t, filepath.Join(tmpDir, "drafts"), "002")
+
+	s := NewScanner(tmpDir, false, []string{"drafts"})
+	result, err := s.Scan()
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if len(result.Tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(result.Tasks))
+	}
+	if result.Tasks[0].ID != "001" {
+		t.Errorf("Expected task 001, got %s", result.Tasks[0].ID)
+	}
+}
+
+func TestScanner_IgnoreMultipleDirectories(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createTaskFile(t, filepath.Join(tmpDir, "active"), "001")
+	createTaskFile(t, filepath.Join(tmpDir, "drafts"), "002")
+	createTaskFile(t, filepath.Join(tmpDir, "templates"), "003")
+
+	s := NewScanner(tmpDir, false, []string{"drafts", "templates"})
+	result, err := s.Scan()
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if len(result.Tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(result.Tasks))
+	}
+	if result.Tasks[0].ID != "001" {
+		t.Errorf("Expected task 001, got %s", result.Tasks[0].ID)
+	}
+}
+
+func TestScanner_IgnoreNestedDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createTaskFile(t, filepath.Join(tmpDir, "project", "active"), "001")
+	createTaskFile(t, filepath.Join(tmpDir, "project", "drafts"), "002")
+
+	s := NewScanner(tmpDir, false, []string{"drafts"})
+	result, err := s.Scan()
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if len(result.Tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(result.Tasks))
+	}
+	if result.Tasks[0].ID != "001" {
+		t.Errorf("Expected task 001, got %s", result.Tasks[0].ID)
+	}
+}
+
+func TestScanner_IgnoreWithHiddenDirsStillWorks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createTaskFile(t, filepath.Join(tmpDir, "active"), "001")
+	createTaskFile(t, filepath.Join(tmpDir, ".hidden"), "002")
+	createTaskFile(t, filepath.Join(tmpDir, "drafts"), "003")
+
+	s := NewScanner(tmpDir, false, []string{"drafts"})
+	result, err := s.Scan()
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if len(result.Tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(result.Tasks))
+	}
+	if result.Tasks[0].ID != "001" {
+		t.Errorf("Expected task 001, got %s", result.Tasks[0].ID)
+	}
+}
+
+func TestScanner_NoIgnoreConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createTaskFile(t, filepath.Join(tmpDir, "active"), "001")
+	createTaskFile(t, filepath.Join(tmpDir, "custom"), "002")
+
+	// nil ignore list - only hardcoded defaults apply
+	s := NewScanner(tmpDir, false, nil)
+	result, err := s.Scan()
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if len(result.Tasks) != 2 {
+		t.Fatalf("Expected 2 tasks, got %d", len(result.Tasks))
+	}
+}
+
+func TestScanner_DefaultSkipDirsStillApply(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createTaskFile(t, filepath.Join(tmpDir, "active"), "001")
+	createTaskFile(t, filepath.Join(tmpDir, "node_modules"), "002")
+	createTaskFile(t, filepath.Join(tmpDir, "vendor"), "003")
+
+	// Even with custom ignore dirs, defaults still apply
+	s := NewScanner(tmpDir, false, []string{"custom"})
+	result, err := s.Scan()
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+
+	if len(result.Tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(result.Tasks))
+	}
+	if result.Tasks[0].ID != "001" {
+		t.Errorf("Expected task 001, got %s", result.Tasks[0].ID)
 	}
 }
 

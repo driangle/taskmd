@@ -11,17 +11,41 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/parser"
 )
 
-// Scanner scans directories for markdown task files
-type Scanner struct {
-	rootDir string
-	verbose bool
+// defaultSkipDirs are directories always skipped during scanning.
+var defaultSkipDirs = []string{
+	"node_modules",
+	"vendor",
+	"dist",
+	"build",
+	".next",
+	".nuxt",
+	"out",
+	"target",
+	"__pycache__",
+	"archive",
 }
 
-// NewScanner creates a new directory scanner
-func NewScanner(rootDir string, verbose bool) *Scanner {
+// Scanner scans directories for markdown task files
+type Scanner struct {
+	rootDir    string
+	verbose    bool
+	ignoreDirs map[string]bool
+}
+
+// NewScanner creates a new directory scanner.
+// ignoreDirs specifies additional directory names to skip during scanning.
+func NewScanner(rootDir string, verbose bool, ignoreDirs []string) *Scanner {
+	ignoreMap := make(map[string]bool, len(defaultSkipDirs)+len(ignoreDirs))
+	for _, d := range defaultSkipDirs {
+		ignoreMap[d] = true
+	}
+	for _, d := range ignoreDirs {
+		ignoreMap[d] = true
+	}
 	return &Scanner{
-		rootDir: rootDir,
-		verbose: verbose,
+		rootDir:    rootDir,
+		verbose:    verbose,
+		ignoreDirs: ignoreMap,
 	}
 }
 
@@ -68,9 +92,9 @@ func (s *Scanner) Scan() (*ScanResult, error) {
 
 		// Skip directories
 		if d.IsDir() {
-			// Skip hidden directories and common ignore patterns
+			// Skip hidden directories and configured/default ignore patterns
 			name := d.Name()
-			if shouldSkipDirectory(name) {
+			if s.shouldSkipDirectory(name) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -118,34 +142,12 @@ func (s *Scanner) Scan() (*ScanResult, error) {
 	return result, nil
 }
 
-// shouldSkipDirectory determines if a directory should be skipped during scanning
-func shouldSkipDirectory(name string) bool {
-	// Skip hidden directories
+// shouldSkipDirectory determines if a directory should be skipped during scanning.
+func (s *Scanner) shouldSkipDirectory(name string) bool {
 	if strings.HasPrefix(name, ".") {
 		return true
 	}
-
-	// Skip common build/dependency directories
-	skipDirs := []string{
-		"node_modules",
-		"vendor",
-		"dist",
-		"build",
-		".next",
-		".nuxt",
-		"out",
-		"target",
-		"__pycache__",
-		"archive",
-	}
-
-	for _, skip := range skipDirs {
-		if name == skip {
-			return true
-		}
-	}
-
-	return false
+	return s.ignoreDirs[name]
 }
 
 // deriveGroupFromPath derives a group name from the file's directory path

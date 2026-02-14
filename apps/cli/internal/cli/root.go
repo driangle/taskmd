@@ -133,12 +133,13 @@ func GetGlobalFlags() GlobalFlags {
 	dirVal := resolveTaskDir()
 
 	return GlobalFlags{
-		Stdin:   viper.GetBool("stdin") || stdin,
-		Quiet:   viper.GetBool("quiet") || quiet,
-		Verbose: viper.GetBool("verbose") || verbose,
-		Debug:   viper.GetBool("debug") || debug,
-		NoColor: viper.GetBool("no-color") || noColor,
-		TaskDir: dirVal,
+		Stdin:      viper.GetBool("stdin") || stdin,
+		Quiet:      viper.GetBool("quiet") || quiet,
+		Verbose:    viper.GetBool("verbose") || verbose,
+		Debug:      viper.GetBool("debug") || debug,
+		NoColor:    viper.GetBool("no-color") || noColor,
+		TaskDir:    dirVal,
+		IgnoreDirs: viper.GetStringSlice("ignore"),
 	}
 }
 
@@ -175,12 +176,13 @@ func resolveTaskDir() string {
 
 // GlobalFlags holds global flag values
 type GlobalFlags struct {
-	Stdin   bool
-	Quiet   bool
-	Verbose bool
-	Debug   bool
-	NoColor bool
-	TaskDir string
+	Stdin      bool
+	Quiet      bool
+	Verbose    bool
+	Debug      bool
+	NoColor    bool
+	TaskDir    string
+	IgnoreDirs []string
 }
 
 // ResolveScanDir returns the scan directory from positional arg or --task-dir flag.
