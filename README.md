@@ -254,6 +254,27 @@ All new CLI features must include comprehensive tests. See [CLAUDE.md](CLAUDE.md
 - **Documentation**: [docs/guides/](docs/guides/)
 - **Specification**: [taskmd_specification.md](docs/taskmd_specification.md)
 
+## Claude Code Plugin
+
+Use taskmd directly inside [Claude Code](https://claude.com/claude-code) with slash commands:
+
+```
+/taskmd:next-task              # Find next task to work on
+/taskmd:do-task 015            # Pick up and work on a task
+/taskmd:list-tasks --status pending  # List pending tasks
+/taskmd:add-task Fix login bug       # Create a new task
+/taskmd:complete-task 015      # Mark a task done
+/taskmd:validate               # Validate task files
+```
+
+Install the plugin:
+
+```
+/plugins add taskmd
+```
+
+See [`claude-code-plugin/README.md`](claude-code-plugin/README.md) for full details.
+
 ## Roadmap
 
 - [x] Homebrew installation - Available via `brew tap driangle/tap`
