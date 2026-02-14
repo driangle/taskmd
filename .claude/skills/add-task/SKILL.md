@@ -21,7 +21,13 @@ The user's task description is in `$ARGUMENTS`.
    - `tasks/cli/` — CLI commands, Go backend, terminal features
    - `tasks/web/` — Web frontend, UI, React components
    - `tasks/` (root) — Cross-cutting, infrastructure, documentation, or unclear domain
-4. **Create the task file** named `<NNN>-<slug>.md` with:
+4. **Determine `touches` scopes**:
+   - Read `.taskmd.yaml` to see the existing `scopes` definitions
+   - Based on the task description, identify which code areas the task will modify
+   - Assign matching scope identifiers **only from the existing scopes list** (e.g., `cli/graph`, `web/board`, `sync/jira`)
+   - Do NOT create new scopes or modify `.taskmd.yaml` — only use scopes already defined there
+   - If no existing scope matches, omit `touches`
+5. **Create the task file** named `<NNN>-<slug>.md` with:
 
 ```yaml
 ---
@@ -31,6 +37,7 @@ status: pending
 priority: medium
 effort: medium
 tags: []
+touches: []  # scope identifiers from .taskmd.yaml (omit if not applicable)
 created: <today's date YYYY-MM-DD>
 ---
 ```
@@ -41,4 +48,4 @@ Followed by a markdown body with:
 - A `## Tasks` section with a checkbox list of subtasks
 - An `## Acceptance Criteria` section
 
-5. **Confirm** the created file path and ID to the user
+6. **Confirm** the created file path and ID to the user
