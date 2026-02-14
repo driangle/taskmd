@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,13 +10,13 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 )
 
 var (
+	listFormat  string
 	listFilters []string
 	listSort    string
 	listColumns string
@@ -32,6 +31,8 @@ var listCmd = &cobra.Command{
 
 By default, scans the current directory and all subdirectories for markdown files
 with task frontmatter. You can specify a different directory to scan.
+
+Output formats: table (default), json, yaml
 
 Multiple --filter flags are combined with AND logic.
 
@@ -50,6 +51,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(listCmd)
 
+	listCmd.Flags().StringVar(&listFormat, "format", "table", "output format (table, json, yaml)")
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", []string{}, "filter tasks (can specify multiple times for AND conditions, e.g., --filter status=pending --filter priority=high)")
 	listCmd.Flags().StringVar(&listSort, "sort", "", "sort by field (id, title, status, priority, effort, created)")
 	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority,file", "comma-separated list of columns to display")
@@ -83,7 +85,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	debugLog("format: %s, sort: %q, filters: %v", flags.Format, listSort, listFilters)
+	debugLog("format: %s, sort: %q, filters: %v", listFormat, listSort, listFilters)
 
 	// Apply filters (multiple filters are AND'ed together)
 	if len(listFilters) > 0 {
@@ -101,7 +103,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output in requested format
-	switch flags.Format {
+	switch listFormat {
 	case "json":
 		return outputJSON(tasks)
 	case "yaml":
@@ -109,7 +111,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	case "table":
 		return outputTable(tasks, listColumns)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: table, json, yaml)", flags.Format)
+		return ValidateFormat(listFormat, []string{"table", "json", "yaml"})
 	}
 }
 
@@ -160,16 +162,12 @@ func sortTasks(tasks []*model.Task, sortField string) error {
 
 // outputJSON outputs tasks as JSON
 func outputJSON(tasks []*model.Task) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(tasks)
+	return WriteJSON(os.Stdout, tasks)
 }
 
 // outputYAML outputs tasks as YAML
 func outputYAML(tasks []*model.Task) error {
-	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
-	return encoder.Encode(tasks)
+	return WriteYAML(os.Stdout, tasks)
 }
 
 // outputTable outputs tasks as a formatted table

@@ -1,7 +1,7 @@
 ---
 id: "031"
 title: "Consistent formatting options across CLI commands"
-status: pending
+status: completed
 priority: low
 effort: medium
 dependencies: ["023"]

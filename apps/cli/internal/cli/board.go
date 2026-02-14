@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -148,8 +147,5 @@ func outputBoardText(gr *board.GroupResult, w io.Writer) error {
 }
 
 func outputBoardJSON(gr *board.GroupResult, w io.Writer) error {
-	out := board.ToJSON(gr)
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	return WriteJSON(w, board.ToJSON(gr))
 }

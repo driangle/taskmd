@@ -18,7 +18,6 @@ func resetViper() {
 func resetFlags() {
 	cfgFile = ""
 	stdin = false
-	format = "table"
 	quiet = false
 	verbose = false
 	dir = "."
@@ -62,14 +61,12 @@ verbose: true
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
@@ -118,14 +115,12 @@ verbose: true
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
@@ -179,14 +174,12 @@ verbose: false
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
@@ -228,14 +221,12 @@ verbose: true
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
@@ -335,14 +326,12 @@ func TestConfigFile_Defaults(t *testing.T) {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
@@ -357,9 +346,6 @@ func TestConfigFile_Defaults(t *testing.T) {
 	}
 	if flags.Verbose {
 		t.Error("expected default verbose to be false")
-	}
-	if flags.Format != "table" {
-		t.Errorf("expected default format 'table', got '%s'", flags.Format)
 	}
 }
 
@@ -384,14 +370,12 @@ verbose: true
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))

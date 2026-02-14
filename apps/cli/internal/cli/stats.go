@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -15,6 +14,8 @@ import (
 )
 
 // statsCmd represents the stats command
+var statsFormat string
+
 var statsCmd = &cobra.Command{
 	Use:        "stats",
 	SuggestFor: []string{"summary", "status", "overview"},
@@ -29,16 +30,21 @@ var statsCmd = &cobra.Command{
 By default, scans the current directory and all subdirectories for markdown files
 with task frontmatter. You can specify a different directory to scan.
 
+Output formats: table (default), json, yaml
+
 Examples:
   taskmd stats
   taskmd stats ./tasks
-  taskmd stats --format json`,
+  taskmd stats --format json
+  taskmd stats --format yaml`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runStats,
 }
 
 func init() {
 	rootCmd.AddCommand(statsCmd)
+
+	statsCmd.Flags().StringVar(&statsFormat, "format", "table", "output format (table, json, yaml)")
 }
 
 func runStats(cmd *cobra.Command, args []string) error {
@@ -68,21 +74,21 @@ func runStats(cmd *cobra.Command, args []string) error {
 	m := metrics.Calculate(tasks)
 
 	// Output in requested format
-	switch flags.Format {
+	switch statsFormat {
 	case "json":
 		return outputStatsJSON(m)
+	case "yaml":
+		return WriteYAML(os.Stdout, m)
 	case "table":
 		return outputStatsTable(m)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: table, json)", flags.Format)
+		return ValidateFormat(statsFormat, []string{"table", "json", "yaml"})
 	}
 }
 
 // outputStatsJSON outputs metrics as JSON
 func outputStatsJSON(m *metrics.Metrics) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(m)
+	return WriteJSON(os.Stdout, m)
 }
 
 // outputStatsTable outputs metrics in a human-readable table format

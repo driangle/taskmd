@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/driangle/taskmd/apps/cli/internal/graph"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
@@ -403,15 +401,9 @@ func buildGetOutput(task *model.Task, deps dependencyInfo) getOutput {
 }
 
 func outputGetJSON(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	out := buildGetOutput(task, deps)
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	return WriteJSON(w, buildGetOutput(task, deps))
 }
 
 func outputGetYAML(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	out := buildGetOutput(task, deps)
-	enc := yaml.NewEncoder(w)
-	defer enc.Close()
-	return enc.Encode(out)
+	return WriteYAML(w, buildGetOutput(task, deps))
 }

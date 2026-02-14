@@ -1,7 +1,7 @@
 ---
 id: "020"
 title: "stats command - Show computed metrics"
-status: completed
+status: in-progress
 priority: medium
 effort: small
 dependencies: ["017"]

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -13,6 +12,7 @@ import (
 )
 
 var (
+	validateFormat string
 	validateStrict bool
 )
 
@@ -32,6 +32,8 @@ Validation checks include:
 
 Use --strict to enable additional warnings for missing optional fields.
 
+Output formats: text (default), table, json
+
 Exit codes:
   0 - Valid (no errors)
   1 - Invalid (errors found)
@@ -49,6 +51,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(validateCmd)
 
+	validateCmd.Flags().StringVar(&validateFormat, "format", "text", "output format (text, table, json)")
 	validateCmd.Flags().BoolVar(&validateStrict, "strict", false, "enable strict validation with additional warnings")
 }
 
@@ -82,7 +85,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	validationResult := v.Validate(tasks)
 
 	// Output results
-	switch flags.Format {
+	switch validateFormat {
 	case "json":
 		if err := outputValidationJSON(validationResult); err != nil {
 			return err
@@ -90,7 +93,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	case "text", "table":
 		outputValidationText(validationResult, flags.Quiet)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: text, json)", flags.Format)
+		return ValidateFormat(validateFormat, []string{"text", "table", "json"})
 	}
 
 	// Determine exit code
@@ -172,7 +175,5 @@ func printIssue(issue validator.ValidationIssue, r *lipgloss.Renderer) {
 
 // outputValidationJSON outputs validation results as JSON
 func outputValidationJSON(result *validator.ValidationResult) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
+	return WriteJSON(os.Stdout, result)
 }

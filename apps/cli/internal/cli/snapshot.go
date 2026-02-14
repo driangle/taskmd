@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	snapshotFormat  string
 	snapshotCore    bool
 	snapshotDerived bool
 	snapshotGroupBy string
@@ -29,7 +30,7 @@ for CI/CD pipelines and automation.
 By default, outputs all task data in JSON format. Use --core to output only
 essential fields, or --derived to include computed dependency analysis.
 
-Supported output formats: json, yaml, md
+Output formats: json (default), yaml, md
 
 Examples:
   taskmd snapshot > snapshot.json
@@ -44,6 +45,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(snapshotCmd)
 
+	snapshotCmd.Flags().StringVar(&snapshotFormat, "format", "json", "output format (json, yaml, md)")
 	snapshotCmd.Flags().BoolVar(&snapshotCore, "core", false, "output only core fields (id, title, dependencies)")
 	snapshotCmd.Flags().BoolVar(&snapshotDerived, "derived", false, "include computed/derived fields (blocked status, depth, topological order)")
 	snapshotCmd.Flags().StringVar(&snapshotGroupBy, "group-by", "", "group tasks by field (status, priority, effort, group)")
@@ -153,7 +155,7 @@ func runSnapshot(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output in requested format
-	switch flags.Format {
+	switch snapshotFormat {
 	case "json":
 		return outputSnapshotJSON(output, outFile)
 	case "yaml":
@@ -161,7 +163,7 @@ func runSnapshot(cmd *cobra.Command, args []string) error {
 	case "md", "markdown":
 		return outputSnapshotMarkdown(snapshots, outFile, snapshotGroupBy)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: json, yaml, md)", flags.Format)
+		return ValidateFormat(snapshotFormat, []string{"json", "yaml", "md"})
 	}
 }
 

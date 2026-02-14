@@ -61,13 +61,13 @@ priority: high
 
 	// Save and reset flags
 	oldDir := dir
-	oldFormat := format
+	oldListFormat := listFormat
 	oldFilters := listFilters
 	oldSort := listSort
 	oldColumns := listColumns
 	defer func() {
 		dir = oldDir
-		format = oldFormat
+		listFormat = oldListFormat
 		listFilters = oldFilters
 		listSort = oldSort
 		listColumns = oldColumns
@@ -75,7 +75,7 @@ priority: high
 
 	// Use --dir flag (no positional arg)
 	dir = tmpDir
-	format = "json"
+	listFormat = "json"
 	listFilters = []string{}
 	listSort = ""
 	listColumns = "id,title,status,priority"

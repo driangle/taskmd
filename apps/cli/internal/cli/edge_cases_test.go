@@ -156,7 +156,7 @@ func TestEdge_InvalidFormat(t *testing.T) {
 	tmpDir := createEdgeCaseTestFiles(t)
 	resetListFlags()
 	noColor = true
-	format = "xml"
+	listFormat = "xml"
 
 	_, err := captureListOutput(t, tmpDir)
 	if err == nil {
@@ -167,7 +167,7 @@ func TestEdge_InvalidFormat(t *testing.T) {
 	}
 
 	// Reset format
-	format = "table"
+	listFormat = "table"
 }
 
 // --- Invalid filter syntax ---

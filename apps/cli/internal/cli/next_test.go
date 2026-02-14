@@ -164,18 +164,18 @@ func captureNextOutput(t *testing.T, args []string) (string, error) {
 
 // resetNextFlags resets all next command flags to defaults
 func resetNextFlags() {
+	nextFormat = "table"
 	nextLimit = 5
 	nextFilters = []string{}
 	nextQuickWins = false
 	nextCritical = false
-	format = "table"
 }
 
 func TestNext_BasicRanking(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -218,7 +218,7 @@ func TestNext_BlockedTasksExcluded(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 20
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -299,7 +299,7 @@ created: 2026-02-12
 	}
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 20
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -339,7 +339,7 @@ func TestNext_LimitFlag(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 2
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -361,7 +361,7 @@ func TestNext_LimitExceedsAvailable(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 100
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -384,7 +384,7 @@ func TestNext_FilterByTag(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 	nextFilters = []string{"tag=cli"}
 
@@ -418,7 +418,7 @@ func TestNext_FilterByPriority(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 	nextFilters = []string{"priority=high"}
 
@@ -452,7 +452,7 @@ func TestNext_MultipleFilters(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 	nextFilters = []string{"tag=cli", "priority=high"}
 
@@ -476,7 +476,7 @@ func TestNext_InvalidFilterFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextFilters = []string{"invalid"}
 
 	_, err := captureNextOutput(t, []string{tmpDir})
@@ -493,7 +493,7 @@ func TestNext_UnsupportedFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "csv"
+	nextFormat = "csv"
 
 	_, err := captureNextOutput(t, []string{tmpDir})
 	if err == nil {
@@ -509,7 +509,7 @@ func TestNext_JSONFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 2
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -549,7 +549,7 @@ func TestNext_YAMLFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "yaml"
+	nextFormat = "yaml"
 	nextLimit = 2
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -573,7 +573,7 @@ func TestNext_TableFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "table"
+	nextFormat = "table"
 	nextLimit = 3
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -612,7 +612,7 @@ created: 2026-02-01
 	}
 
 	resetNextFlags()
-	format = "table"
+	nextFormat = "table"
 
 	output, err := captureNextOutput(t, []string{tmpDir})
 	if err != nil {
@@ -628,7 +628,7 @@ func TestNext_InProgressTasksIncluded(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -660,7 +660,7 @@ func TestNext_ReasonStrings(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -719,7 +719,7 @@ func TestNext_ScoringOrder(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -783,7 +783,7 @@ created: 2026-02-01
 	}
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -998,7 +998,7 @@ func TestNext_DownstreamCountUsesFullGraph(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextLimit = 10
 	nextFilters = []string{"tag=api"}
 
@@ -1030,7 +1030,7 @@ func TestNext_QuickWins_HappyPath(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextQuickWins = true
 	nextLimit = 10
 
@@ -1073,7 +1073,7 @@ func TestNext_QuickWins_WithFilter(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextQuickWins = true
 	nextFilters = []string{"tag=cli"}
 	nextLimit = 10
@@ -1110,7 +1110,7 @@ func TestNext_QuickWins_WithLimit(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextQuickWins = true
 	nextLimit = 1
 
@@ -1166,7 +1166,7 @@ created: 2026-02-02
 	}
 
 	resetNextFlags()
-	format = "table"
+	nextFormat = "table"
 	nextQuickWins = true
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -1183,7 +1183,7 @@ func TestNext_QuickWins_TableFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "table"
+	nextFormat = "table"
 	nextQuickWins = true
 	nextLimit = 3
 
@@ -1201,7 +1201,7 @@ func TestNext_QuickWins_YAMLFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "yaml"
+	nextFormat = "yaml"
 	nextQuickWins = true
 	nextLimit = 2
 
@@ -1220,7 +1220,7 @@ func TestNext_Critical_HappyPath(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextCritical = true
 	nextLimit = 10
 
@@ -1260,7 +1260,7 @@ func TestNext_Critical_WithFilter(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextCritical = true
 	nextFilters = []string{"tag=cli"}
 	nextLimit = 10
@@ -1287,7 +1287,7 @@ func TestNext_Critical_WithLimit(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextCritical = true
 	nextLimit = 1
 
@@ -1363,7 +1363,7 @@ created: 2026-02-04
 	}
 
 	resetNextFlags()
-	format = "table"
+	nextFormat = "table"
 	nextCritical = true
 
 	output, err := captureNextOutput(t, []string{tmpDir})
@@ -1382,7 +1382,7 @@ func TestNext_Critical_TableFormat(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "table"
+	nextFormat = "table"
 	nextCritical = true
 	nextLimit = 3
 
@@ -1400,7 +1400,7 @@ func TestNext_QuickWins_Ranking(t *testing.T) {
 	tmpDir := createNextTestTaskFiles(t)
 
 	resetNextFlags()
-	format = "json"
+	nextFormat = "json"
 	nextQuickWins = true
 	nextLimit = 10
 

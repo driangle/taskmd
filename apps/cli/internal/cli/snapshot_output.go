@@ -1,28 +1,20 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 // outputSnapshotJSON outputs snapshot as JSON
 func outputSnapshotJSON(output any, outFile *os.File) error {
-	encoder := json.NewEncoder(outFile)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(output)
+	return WriteJSON(outFile, output)
 }
 
 // outputSnapshotYAML outputs snapshot as YAML
 func outputSnapshotYAML(output any, outFile *os.File) error {
-	encoder := yaml.NewEncoder(outFile)
-	encoder.SetIndent(2)
-	defer encoder.Close()
-	return encoder.Encode(output)
+	return WriteYAML(outFile, output)
 }
 
 // outputSnapshotMarkdown outputs snapshot as Markdown

@@ -17,7 +17,6 @@ var (
 	// Global flags
 	cfgFile string
 	stdin   bool
-	format  string
 	quiet   bool
 	verbose bool
 	debug   bool
@@ -57,7 +56,6 @@ func init() {
 	// Global flags available to all subcommands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.taskmd.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read input from stdin instead of file")
-	rootCmd.PersistentFlags().StringVar(&format, "format", "table", "output format (table, json, yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output (prints to stderr)")
@@ -66,7 +64,6 @@ func init() {
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
-	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
@@ -114,16 +111,8 @@ func GetGlobalFlags() GlobalFlags {
 		dirVal = "."
 	}
 
-	formatVal := viper.GetString("format")
-	if formatVal == "" && format != "" {
-		formatVal = format
-	} else if formatVal == "" {
-		formatVal = "table"
-	}
-
 	return GlobalFlags{
 		Stdin:   viper.GetBool("stdin") || stdin,
-		Format:  formatVal,
 		Quiet:   viper.GetBool("quiet") || quiet,
 		Verbose: viper.GetBool("verbose") || verbose,
 		Debug:   viper.GetBool("debug") || debug,
@@ -135,7 +124,6 @@ func GetGlobalFlags() GlobalFlags {
 // GlobalFlags holds global flag values
 type GlobalFlags struct {
 	Stdin   bool
-	Format  string
 	Quiet   bool
 	Verbose bool
 	Debug   bool

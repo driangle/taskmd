@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -9,7 +8,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 
 	"github.com/driangle/taskmd/apps/cli/internal/graph"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
@@ -45,6 +43,7 @@ type Recommendation struct {
 }
 
 var (
+	nextFormat    string
 	nextLimit     int
 	nextFilters   []string
 	nextQuickWins bool
@@ -61,6 +60,8 @@ Tasks are scored based on priority, critical path position, downstream impact,
 and effort. Only actionable tasks (pending or in-progress with all dependencies
 completed) are shown.
 
+Output formats: table (default), json, yaml
+
 Examples:
   taskmd next
   taskmd next ./tasks
@@ -76,6 +77,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(nextCmd)
 
+	nextCmd.Flags().StringVar(&nextFormat, "format", "table", "output format (table, json, yaml)")
 	nextCmd.Flags().IntVar(&nextLimit, "limit", 5, "maximum number of recommendations")
 	nextCmd.Flags().StringArrayVar(&nextFilters, "filter", []string{}, "filter tasks (e.g., --filter tag=cli)")
 	nextCmd.Flags().BoolVar(&nextQuickWins, "quick-wins", false, "show only quick wins (effort: small)")
@@ -272,7 +274,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	switch flags.Format {
+	switch nextFormat {
 	case "json":
 		return outputNextJSON(recs)
 	case "yaml":
@@ -280,20 +282,16 @@ func runNext(cmd *cobra.Command, args []string) error {
 	case "table":
 		return outputNextTable(recs)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: table, json, yaml)", flags.Format)
+		return ValidateFormat(nextFormat, []string{"table", "json", "yaml"})
 	}
 }
 
 func outputNextJSON(recs []Recommendation) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(recs)
+	return WriteJSON(os.Stdout, recs)
 }
 
 func outputNextYAML(recs []Recommendation) error {
-	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
-	return encoder.Encode(recs)
+	return WriteYAML(os.Stdout, recs)
 }
 
 func outputNextTable(recs []Recommendation) error {

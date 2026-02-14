@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -13,7 +12,10 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 )
 
-var tagsFilters []string
+var (
+	tagsFormat  string
+	tagsFilters []string
+)
 
 // TagInfo holds a tag name and the number of tasks using it.
 type TagInfo struct {
@@ -31,13 +33,16 @@ of tasks per tag, sorted from most to least used.
 By default, scans the current directory and all subdirectories for markdown files
 with task frontmatter. You can specify a different directory to scan.
 
+Output formats: table (default), json, yaml
+
 Multiple --filter flags are combined with AND logic.
 
 Examples:
   taskmd tags
   taskmd tags ./tasks
   taskmd tags --filter status=pending
-  taskmd tags --format json`,
+  taskmd tags --format json
+  taskmd tags --format yaml`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runTags,
 }
@@ -45,6 +50,7 @@ Examples:
 func init() {
 	rootCmd.AddCommand(tagsCmd)
 
+	tagsCmd.Flags().StringVar(&tagsFormat, "format", "table", "output format (table, json, yaml)")
 	tagsCmd.Flags().StringArrayVar(&tagsFilters, "filter", []string{}, "filter tasks before aggregating tags (e.g., --filter status=pending)")
 }
 
@@ -78,13 +84,15 @@ func runTags(cmd *cobra.Command, args []string) error {
 
 	tagInfos := aggregateTags(tasks)
 
-	switch flags.Format {
+	switch tagsFormat {
 	case "json":
 		return outputTagsJSON(tagInfos)
+	case "yaml":
+		return WriteYAML(os.Stdout, tagInfos)
 	case "table":
 		return outputTagsTable(tagInfos)
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: table, json)", flags.Format)
+		return ValidateFormat(tagsFormat, []string{"table", "json", "yaml"})
 	}
 }
 
@@ -112,9 +120,7 @@ func aggregateTags(tasks []*model.Task) []TagInfo {
 }
 
 func outputTagsJSON(tagInfos []TagInfo) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(tagInfos)
+	return WriteJSON(os.Stdout, tagInfos)
 }
 
 func outputTagsTable(tagInfos []TagInfo) error {
