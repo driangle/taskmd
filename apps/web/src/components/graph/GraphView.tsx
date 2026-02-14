@@ -1,72 +1,86 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import mermaid from "mermaid";
+import {
+  ReactFlow,
+  Controls,
+  Background,
+  BackgroundVariant,
+  type NodeTypes,
+  type NodeMouseHandler,
+  type Node,
+  type Edge,
+  type Viewport,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { TaskNode } from "./TaskNode.tsx";
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "default",
-  securityLevel: "loose",
-});
+const nodeTypes: NodeTypes = { task: TaskNode };
+const fitViewOptions = { maxZoom: 0.85, padding: 0.15 };
 
 interface GraphViewProps {
-  mermaidSyntax: string;
+  nodes: Node[];
+  edges: Edge[];
+  defaultViewport?: Viewport;
+  onViewportChange?: (viewport: Viewport) => void;
+  matchedNodeIds?: Set<string>;
+  searchActive?: boolean;
 }
 
-export function GraphView({ mermaidSyntax }: GraphViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+export function GraphView({
+  nodes,
+  edges,
+  defaultViewport,
+  onViewportChange,
+  matchedNodeIds,
+  searchActive,
+}: GraphViewProps) {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!containerRef.current || !mermaidSyntax) return;
+  const onNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      navigate(`/tasks/${node.data.taskId}`);
+    },
+    [navigate],
+  );
 
-    const id = `mermaid-${Date.now()}`;
-    mermaid.render(id, mermaidSyntax).then(({ svg }) => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = svg;
+  const decoratedNodes = useMemo(() => {
+    if (!searchActive || !matchedNodeIds) return nodes;
+    return nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        highlighted: matchedNodeIds.has(node.id),
+        dimmed: !matchedNodeIds.has(node.id),
+      },
+    }));
+  }, [nodes, matchedNodeIds, searchActive]);
 
-        // Add click handlers to graph nodes
-        const nodes = containerRef.current.querySelectorAll(".node");
-        nodes.forEach((node) => {
-          // Extract task ID from the node's id attribute
-          // Mermaid generates ids like "flowchart-task-001-123"
-          const nodeId = node.getAttribute("id");
-          const match = nodeId?.match(/task-(\d+)/);
-          if (match) {
-            const taskId = match[1];
+  if (nodes.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-gray-500">
+        No tasks to display
+      </div>
+    );
+  }
 
-            // Make node clickable
-            const nodeElement = node as HTMLElement;
-            nodeElement.style.cursor = "pointer";
-
-            // Add click handler
-            nodeElement.addEventListener("click", () => {
-              navigate(`/tasks/${taskId}`);
-            });
-
-            // Add hover effect
-            nodeElement.addEventListener("mouseenter", () => {
-              const rect = nodeElement.querySelector("rect, polygon");
-              if (rect) {
-                (rect as SVGElement).style.opacity = "0.8";
-              }
-            });
-
-            nodeElement.addEventListener("mouseleave", () => {
-              const rect = nodeElement.querySelector("rect, polygon");
-              if (rect) {
-                (rect as SVGElement).style.opacity = "1";
-              }
-            });
-          }
-        });
-      }
-    });
-  }, [mermaidSyntax, navigate]);
+  const hasRestoredViewport = defaultViewport !== undefined;
 
   return (
-    <div
-      ref={containerRef}
-      className="bg-white rounded-lg border border-gray-200 p-4 overflow-auto"
-    />
+    <ReactFlow
+      nodes={decoratedNodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      onNodeClick={onNodeClick}
+      fitView={!hasRestoredViewport}
+      fitViewOptions={fitViewOptions}
+      defaultViewport={hasRestoredViewport ? defaultViewport : undefined}
+      onViewportChange={onViewportChange}
+      minZoom={0.1}
+      maxZoom={2}
+      proOptions={{ hideAttribution: true }}
+    >
+      <Controls position="bottom-right" />
+      <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e5e7eb" />
+    </ReactFlow>
   );
 }

@@ -38,3 +38,6 @@ apps/cli/taskmd
 
 # misc
 settings.local.json
+
+# VitePress (docs)
+apps/docs/.vitepress/cache

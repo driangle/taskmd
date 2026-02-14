@@ -49,13 +49,6 @@ export function TaskDetailPage() {
 
   return (
     <div>
-      <Link
-        to="/tasks"
-        className="text-sm text-gray-500 hover:text-gray-700 mb-4 inline-block"
-      >
-        &larr; All tasks
-      </Link>
-
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         {isEditing ? (
           <TaskEditForm

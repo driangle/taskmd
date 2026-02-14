@@ -134,12 +134,14 @@ The web interface provides:
 
 ## Documentation
 
-- **[Quick Start Guide](docs/guides/quickstart.md)** - Get productive in 5 minutes
-- **[FAQ](docs/FAQ.md)** - Frequently asked questions and quick answers
-- **[CLI User Guide](docs/guides/cli-guide.md)** - Comprehensive CLI reference
-- **[TUI User Guide](docs/guides/tui-guide.md)** - Interactive terminal interface guide
-- **[Web User Guide](docs/guides/web-guide.md)** - Web interface walkthrough
-- **[Task Format Specification](docs/taskmd_specification.md)** - Task file format reference
+**[Read the full documentation →](https://driangle.github.io/taskmd/)**
+
+- **[Quick Start Guide](https://driangle.github.io/taskmd/getting-started/)** - Get productive in 5 minutes
+- **[CLI Guide](https://driangle.github.io/taskmd/guide/cli)** - Comprehensive CLI reference
+- **[Web Interface](https://driangle.github.io/taskmd/guide/web)** - Web dashboard walkthrough
+- **[TUI Guide](https://driangle.github.io/taskmd/guide/tui)** - Interactive terminal interface
+- **[Task Specification](https://driangle.github.io/taskmd/reference/specification)** - Task file format reference
+- **[FAQ](https://driangle.github.io/taskmd/faq)** - Frequently asked questions
 
 ## Task Format
 
