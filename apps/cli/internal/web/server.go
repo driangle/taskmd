@@ -59,6 +59,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))
 	mux.HandleFunc("GET /api/graph/mermaid", handleGraphMermaid(s.dp))
 	mux.HandleFunc("GET /api/stats", handleStats(s.dp))
+	mux.HandleFunc("GET /api/next", handleNext(s.dp))
 	mux.HandleFunc("GET /api/validate", handleValidate(s.dp))
 	mux.Handle("GET /api/events", s.broker)
 

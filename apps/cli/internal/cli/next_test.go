@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/next"
 )
 
 // createNextTestTaskFiles creates a set of 10 task files designed to exercise
@@ -848,7 +849,7 @@ func TestHasUnmetDependencies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasUnmetDependencies(tt.task, taskMap)
+			got := next.HasUnmetDependencies(tt.task, taskMap)
 			if got != tt.expected {
 				t.Errorf("hasUnmetDependencies() = %v, want %v", got, tt.expected)
 			}
@@ -901,7 +902,7 @@ func TestIsActionable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isActionable(tt.task, taskMap)
+			got := next.IsActionable(tt.task, taskMap)
 			if got != tt.expected {
 				t.Errorf("isActionable() = %v, want %v", got, tt.expected)
 			}
@@ -926,54 +927,54 @@ func TestScoreTask(t *testing.T) {
 		{
 			name:          "critical priority",
 			task:          &model.Task{ID: "t1", Priority: model.PriorityCritical},
-			expectedScore: scorePriorityCritical,
+			expectedScore: next.ScorePriorityCritical,
 			expectReason:  "critical priority",
 		},
 		{
 			name:          "high priority",
 			task:          &model.Task{ID: "t2", Priority: model.PriorityHigh},
-			expectedScore: scorePriorityHigh,
+			expectedScore: next.ScorePriorityHigh,
 			expectReason:  "high priority",
 		},
 		{
 			name:          "medium priority no special reason",
 			task:          &model.Task{ID: "t3", Priority: model.PriorityMedium},
-			expectedScore: scorePriorityMedium,
+			expectedScore: next.ScorePriorityMedium,
 		},
 		{
 			name:          "low/unset priority",
 			task:          &model.Task{ID: "t4"},
-			expectedScore: scorePriorityLow,
+			expectedScore: next.ScorePriorityLow,
 		},
 		{
 			name:          "small effort bonus",
 			task:          &model.Task{ID: "t5", Effort: model.EffortSmall},
-			expectedScore: scorePriorityLow + scoreEffortSmall,
+			expectedScore: next.ScorePriorityLow + next.ScoreEffortSmall,
 			expectReason:  "quick win",
 		},
 		{
 			name:          "critical path bonus",
 			task:          &model.Task{ID: "cp1", Priority: model.PriorityMedium, Effort: model.EffortMedium},
-			expectedScore: scorePriorityMedium + scoreCriticalPath + min(3*scorePerDownstream, scoreDownstreamMax) + scoreEffortMedium,
+			expectedScore: next.ScorePriorityMedium + next.ScoreCriticalPath + min(3*next.ScorePerDownstream, next.ScoreDownstreamMax) + next.ScoreEffortMedium,
 			expectReason:  "on critical path",
 		},
 		{
 			name:          "downstream 1 task",
 			task:          &model.Task{ID: "ds1", Priority: model.PriorityMedium},
-			expectedScore: scorePriorityMedium + 1*scorePerDownstream,
+			expectedScore: next.ScorePriorityMedium + 1*next.ScorePerDownstream,
 			expectReason:  "unblocks 1 task",
 		},
 		{
 			name:          "downstream capped at max",
 			task:          &model.Task{ID: "ds6", Priority: model.PriorityMedium},
-			expectedScore: scorePriorityMedium + scoreDownstreamMax,
+			expectedScore: next.ScorePriorityMedium + next.ScoreDownstreamMax,
 			expectReason:  "unblocks 6 tasks",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, reasons := scoreTask(tt.task, criticalPath, downstreamCounts)
+			score, reasons := next.ScoreTask(tt.task, criticalPath, downstreamCounts)
 			if score != tt.expectedScore {
 				t.Errorf("scoreTask() score = %d, want %d", score, tt.expectedScore)
 			}

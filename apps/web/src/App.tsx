@@ -4,6 +4,7 @@ import { TasksPage } from "./pages/TasksPage.tsx";
 import { TaskDetailPage } from "./pages/TaskDetailPage.tsx";
 import { BoardPage } from "./pages/BoardPage.tsx";
 import { GraphPage } from "./pages/GraphPage.tsx";
+import { NextPage } from "./pages/NextPage.tsx";
 import { StatsPage } from "./pages/StatsPage.tsx";
 import { ValidatePage } from "./pages/ValidatePage.tsx";
 import { useLiveReload } from "./hooks/use-live-reload.ts";
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
         <Route path="/board" element={<BoardPage />} />
         <Route path="/graph" element={<GraphPage />} />
+        <Route path="/next" element={<NextPage />} />
         <Route path="/stats" element={<StatsPage />} />
         <Route path="/validate" element={<ValidatePage />} />
       </Routes>

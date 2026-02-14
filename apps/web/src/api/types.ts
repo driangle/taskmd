@@ -75,6 +75,20 @@ export interface ValidationIssue {
   message: string;
 }
 
+export interface Recommendation {
+  rank: number;
+  id: string;
+  title: string;
+  file_path: string;
+  status: string;
+  priority: string;
+  effort: string;
+  score: number;
+  reasons: string[];
+  downstream_count: number;
+  on_critical_path: boolean;
+}
+
 export interface TaskUpdateRequest {
   title?: string;
   status?: string;

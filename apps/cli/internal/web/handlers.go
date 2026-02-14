@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/driangle/taskmd/apps/cli/internal/board"
 	"github.com/driangle/taskmd/apps/cli/internal/graph"
 	"github.com/driangle/taskmd/apps/cli/internal/metrics"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/next"
 	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
@@ -149,6 +151,36 @@ func handleStats(dp *DataProvider) http.HandlerFunc {
 
 		m := metrics.Calculate(tasks)
 		writeJSON(w, m)
+	}
+}
+
+func handleNext(dp *DataProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		limit := 5
+		if v := r.URL.Query().Get("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				limit = n
+			}
+		}
+
+		filters := r.URL.Query()["filter"]
+
+		recs, err := next.Recommend(tasks, next.Options{
+			Limit:   limit,
+			Filters: filters,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		writeJSON(w, recs)
 	}
 }
 

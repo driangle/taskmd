@@ -1,82 +1,34 @@
 package cli
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/driangle/taskmd/apps/cli/internal/filter"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
 
-// filterCriteria represents a single filter condition
-type filterCriteria struct {
-	field string
-	value string
-}
+// filterCriteria represents a single filter condition (kept for test compat).
+type filterCriteria = filter.Criteria
 
-// applyFilters applies multiple filter expressions to tasks (AND logic)
+// applyFilters delegates to the shared filter package.
 func applyFilters(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {
-	// Parse all filter expressions first
-	filters := make([]filterCriteria, 0, len(filterExprs))
-	for _, expr := range filterExprs {
-		parts := strings.SplitN(expr, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid filter format (expected field=value): %s", expr)
-		}
-		filters = append(filters, filterCriteria{
-			field: strings.TrimSpace(parts[0]),
-			value: strings.TrimSpace(parts[1]),
-		})
-	}
-
-	// Apply all filters (AND logic)
-	var filtered []*model.Task
-	for _, task := range tasks {
-		if matchesAllFilters(task, filters) {
-			filtered = append(filtered, task)
-		}
-	}
-
-	return filtered, nil
+	return filter.Apply(tasks, filterExprs)
 }
 
-// matchesAllFilters checks if a task matches all filter criteria (AND logic)
+// matchesAllFilters is kept for backward-compatible tests.
 func matchesAllFilters(task *model.Task, filters []filterCriteria) bool {
-	for _, filter := range filters {
-		if !matchesFilter(task, filter.field, filter.value) {
+	for _, f := range filters {
+		if !matchesFilter(task, f.Field, f.Value) {
 			return false
 		}
 	}
 	return true
 }
 
-// matchesFilter checks if a task matches a filter criterion
+// matchesFilter is kept for backward-compatible tests.
 func matchesFilter(task *model.Task, field, value string) bool {
-	switch field {
-	case "status":
-		return string(task.Status) == value
-	case "priority":
-		return string(task.Priority) == value
-	case "effort":
-		return string(task.Effort) == value
-	case "id":
-		return task.ID == value
-	case "title":
-		return strings.Contains(strings.ToLower(task.Title), strings.ToLower(value))
-	case "group":
-		return task.Group == value
-	case "blocked":
-		// A task is blocked if it has dependencies
-		isBlocked := len(task.Dependencies) > 0
-		return (value == "true" && isBlocked) || (value == "false" && !isBlocked)
-	case "tag":
-		// Check if task has the specified tag
-		for _, tag := range task.Tags {
-			if tag == value {
-				return true
-			}
-		}
-		return false
-	default:
+	// Test a single-filter list via the shared package
+	result, err := filter.Apply([]*model.Task{task}, []string{field + "=" + value})
+	if err != nil {
 		return false
 	}
+	return len(result) == 1
 }

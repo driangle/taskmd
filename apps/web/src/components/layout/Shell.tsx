@@ -5,6 +5,7 @@ import { useTheme } from "../../hooks/use-theme.ts";
 
 const tabs = [
   { path: "/tasks", label: "Tasks" },
+  { path: "/next", label: "Next Up" },
   { path: "/board", label: "Board" },
   { path: "/graph", label: "Graph" },
   { path: "/stats", label: "Stats" },

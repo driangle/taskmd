@@ -101,22 +101,22 @@ func TestMatchesAllFilters(t *testing.T) {
 	}{
 		{
 			name:     "single matching filter",
-			filters:  []filterCriteria{{field: "status", value: "pending"}},
+			filters:  []filterCriteria{{Field: "status", Value: "pending"}},
 			expected: true,
 		},
 		{
 			name:     "multiple matching filters",
-			filters:  []filterCriteria{{field: "status", value: "pending"}, {field: "priority", value: "high"}},
+			filters:  []filterCriteria{{Field: "status", Value: "pending"}, {Field: "priority", Value: "high"}},
 			expected: true,
 		},
 		{
 			name:     "one non-matching filter",
-			filters:  []filterCriteria{{field: "status", value: "pending"}, {field: "priority", value: "low"}},
+			filters:  []filterCriteria{{Field: "status", Value: "pending"}, {Field: "priority", Value: "low"}},
 			expected: false,
 		},
 		{
 			name:     "all non-matching filters",
-			filters:  []filterCriteria{{field: "status", value: "completed"}, {field: "priority", value: "low"}},
+			filters:  []filterCriteria{{Field: "status", Value: "completed"}, {Field: "priority", Value: "low"}},
 			expected: false,
 		},
 	}

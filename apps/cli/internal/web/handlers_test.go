@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/driangle/taskmd/apps/cli/internal/board"
 	"github.com/driangle/taskmd/apps/cli/internal/metrics"
+	"github.com/driangle/taskmd/apps/cli/internal/next"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
@@ -544,5 +546,137 @@ func TestHandleUpdateTask_ReadOnly(t *testing.T) {
 	}
 	if errResp.Error != "server is in read-only mode" {
 		t.Errorf("expected 'server is in read-only mode', got %q", errResp.Error)
+	}
+}
+
+// GET /api/next tests
+
+func TestHandleNext(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
+	rec := httptest.NewRecorder()
+
+	handleNext(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal(rec.Body.Bytes(), &recs); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Task 001 is pending (actionable), 002 depends on 001 (blocked)
+	if len(recs) != 1 {
+		t.Fatalf("expected 1 recommendation, got %d", len(recs))
+	}
+
+	if recs[0].ID != "001" {
+		t.Errorf("expected recommendation for task 001, got %s", recs[0].ID)
+	}
+
+	if recs[0].Score <= 0 {
+		t.Errorf("expected positive score, got %d", recs[0].Score)
+	}
+
+	if recs[0].Rank != 1 {
+		t.Errorf("expected rank 1, got %d", recs[0].Rank)
+	}
+}
+
+func TestHandleNext_WithLimit(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/next?limit=1", nil)
+	rec := httptest.NewRecorder()
+
+	handleNext(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal(rec.Body.Bytes(), &recs); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(recs) > 1 {
+		t.Fatalf("expected at most 1 recommendation with limit=1, got %d", len(recs))
+	}
+}
+
+func TestHandleNext_EmptyResult(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create only completed tasks
+	task := `---
+id: "001"
+title: "Done"
+status: completed
+priority: high
+---
+`
+	os.WriteFile(filepath.Join(dir, "001.md"), []byte(task), 0644)
+
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
+	rec := httptest.NewRecorder()
+
+	handleNext(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal(rec.Body.Bytes(), &recs); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(recs) != 0 {
+		t.Fatalf("expected 0 recommendations for all-completed tasks, got %d", len(recs))
+	}
+}
+
+func TestHandleNext_DefaultLimit(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create 7 pending tasks
+	for i := 1; i <= 7; i++ {
+		task := fmt.Sprintf(`---
+id: "%03d"
+title: "Task %d"
+status: pending
+priority: medium
+---
+`, i, i)
+		os.WriteFile(filepath.Join(dir, fmt.Sprintf("%03d.md", i)), []byte(task), 0644)
+	}
+
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
+	rec := httptest.NewRecorder()
+
+	handleNext(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal(rec.Body.Bytes(), &recs); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Default limit is 5
+	if len(recs) != 5 {
+		t.Fatalf("expected 5 recommendations (default limit), got %d", len(recs))
 	}
 }

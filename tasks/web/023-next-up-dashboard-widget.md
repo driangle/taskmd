@@ -1,7 +1,7 @@
 ---
 id: "web-023"
 title: "Next Up widget - Surface recommended tasks in the web UI"
-status: pending
+status: completed
 priority: low
 effort: medium
 dependencies: ["032"]
