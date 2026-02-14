@@ -1,7 +1,7 @@
 ---
 name: release
 description: Create a new release by bumping versions, tagging, pushing, and generating release notes. Use when the user wants to release a new version.
-allowed-tools: Bash, Read, Edit, Grep, Glob
+allowed-tools: Bash, Read, Edit, Grep, Glob, Task
 ---
 
 # Release
@@ -69,17 +69,27 @@ The user's input is in `$ARGUMENTS` (a semver version like `1.2.3` or `v1.2.3`, 
    ```bash
    git log $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD --pretty=format:"- %s" --no-merges
    ```
-   Present the release notes to the user before pushing.
+   Don't use these raw commit messages as the release notes. Instead, investigate what each commit/task actually did (read task files, check diffs) and write polished, user-facing release notes grouped by category (e.g., New Commands, CLI Improvements, Web Dashboard, Core, Documentation, Removed). Present the release notes to the user before proceeding.
 
 10. **If `--no-push`**, stop here and report what was created locally.
 
-11. **Push the release commit and tag** (ask the user for confirmation first):
+11. **Push the version commit** (without the tag yet):
     ```bash
     git push origin <current-branch>
-    git push origin "vX.Y.Z"
     ```
 
-12. **Report success** with the release tag and a link to the GitHub releases page. Note that the GitHub Actions release workflow will build and publish the binaries automatically.
+12. **Create a draft GitHub Release** with the release notes. This must happen **before** pushing the tag so the workflow attaches binaries to this release instead of creating a new one with auto-generated notes:
+    ```bash
+    gh release create "vX.Y.Z" --draft --title "vX.Y.Z" --notes "<release notes>"
+    ```
+
+13. **Push the tag** to trigger the release workflow (ask the user for confirmation first):
+    ```bash
+    git push origin "vX.Y.Z"
+    ```
+    The GitHub Actions workflow will build binaries, attach them to the existing draft release, and publish it.
+
+14. **Report success** with the release tag and a link to the GitHub releases page.
 
 ### Error Handling
 

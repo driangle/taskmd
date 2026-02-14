@@ -1,7 +1,7 @@
 ---
 id: "082"
 title: "Sync command foundation with pluggable source architecture"
-status: pending
+status: completed
 priority: low
 effort: medium
 dependencies: []
