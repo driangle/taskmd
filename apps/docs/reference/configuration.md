@@ -39,10 +39,40 @@ Command-line flags always override config file values.
 | `dir` | string | `.` | Default task directory |
 | `web.port` | integer | `8080` | Web server port |
 | `web.auto_open_browser` | boolean | `false` | Auto-open browser on `web start` |
+| `scopes` | map | — | Scope-to-path mappings for the `touches` field ([details](#scopes-configuration)) |
 
 ::: tip
 Only project-level settings are supported in config files. Per-invocation preferences like `format`, `verbose`, and `quiet` are intentionally CLI-only.
 :::
+
+## Scopes Configuration {#scopes-configuration}
+
+The `scopes` key defines concrete mappings for the abstract scope identifiers used by the [`touches`](/reference/specification#frontmatter-schema) frontmatter field. The `tracks` command uses `touches` to detect spatial overlap between tasks and assign them to parallel work tracks — tasks sharing a scope are placed in separate tracks to avoid merge conflicts.
+
+```yaml
+# .taskmd.yaml
+scopes:
+  cli/graph:
+    description: "Graph visualization and dependency rendering"
+    paths:
+      - "apps/cli/internal/graph/"
+      - "apps/cli/internal/cli/graph.go"
+  cli/output:
+    paths:
+      - "apps/cli/internal/cli/format.go"
+```
+
+Each scope entry has the following fields:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `description` | No | Human-readable explanation of what the scope covers. Included in validation error messages. |
+| `paths` | No | List of file or directory paths that the scope maps to. |
+
+**Behavior:**
+
+- When scopes are configured, any `touches` value in a task that does not match a configured scope produces a warning.
+- When no scopes config exists, all `touches` values are accepted silently.
 
 ## Usage Examples
 

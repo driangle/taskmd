@@ -1,7 +1,7 @@
 ---
 id: "104"
 title: "Document all frontmatter fields on docs site with tool usage"
-status: pending
+status: completed
 priority: medium
 effort: medium
 tags:
@@ -20,11 +20,11 @@ Currently the docs site is missing the `touches`, `owner`, and `parent` fields t
 
 ## Tasks
 
-- [ ] Add `owner` field documentation to `apps/docs/reference/specification.md`
-- [ ] Add `touches` field documentation to `apps/docs/reference/specification.md`
-- [ ] Add `parent` field documentation to `apps/docs/reference/specification.md`
-- [ ] Update the field summary table to include all fields (`owner`, `touches`, `parent`)
-- [ ] For each field, add a "Used by" section explaining which commands consume it:
+- [x] Add `owner` field documentation to `apps/docs/reference/specification.md`
+- [x] Add `touches` field documentation to `apps/docs/reference/specification.md`
+- [x] Add `parent` field documentation to `apps/docs/reference/specification.md`
+- [x] Update the field summary table to include all fields (`owner`, `touches`, `parent`)
+- [x] For each field, add a "Used by" section explaining which commands consume it:
   - `id` — used by all commands for task identification; `get`, `set` use it for lookup
   - `title` — displayed in `list`, `board`, `next`, `graph`, web views
   - `status` — used by `list` (filtering), `board` (column assignment), `next` (excludes completed), `graph` (exclude-status), `stats` (status breakdown), `set` (can update)
@@ -37,8 +37,8 @@ Currently the docs site is missing the `touches`, `owner`, and `parent` fields t
   - `touches` — used by `tracks` command to assign tasks to parallel work tracks; tasks sharing a scope are placed in separate tracks
   - `parent` — used for hierarchical grouping; children computed dynamically
   - `created` — used by `list` (sorting), display purposes
-- [ ] Document the `scopes` configuration key in `apps/docs/reference/configuration.md` and its relationship to `touches`
-- [ ] Update `apps/docs/getting-started/concepts.md` to mention `owner`, `touches`, and `parent` in the optional fields list
+- [x] Document the `scopes` configuration key in `apps/docs/reference/configuration.md` and its relationship to `touches`
+- [x] Update `apps/docs/getting-started/concepts.md` to mention `owner`, `touches`, and `parent` in the optional fields list
 
 ## Acceptance Criteria
 
