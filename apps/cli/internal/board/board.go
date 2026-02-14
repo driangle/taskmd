@@ -103,11 +103,12 @@ type JSONGroup struct {
 
 // JSONTask is the JSON representation of a task within a board group.
 type JSONTask struct {
-	ID       string `json:"id"`
-	Title    string `json:"title"`
-	Status   string `json:"status"`
-	Priority string `json:"priority,omitempty"`
-	Effort   string `json:"effort,omitempty"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Status   string   `json:"status"`
+	Priority string   `json:"priority,omitempty"`
+	Effort   string   `json:"effort,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
 }
 
 // ToJSON converts a GroupResult to a JSON-serializable slice.
@@ -123,6 +124,7 @@ func ToJSON(gr *GroupResult) []JSONGroup {
 				Status:   string(t.Status),
 				Priority: string(t.Priority),
 				Effort:   string(t.Effort),
+				Tags:     t.Tags,
 			}
 		}
 		out = append(out, JSONGroup{

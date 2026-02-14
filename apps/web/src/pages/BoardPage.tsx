@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useBoard } from "../hooks/use-board.ts";
 import { useConfig } from "../hooks/use-config.ts";
 import { updateTask } from "../api/client.ts";
 import { BoardView } from "../components/board/BoardView.tsx";
+import { BoardFilterBar } from "../components/board/BoardFilterBar.tsx";
 import { LoadingState } from "../components/shared/LoadingState.tsx";
 import { ErrorState } from "../components/shared/ErrorState.tsx";
+import type { BoardGroup } from "../api/types.ts";
+import { STATUSES, PRIORITIES, EFFORTS } from "../components/tasks/TaskTable/constants.ts";
 
 const groupByOptions = ["status", "priority", "effort", "group", "tag"];
 
@@ -22,6 +25,41 @@ export function BoardPage() {
   const { readonly } = useConfig();
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+
+  const [selectedStatuses, setSelectedStatuses] = useState(() => new Set(STATUSES));
+  const [selectedPriorities, setSelectedPriorities] = useState(() => new Set(PRIORITIES));
+  const [selectedEfforts, setSelectedEfforts] = useState(() => new Set(EFFORTS));
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(() => new Set());
+
+  const availableTags = useMemo(() => {
+    if (!data) return [];
+    const tags = new Set<string>();
+    for (const group of data) {
+      for (const task of group.tasks) {
+        for (const tag of task.tags ?? []) {
+          tags.add(tag);
+        }
+      }
+    }
+    return [...tags].sort();
+  }, [data]);
+
+  const filteredGroups = useMemo((): BoardGroup[] | undefined => {
+    if (!data) return undefined;
+    return data.map((group) => {
+      const filtered = group.tasks.filter((task) => {
+        if (groupBy !== "status" && !selectedStatuses.has(task.status)) return false;
+        if (groupBy !== "priority" && task.priority && !selectedPriorities.has(task.priority)) return false;
+        if (groupBy !== "effort" && task.effort && !selectedEfforts.has(task.effort)) return false;
+        if (groupBy !== "tag" && selectedTags.size > 0) {
+          const taskTags = task.tags ?? [];
+          if (!taskTags.some((t) => selectedTags.has(t))) return false;
+        }
+        return true;
+      });
+      return { ...group, tasks: filtered, count: filtered.length };
+    });
+  }, [data, groupBy, selectedStatuses, selectedPriorities, selectedEfforts, selectedTags]);
 
   function handleGroupByChange(value: string) {
     setSearchParams(value === "status" ? {} : { groupBy: value }, {
@@ -71,17 +109,32 @@ export function BoardPage() {
         )}
       </div>
 
+      {data && (
+        <BoardFilterBar
+          groupBy={groupBy}
+          selectedStatuses={selectedStatuses}
+          onStatusesChange={setSelectedStatuses}
+          selectedPriorities={selectedPriorities}
+          onPrioritiesChange={setSelectedPriorities}
+          selectedEfforts={selectedEfforts}
+          onEffortsChange={setSelectedEfforts}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+          availableTags={availableTags}
+        />
+      )}
+
       {isLoading && <LoadingState variant="board" />}
       {error && <ErrorState error={error} onRetry={() => mutate()} />}
-      {data && data.length === 0 && (
+      {filteredGroups && filteredGroups.length === 0 && (
         <p className="text-sm text-gray-500 py-8 text-center">
           No tasks to display.
         </p>
       )}
-      {data && data.length > 0 && (
+      {filteredGroups && filteredGroups.length > 0 && (
         <div className="relative">
           <BoardView
-            groups={data}
+            groups={filteredGroups}
             groupBy={groupBy}
             readonly={readonly}
             onTaskMove={handleTaskMove}

@@ -16,3 +16,9 @@ export const PRIORITY_COLORS: Record<string, string> = {
   medium: "bg-gray-100 text-gray-600 font-medium ring-1 ring-gray-300 dark:bg-gray-700/50 dark:text-gray-400 dark:ring-gray-600",
   low: "bg-gray-50 text-gray-400 font-medium ring-1 ring-gray-200 dark:bg-gray-800/50 dark:text-gray-500 dark:ring-gray-700",
 };
+
+export const EFFORT_COLORS: Record<string, string> = {
+  small: "bg-emerald-100 text-emerald-700 font-medium ring-1 ring-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:ring-emerald-700",
+  medium: "bg-amber-100 text-amber-700 font-medium ring-1 ring-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:ring-amber-700",
+  large: "bg-purple-100 text-purple-700 font-medium ring-1 ring-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:ring-purple-700",
+};

@@ -25,6 +25,7 @@ export interface BoardTask {
   status: string;
   priority?: string;
   effort?: string;
+  tags?: string[];
 }
 
 export interface GraphData {

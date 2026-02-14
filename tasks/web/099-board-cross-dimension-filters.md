@@ -1,7 +1,7 @@
 ---
 id: "099"
 title: "Add cross-dimension filter pills to board view"
-status: pending
+status: completed
 priority: medium
 effort: medium
 tags:
@@ -18,12 +18,12 @@ When the board is grouped by one dimension (e.g., status), add filter pills for 
 
 ## Tasks
 
-- [ ] Determine which dimensions to offer as filters based on the current groupBy selection
-- [ ] Add filter pill UI above the board (reuse or adapt the existing FilterBar pattern from TaskTable)
-- [ ] Wire filter state into the board API query or apply client-side filtering to the board data
-- [ ] Ensure selected filters persist across groupBy changes where applicable
-- [ ] Test that filters work correctly with drag-and-drop (task 090)
-- [ ] Verify both light and dark mode styling
+- [x] Determine which dimensions to offer as filters based on the current groupBy selection
+- [x] Add filter pill UI above the board (reuse or adapt the existing FilterBar pattern from TaskTable)
+- [x] Wire filter state into the board API query or apply client-side filtering to the board data
+- [x] Ensure selected filters persist across groupBy changes where applicable
+- [x] Test that filters work correctly with drag-and-drop (task 090)
+- [x] Verify both light and dark mode styling
 
 ## Acceptance Criteria
 
