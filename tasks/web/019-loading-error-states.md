@@ -1,7 +1,7 @@
 ---
 id: "web-019"
 title: "Polish loading and error states"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies: ["web-015"]
@@ -22,19 +22,19 @@ Replace bare "Loading..." text and "Error: ..." messages with proper UI componen
 
 ## Tasks
 
-- [ ] Create a reusable `LoadingSpinner` component (or skeleton loader)
-- [ ] Create a reusable `ErrorMessage` component with retry button
-- [ ] Update all pages to use these components:
+- [x] Create a reusable `LoadingSpinner` component (or skeleton loader)
+- [x] Create a reusable `ErrorMessage` component with retry button
+- [x] Update all pages to use these components:
   - TasksPage: skeleton table rows while loading
   - BoardPage: skeleton columns while loading
   - GraphPage: placeholder while Mermaid renders
   - StatsPage: skeleton cards while loading
-- [ ] Add empty state handling:
+- [x] Add empty state handling:
   - Tasks table: "No tasks found" message when empty
   - Board: "No tasks" message (already partial)
   - Graph: "No dependencies to display" when graph is empty
   - Stats: "No data" when no tasks exist
-- [ ] Handle API connection errors gracefully (server not running)
+- [x] Handle API connection errors gracefully (server not running)
 
 ## Acceptance Criteria
 

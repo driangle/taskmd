@@ -1,13 +1,15 @@
 import { useSearchParams } from "react-router-dom";
 import { useBoard } from "../hooks/use-board.ts";
 import { BoardView } from "../components/board/BoardView.tsx";
+import { LoadingState } from "../components/shared/LoadingState.tsx";
+import { ErrorState } from "../components/shared/ErrorState.tsx";
 
 const groupByOptions = ["status", "priority", "effort", "group", "tag"];
 
 export function BoardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const groupBy = searchParams.get("groupBy") ?? "status";
-  const { data, error, isLoading } = useBoard(groupBy);
+  const { data, error, isLoading, mutate } = useBoard(groupBy);
 
   function handleGroupByChange(value: string) {
     setSearchParams(value === "status" ? {} : { groupBy: value }, {
@@ -32,9 +34,14 @@ export function BoardPage() {
         </select>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-500">Loading...</p>}
-      {error && <p className="text-sm text-red-600">Error: {error.message}</p>}
-      {data && <BoardView groups={data} />}
+      {isLoading && <LoadingState variant="board" />}
+      {error && <ErrorState error={error} onRetry={() => mutate()} />}
+      {data && data.length === 0 && (
+        <p className="text-sm text-gray-500 py-8 text-center">
+          No tasks to display.
+        </p>
+      )}
+      {data && data.length > 0 && <BoardView groups={data} />}
     </div>
   );
 }

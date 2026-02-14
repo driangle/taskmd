@@ -1,12 +1,13 @@
 import { useValidate } from "../hooks/use-validate.ts";
 import { ValidateView } from "../components/validate/ValidateView.tsx";
+import { LoadingState } from "../components/shared/LoadingState.tsx";
+import { ErrorState } from "../components/shared/ErrorState.tsx";
 
 export function ValidatePage() {
-  const { data, error, isLoading } = useValidate();
+  const { data, error, isLoading, mutate } = useValidate();
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
-  if (error)
-    return <p className="text-sm text-red-600">Error: {error.message}</p>;
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState error={error} onRetry={() => mutate()} />;
   if (!data) return null;
 
   return <ValidateView result={data} />;

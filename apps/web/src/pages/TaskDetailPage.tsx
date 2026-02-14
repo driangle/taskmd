@@ -8,6 +8,8 @@ import { useConfig } from "../hooks/use-config.ts";
 import { updateTask, ApiRequestError } from "../api/client.ts";
 import type { TaskUpdateRequest } from "../api/types.ts";
 import { TaskEditForm } from "../components/tasks/TaskEditForm.tsx";
+import { LoadingState } from "../components/shared/LoadingState.tsx";
+import { ErrorState } from "../components/shared/ErrorState.tsx";
 
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,9 +18,8 @@ export function TaskDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
-  if (error)
-    return <p className="text-sm text-red-600">Error: {error.message}</p>;
+  if (isLoading) return <LoadingState variant="detail" />;
+  if (error) return <ErrorState error={error} onRetry={() => mutate()} />;
 
   if (!task) {
     return (

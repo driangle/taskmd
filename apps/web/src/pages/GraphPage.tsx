@@ -7,6 +7,8 @@ import { GraphStats } from "../components/graph/GraphStats.tsx";
 import { GraphSearch } from "../components/graph/GraphSearch.tsx";
 import { GraphLegend } from "../components/graph/GraphLegend.tsx";
 import { useGraphLayout } from "../components/graph/useGraphLayout.ts";
+import { LoadingState } from "../components/shared/LoadingState.tsx";
+import { ErrorState } from "../components/shared/ErrorState.tsx";
 import type { GraphData } from "../api/types.ts";
 import type { Viewport } from "@xyflow/react";
 
@@ -17,7 +19,7 @@ const savedState = {
 };
 
 export function GraphPage() {
-  const { data, error, isLoading } = useGraph();
+  const { data, error, isLoading, mutate } = useGraph();
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(savedState.statuses);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -67,9 +69,17 @@ export function GraphPage() {
     savedState.viewport = viewport;
   }, []);
 
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
-  if (error) return <p className="text-sm text-red-600">Error: {error.message}</p>;
+  if (isLoading) return <LoadingState variant="graph" />;
+  if (error) return <ErrorState error={error} onRetry={() => mutate()} />;
   if (!data) return null;
+
+  if (data.nodes.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 py-8 text-center">
+        No dependencies to display.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
