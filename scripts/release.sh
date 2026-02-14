@@ -253,11 +253,18 @@ check_tag_exists() {
     log_success "Tag $tag does not exist"
 }
 
-# Update package.json files
-update_package_json() {
+# Update version references across the project
+update_versions() {
     local version="$1"
 
-    log_step "Updating version in package.json files"
+    log_step "Updating version references"
+
+    # Update Go version constant in root.go
+    local root_go="$PROJECT_ROOT/apps/cli/internal/cli/root.go"
+    if [[ -f "$root_go" ]]; then
+        sed -i '' "s/Version   = \"[^\"]*\"/Version   = \"$version\"/" "$root_go"
+        log_success "Updated $root_go"
+    fi
 
     # Update root package.json
     local root_pkg="$PROJECT_ROOT/package.json"
@@ -294,7 +301,7 @@ commit_version_changes() {
 
     log_step "Committing version changes"
 
-    git add package.json apps/web/package.json 2>/dev/null || true
+    git add package.json apps/web/package.json apps/cli/internal/cli/root.go 2>/dev/null || true
 
     if [[ -z $(git diff --cached --name-only) ]]; then
         log_warning "No version changes to commit"
@@ -490,7 +497,7 @@ main() {
     local workflow_failed=false
 
     {
-        update_package_json "$clean_version"
+        update_versions "$clean_version"
         commit_version_changes "$clean_version"
         create_git_tag "$clean_version"
 
