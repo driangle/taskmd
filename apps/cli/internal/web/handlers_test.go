@@ -817,3 +817,32 @@ func TestHandleTracks_WithFilters(t *testing.T) {
 		t.Fatalf("expected 1 total task with priority=high filter, got %d", totalTasks)
 	}
 }
+
+func TestHandleTracks_WithLimit(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create tasks with overlapping scopes to force multiple tracks
+	tasks := []struct {
+		file, content string
+	}{
+		{"020.md", "---\nid: \"020\"\ntitle: \"Task A\"\nstatus: pending\npriority: high\ntouches:\n  - api/auth\n---\n"},
+		{"021.md", "---\nid: \"021\"\ntitle: \"Task B\"\nstatus: pending\npriority: high\ntouches:\n  - api/auth\n---\n"},
+	}
+	for _, tc := range tasks {
+		os.WriteFile(filepath.Join(dir, tc.file), []byte(tc.content), 0644)
+	}
+
+	dp := NewDataProvider(dir, false)
+
+	// Without limit, should have 2 tracks (both touch api/auth -> overlap)
+	noLimit := fetchTracksResult(t, dp, "")
+	if len(noLimit.Tracks) != 2 {
+		t.Fatalf("expected 2 tracks without limit, got %d", len(noLimit.Tracks))
+	}
+
+	// With limit=1, should truncate to 1 track
+	limited := fetchTracksResult(t, dp, "?limit=1")
+	if len(limited.Tracks) != 1 {
+		t.Fatalf("expected 1 track with limit=1, got %d", len(limited.Tracks))
+	}
+}

@@ -207,6 +207,12 @@ func handleTracks(dp *DataProvider) http.HandlerFunc {
 			return
 		}
 
+		if v := r.URL.Query().Get("limit"); v != "" {
+			if n, parseErr := strconv.Atoi(v); parseErr == nil && n > 0 && n < len(result.Tracks) {
+				result.Tracks = result.Tracks[:n]
+			}
+		}
+
 		writeJSON(w, result)
 	}
 }
