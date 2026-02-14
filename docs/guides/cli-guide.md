@@ -476,59 +476,6 @@ taskmd board --group-by tag --format json
 taskmd board --out weekly-board-$(date +%Y-%m-%d).md
 ```
 
-### tui - Interactive Terminal UI
-
-Launch an interactive terminal interface for browsing tasks.
-
-**Basic usage:**
-```bash
-# Launch TUI
-taskmd tui
-
-# Specific directory
-taskmd tui ./tasks
-```
-
-**Keyboard shortcuts:**
-
-- `↑/k` - Move up
-- `↓/j` - Move down
-- `Enter` - View task details
-- `Tab` - Switch between views
-- `/` - Start search
-- `Esc` - Clear search / Go back
-- `q` - Quit
-
-**Starting options:**
-```bash
-# Start with filter
-taskmd tui --filter status=pending
-
-# Start with specific task
-taskmd tui --focus 022
-
-# Group by field
-taskmd tui --group-by priority
-
-# Read-only mode
-taskmd tui --readonly
-```
-
-**Examples:**
-```bash
-# Browse pending tasks
-taskmd tui --filter status=pending
-
-# Review high-priority items
-taskmd tui --filter priority=high
-
-# Start at specific task
-taskmd tui --focus 025
-
-# Grouped by status
-taskmd tui --group-by status
-```
-
 ### snapshot - Machine-Readable Export
 
 Produce static, machine-readable representation for automation.
@@ -659,8 +606,7 @@ taskmd list --filter priority=high --filter status=pending
 **During work: Track progress**
 ```bash
 # Update task status in your editor
-# The TUI can help navigate
-taskmd tui --filter status=in-progress
+taskmd set --task-id 042 --status in-progress
 
 # Validate changes
 taskmd validate

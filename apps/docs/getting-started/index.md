@@ -143,14 +143,6 @@ taskmd web start --open
 
 This opens a web dashboard with task list, board, graph, and statistics views.
 
-## Step 10: Try the Interactive TUI
-
-```bash
-taskmd tui tasks/
-```
-
-Navigate with arrow keys, press `/` to search, `q` to quit.
-
 ## Next Steps
 
 - [Installation](./installation) - All installation methods

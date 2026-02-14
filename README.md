@@ -111,9 +111,6 @@ taskmd next tasks/
 # Visualize dependencies
 taskmd graph tasks/ --format ascii
 
-# Launch interactive TUI
-taskmd tui tasks/
-
 # Start web interface
 taskmd web start --dir tasks/ --open
 ```
@@ -139,7 +136,6 @@ The web interface provides:
 - **[Quick Start Guide](https://driangle.github.io/taskmd/getting-started/)** - Get productive in 5 minutes
 - **[CLI Guide](https://driangle.github.io/taskmd/guide/cli)** - Comprehensive CLI reference
 - **[Web Interface](https://driangle.github.io/taskmd/guide/web)** - Web dashboard walkthrough
-- **[TUI Guide](https://driangle.github.io/taskmd/guide/tui)** - Interactive terminal interface
 - **[Task Specification](https://driangle.github.io/taskmd/reference/specification)** - Task file format reference
 - **[FAQ](https://driangle.github.io/taskmd/faq)** - Frequently asked questions
 

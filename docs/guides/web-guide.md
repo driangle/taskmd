@@ -837,4 +837,4 @@ Planned enhancements:
 
 ---
 
-**Next:** Learn about the [TUI interface](tui-guide.md) for terminal-based interaction, or explore [CLI commands](cli-guide.md) for automation.
+**Next:** Explore [CLI commands](cli-guide.md) for automation.

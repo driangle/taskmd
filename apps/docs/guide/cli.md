@@ -235,26 +235,6 @@ taskmd board --format txt   # Plain text
 taskmd board --format json  # JSON
 ```
 
-### tui - Interactive Terminal UI
-
-Launch an interactive terminal interface for browsing tasks.
-
-```bash
-# Launch TUI
-taskmd tui
-
-# Specific directory
-taskmd tui ./tasks
-
-# Start with filter
-taskmd tui --filter status=pending
-
-# Focus on specific task
-taskmd tui --focus 022
-```
-
-See the [TUI Guide](./tui) for keyboard shortcuts and detailed usage.
-
 ### snapshot - Machine-Readable Export
 
 Produce a static, machine-readable representation for automation.

@@ -1,7 +1,7 @@
 ---
 id: "074"
 title: "Remove interactive TUI feature"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: []
@@ -27,42 +27,42 @@ The TUI was built using the Charm ecosystem (Bubble Tea, Lipgloss, Glamour) and 
 
 ### Code Removal
 
-- [ ] Delete `internal/tui/app.go` (main TUI application)
-- [ ] Delete `internal/tui/app_test.go` (TUI tests)
-- [ ] Delete `internal/tui/styles.go` (Lipgloss styles)
-- [ ] Delete the `internal/tui/` directory
-- [ ] Delete `internal/cli/tui.go` (cobra command registration)
-- [ ] Remove any TUI command registration from `internal/cli/root.go` (if wired there)
-- [ ] Remove the `internal/watcher/` package if it is only used by the TUI
+- [x] Delete `internal/tui/app.go` (main TUI application)
+- [x] Delete `internal/tui/app_test.go` (TUI tests)
+- [x] Delete `internal/tui/styles.go` (Lipgloss styles)
+- [x] Delete the `internal/tui/` directory
+- [x] Delete `internal/cli/tui.go` (cobra command registration)
+- [x] Remove any TUI command registration from `internal/cli/root.go` (if wired there) — not present, self-registered via init()
+- [x] Remove the `internal/watcher/` package if it is only used by the TUI — kept, also used by web server
 
 ### Dependency Cleanup
 
-- [ ] Remove `github.com/charmbracelet/bubbletea` from `go.mod`
-- [ ] Remove `github.com/charmbracelet/lipgloss` from `go.mod` (if not used elsewhere)
-- [ ] Remove `github.com/charmbracelet/glamour` from `go.mod` (if not used elsewhere)
-- [ ] Remove `github.com/fsnotify/fsnotify` from `go.mod` (if only used by watcher)
-- [ ] Run `go mod tidy` to clean up transitive dependencies
-- [ ] Verify `go.sum` is updated
+- [x] Remove `github.com/charmbracelet/bubbletea` from `go.mod`
+- [x] Remove `github.com/charmbracelet/lipgloss` from `go.mod` (if not used elsewhere) — kept, used by CLI styling
+- [x] Remove `github.com/charmbracelet/glamour` from `go.mod` (if not used elsewhere)
+- [x] Remove `github.com/fsnotify/fsnotify` from `go.mod` (if only used by watcher) — kept, watcher used by web server
+- [x] Run `go mod tidy` to clean up transitive dependencies
+- [x] Verify `go.sum` is updated
 
 ### Documentation Removal
 
-- [ ] Delete `docs/guides/tui-guide.md`
-- [ ] Remove TUI references from `README.md` (if any)
-- [ ] Remove TUI references from `PLAN.md` (if any)
-- [ ] Remove TUI references from `CLAUDE.md` (if any)
-- [ ] Remove TUI references from any other documentation
+- [x] Delete `docs/guides/tui-guide.md`
+- [x] Remove TUI references from `README.md` (if any)
+- [x] Remove TUI references from `PLAN.md` (if any) — none found
+- [x] Remove TUI references from `CLAUDE.md` (if any) — none found
+- [x] Remove TUI references from any other documentation (cli-guide.md, quickstart.md, web-guide.md, docs site guide/tui.md, vitepress config, apps/docs/index.md, apps/docs/getting-started)
 
 ### Related Task Cleanup
 
-- [ ] Cancel task 059 (TUI grouped view mode) — set status to `cancelled`
+- [x] Cancel task 059 (TUI grouped view mode) — task file does not exist, never created
 
 ### Verification
 
-- [ ] Run `go build ./...` — project compiles without TUI
-- [ ] Run `go test ./...` — all remaining tests pass
-- [ ] Run `make lint` — no lint errors
-- [ ] Verify `taskmd --help` no longer lists `tui` command
-- [ ] Verify no broken imports or dead references remain
+- [x] Run `go build ./...` — project compiles without TUI
+- [x] Run `go test ./...` — all remaining tests pass
+- [x] Run `make lint` — no lint errors
+- [x] Verify `taskmd --help` no longer lists `tui` command
+- [x] Verify no broken imports or dead references remain
 
 ## Acceptance Criteria
 

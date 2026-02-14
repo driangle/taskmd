@@ -148,14 +148,6 @@ taskmd next tasks/
 
 taskmd will recommend task 001 since it has no dependencies and is pending.
 
-### Step 10: Use Interactive TUI
-
-```bash
-taskmd tui tasks/
-```
-
-Navigate with arrow keys, press Enter to view details, 'q' to quit.
-
 🎉 **Congratulations!** You've mastered the CLI basics.
 
 ## For Web Users (5 minutes)

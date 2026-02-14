@@ -31,7 +31,6 @@ export default defineConfig({
         items: [
           { text: 'CLI Guide', link: '/guide/cli' },
           { text: 'Web Interface', link: '/guide/web' },
-          { text: 'Terminal UI (TUI)', link: '/guide/tui' },
         ],
       },
       {

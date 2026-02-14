@@ -17,7 +17,7 @@ features:
   - title: Markdown-based
     details: Tasks stored as readable .md files with YAML frontmatter. Version control friendly and easy to edit in any text editor.
   - title: Multiple Interfaces
-    details: Use the CLI for automation, the web dashboard for visual management, or the TUI for keyboard-driven workflows.
+    details: Use the CLI for automation and the web dashboard for visual management.
   - title: Dependency Tracking
     details: Visualize task dependencies with interactive graphs. Find critical paths and identify blockers automatically.
   - title: Smart Filtering
