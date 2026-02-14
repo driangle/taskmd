@@ -32,6 +32,7 @@ Description and subtasks go here.
 | `tags` | array | No | Lowercase, hyphen-separated strings |
 | `group` | string | No | Logical grouping (derived from directory if omitted) |
 | `owner` | string | No | Free-form assignee name or identifier |
+| `touches` | array | No | Abstract scope identifiers (e.g., `["cli/graph", "cli/output"]`) |
 | `parent` | string | No | Single task ID (e.g., `"045"`) |
 | `created` | date | No | `YYYY-MM-DD` |
 
@@ -97,6 +98,30 @@ tags:
 **`group`** — Logical grouping. If omitted, derived from the parent directory name. Root-level tasks have no group.
 
 **`owner`** — Free-form string for assigning a task to a person or team. Used for filtering and display; no validation is applied.
+
+**`touches`** — List of abstract scope identifiers declaring which code areas a task modifies. Used by the `tracks` command to detect spatial overlap and assign tasks to parallel work tracks. Two tasks that share a scope should not be worked on simultaneously (risk of merge conflicts).
+
+```yaml
+touches:
+  - cli/graph
+  - cli/output
+```
+
+Scopes are user-defined identifiers. Concrete scope-to-path mappings can be configured in `.taskmd.yaml`:
+
+```yaml
+# .taskmd.yaml
+scopes:
+  cli/graph:
+    paths:
+      - "apps/cli/internal/graph/"
+      - "apps/cli/internal/cli/graph.go"
+  cli/output:
+    paths:
+      - "apps/cli/internal/cli/format.go"
+```
+
+When scopes are configured, `touches` values not found in the config produce a warning. When no scopes config exists, all values are accepted silently.
 
 **`parent`** — Task ID of the parent task for hierarchical grouping. A task can have at most one parent. Children are computed dynamically (not stored in frontmatter) by finding all tasks whose `parent` matches a given ID.
 

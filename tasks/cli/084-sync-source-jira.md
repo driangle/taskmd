@@ -10,6 +10,9 @@ tags:
   - cli
   - go
   - integration
+touches:
+  - sync/jira
+  - sync/core
 created: 2026-02-14
 ---
 

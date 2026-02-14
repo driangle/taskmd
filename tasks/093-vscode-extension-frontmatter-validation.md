@@ -5,6 +5,8 @@ status: pending
 priority: medium
 effort: large
 tags: []
+touches:
+  - vscode
 created: 2026-02-14
 ---
 

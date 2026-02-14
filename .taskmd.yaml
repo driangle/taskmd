@@ -1,3 +1,50 @@
 dir: ./tasks
 web:
   auto_open_browser: false
+
+scopes:
+  cli/report:
+    paths:
+      - "apps/cli/internal/cli/report.go"
+  cli/metrics:
+    paths:
+      - "apps/cli/internal/metrics/"
+      - "apps/cli/internal/cli/metrics.go"
+  cli/graph:
+    paths:
+      - "apps/cli/internal/graph/"
+      - "apps/cli/internal/cli/graph.go"
+  sync/core:
+    paths:
+      - "apps/cli/internal/sync/source.go"
+      - "apps/cli/internal/sync/engine.go"
+      - "apps/cli/internal/sync/registry.go"
+      - "apps/cli/internal/sync/mapper.go"
+      - "apps/cli/internal/sync/config.go"
+  sync/jira:
+    paths:
+      - "apps/cli/internal/sync/jira/"
+  sync/linear:
+    paths:
+      - "apps/cli/internal/sync/linear/"
+  sync/trello:
+    paths:
+      - "apps/cli/internal/sync/trello/"
+  vscode:
+    paths:
+      - "apps/vscode/"
+  web/layout:
+    paths:
+      - "apps/web/src/components/layout/"
+  web/board:
+    paths:
+      - "apps/web/src/components/board/"
+  web/graph:
+    paths:
+      - "apps/web/src/components/graph/"
+  web/tasks:
+    paths:
+      - "apps/web/src/components/tasks/"
+  web/stats:
+    paths:
+      - "apps/web/src/components/stats/"

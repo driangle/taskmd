@@ -1,7 +1,7 @@
 ---
 id: "098"
 title: "Parallel tracks command with spatial overlap detection"
-status: pending
+status: completed
 priority: medium
 effort: large
 tags:

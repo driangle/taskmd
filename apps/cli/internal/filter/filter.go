@@ -59,6 +59,8 @@ func matches(task *model.Task, field, value string) bool {
 		return (value == "true" && isBlocked) || (value == "false" && !isBlocked)
 	case "tag":
 		return slices.Contains(task.Tags, value)
+	case "touches":
+		return slices.Contains(task.Touches, value)
 	case "parent":
 		return matchBoolOrValue(task.Parent, value)
 	default:

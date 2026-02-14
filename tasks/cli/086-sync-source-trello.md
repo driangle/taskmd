@@ -10,6 +10,9 @@ tags:
   - cli
   - go
   - integration
+touches:
+  - sync/trello
+  - sync/core
 created: 2026-02-14
 ---
 

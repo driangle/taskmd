@@ -10,6 +10,9 @@ tags:
   - cli
   - go
   - integration
+touches:
+  - sync/linear
+  - sync/core
 created: 2026-02-14
 ---
 

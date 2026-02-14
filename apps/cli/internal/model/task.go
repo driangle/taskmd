@@ -44,6 +44,7 @@ type Task struct {
 	Effort       Effort    `yaml:"effort" json:"effort,omitempty"`
 	Dependencies []string  `yaml:"dependencies" json:"dependencies"`
 	Tags         []string  `yaml:"tags" json:"tags"`
+	Touches      []string  `yaml:"touches" json:"touches,omitempty"`
 	Group        string    `yaml:"group" json:"group,omitempty"`
 	Owner        string    `yaml:"owner" json:"owner,omitempty"`
 	Parent       string    `yaml:"parent,omitempty" json:"parent,omitempty"`
