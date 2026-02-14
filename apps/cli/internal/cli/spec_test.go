@@ -12,7 +12,7 @@ func TestSpecCommand_WritesToDirectory(t *testing.T) {
 
 	specForce = false
 	specStdout = false
-	dir = tmpDir
+	taskDir = tmpDir
 
 	err := runSpec(specCmd, []string{})
 	if err != nil {
@@ -40,7 +40,7 @@ func TestSpecCommand_RefusesOverwriteWithoutForce(t *testing.T) {
 
 	specForce = false
 	specStdout = false
-	dir = tmpDir
+	taskDir = tmpDir
 
 	err := runSpec(specCmd, []string{})
 	if err == nil {
@@ -68,7 +68,7 @@ func TestSpecCommand_OverwritesWithForce(t *testing.T) {
 
 	specForce = true
 	specStdout = false
-	dir = tmpDir
+	taskDir = tmpDir
 
 	err := runSpec(specCmd, []string{})
 	if err != nil {
@@ -90,7 +90,7 @@ func TestSpecCommand_StdoutPrintsWithoutCreatingFile(t *testing.T) {
 
 	specForce = false
 	specStdout = true
-	dir = tmpDir
+	taskDir = tmpDir
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -129,7 +129,7 @@ func TestSpecCommand_DirWritesToSpecifiedDirectory(t *testing.T) {
 
 	specForce = false
 	specStdout = false
-	dir = subDir
+	taskDir = subDir
 
 	err := runSpec(specCmd, []string{})
 	if err != nil {
@@ -150,7 +150,7 @@ func TestSpecCommand_DirWritesToSpecifiedDirectory(t *testing.T) {
 func TestSpecCommand_NonExistentDirectoryReturnsError(t *testing.T) {
 	specForce = false
 	specStdout = false
-	dir = "/nonexistent/path/that/does/not/exist"
+	taskDir = "/nonexistent/path/that/does/not/exist"
 
 	err := runSpec(specCmd, []string{})
 	if err == nil {

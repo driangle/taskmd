@@ -1,7 +1,7 @@
 ---
 id: "081"
 title: "Rename --dir flag to --task-dir for clarity"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies: ["033"]
@@ -21,27 +21,27 @@ Rename the global `--dir` / `-d` flag to `--task-dir` / `-d` across all CLI comm
 
 ## Tasks
 
-- [ ] Rename the global persistent flag from `--dir` to `--task-dir` in `root.go`
-- [ ] Keep `-d` as the shorthand
-- [ ] Update the `GlobalFlags` struct field name if needed (e.g., `Dir` → `TaskDir`)
-- [ ] Update `GetGlobalFlags()` to reflect the new field name
-- [ ] Update all commands that reference the directory flag to use the new name
-  - [ ] `list`
-  - [ ] `validate`
-  - [ ] `stats`
-  - [ ] `graph`
-  - [ ] `board`
-  - [ ] `snapshot`
-  - [ ] `next`
-  - [ ] `web`
-  - [ ] `show` / `get`
-  - [ ] `set` / `update`
-  - [ ] `export`
-  - [ ] `tags`
-- [ ] Keep `--dir` as a hidden deprecated alias for backward compatibility
-- [ ] Update all help text and usage examples
-- [ ] Update tests to use `--task-dir`
-- [ ] Update CLAUDE.md examples that reference `--dir`
+- [x] Rename the global persistent flag from `--dir` to `--task-dir` in `root.go`
+- [x] Keep `-d` as the shorthand
+- [x] Update the `GlobalFlags` struct field name if needed (e.g., `Dir` → `TaskDir`)
+- [x] Update `GetGlobalFlags()` to reflect the new field name
+- [x] Update all commands that reference the directory flag to use the new name
+  - [x] `list`
+  - [x] `validate`
+  - [x] `stats`
+  - [x] `graph`
+  - [x] `board`
+  - [x] `snapshot`
+  - [x] `next`
+  - [x] `web`
+  - [x] `show` / `get`
+  - [x] `set` / `update`
+  - [x] `export`
+  - [x] `tags`
+- [x] Keep `--dir` as a hidden deprecated alias for backward compatibility
+- [x] Update all help text and usage examples
+- [x] Update tests to use `--task-dir`
+- [x] Update CLAUDE.md examples that reference `--dir`
 
 ## Acceptance Criteria
 

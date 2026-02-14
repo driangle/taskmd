@@ -113,7 +113,7 @@ func resetArchiveFlags() {
 	archiveYes = false
 	archiveDelete = false
 	archiveForce = false
-	dir = "."
+	taskDir = "."
 }
 
 func captureArchiveOutput(t *testing.T) (string, error) {
@@ -136,7 +136,7 @@ func captureArchiveOutput(t *testing.T) (string, error) {
 func TestArchive_ByID(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveYes = true
 
@@ -164,7 +164,7 @@ func TestArchive_ByID(t *testing.T) {
 func TestArchive_ByMultipleIDs(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001", "002"}
 	archiveYes = true
 
@@ -188,7 +188,7 @@ func TestArchive_ByMultipleIDs(t *testing.T) {
 func TestArchive_AllCompleted(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveAllCompleted = true
 	archiveYes = true
 
@@ -221,7 +221,7 @@ func TestArchive_AllCompleted(t *testing.T) {
 func TestArchive_AllCancelled(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveAllCancelled = true
 	archiveYes = true
 
@@ -242,7 +242,7 @@ func TestArchive_AllCancelled(t *testing.T) {
 func TestArchive_ByStatus(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveStatus = "completed"
 	archiveYes = true
 
@@ -259,7 +259,7 @@ func TestArchive_ByStatus(t *testing.T) {
 func TestArchive_ByTag(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveTag = "backend"
 	archiveYes = true
 
@@ -277,7 +277,7 @@ func TestArchive_ByTag(t *testing.T) {
 func TestArchive_CombinedFilters(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveAllCompleted = true
 	archiveTag = "backend"
 	archiveYes = true
@@ -304,7 +304,7 @@ func TestArchive_CombinedFilters(t *testing.T) {
 func TestArchive_DryRun(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveAllCompleted = true
 	archiveDryRun = true
 
@@ -337,7 +337,7 @@ func TestArchive_DryRun(t *testing.T) {
 func TestArchive_Delete(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveDelete = true
 	archiveForce = true
@@ -365,7 +365,7 @@ func TestArchive_Delete(t *testing.T) {
 func TestArchive_NoMatchingTasks(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"nonexistent"}
 	archiveYes = true
 
@@ -381,7 +381,7 @@ func TestArchive_NoMatchingTasks(t *testing.T) {
 func TestArchive_NoFiltersProvided(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	_, err := captureArchiveOutput(t)
 	if err == nil {
@@ -395,7 +395,7 @@ func TestArchive_NoFiltersProvided(t *testing.T) {
 func TestArchive_PreservesDirectoryStructure(t *testing.T) {
 	tmpDir := createArchiveTestFilesWithSubdir(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveAllCompleted = true
 	archiveYes = true
 
@@ -432,7 +432,7 @@ func TestArchive_ConflictingDestination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveYes = true
 
@@ -448,7 +448,7 @@ func TestArchive_ConflictingDestination(t *testing.T) {
 func TestArchive_RequiresConfirmation(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveAllCompleted = true
 	// Neither --yes nor --dry-run
 
@@ -469,7 +469,7 @@ func TestArchive_RequiresConfirmation(t *testing.T) {
 func TestArchive_DeleteRequiresForce(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveDelete = true
 	// No --force or --yes
@@ -488,7 +488,7 @@ func TestArchive_DeleteRequiresForce(t *testing.T) {
 func TestArchive_DeleteWithYesFlag(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveDelete = true
 	archiveYes = true
@@ -563,7 +563,7 @@ func TestArchive_ScannerSkipsArchiveDir(t *testing.T) {
 	resetArchiveFlags()
 
 	// Archive task 001
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveYes = true
 
@@ -575,7 +575,7 @@ func TestArchive_ScannerSkipsArchiveDir(t *testing.T) {
 	// Now try to archive "001" again — it should not be found since
 	// the scanner skips the archive directory
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"001"}
 	archiveYes = true
 
@@ -591,7 +591,7 @@ func TestArchive_ScannerSkipsArchiveDir(t *testing.T) {
 func TestArchive_IDWithStatusFilter(t *testing.T) {
 	tmpDir := createArchiveTestFiles(t)
 	resetArchiveFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	archiveIDs = []string{"003"} // pending task
 	archiveStatus = "completed"  // only match completed
 	archiveYes = true

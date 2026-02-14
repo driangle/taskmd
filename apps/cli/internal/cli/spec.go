@@ -50,7 +50,7 @@ func runSpec(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	targetDir := GetGlobalFlags().Dir
+	targetDir := GetGlobalFlags().TaskDir
 
 	// Verify target directory exists
 	info, err := os.Stat(targetDir)

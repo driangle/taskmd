@@ -112,7 +112,7 @@ func resetSetFlags() {
 	setDryRun = false
 	setAddTags = nil
 	setRemoveTags = nil
-	dir = "."
+	taskDir = "."
 }
 
 func captureSetOutput(t *testing.T) (string, error) {
@@ -135,7 +135,7 @@ func captureSetOutput(t *testing.T) (string, error) {
 func TestSet_Status(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setStatus = "completed"
 
@@ -160,7 +160,7 @@ func TestSet_Status(t *testing.T) {
 func TestSet_Priority(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setPriority = "low"
 
@@ -182,7 +182,7 @@ func TestSet_Priority(t *testing.T) {
 func TestSet_Effort(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setEffort = "small"
 
@@ -204,7 +204,7 @@ func TestSet_Effort(t *testing.T) {
 func TestSet_DoneFlag(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setDone = true
 
@@ -226,7 +226,7 @@ func TestSet_DoneFlag(t *testing.T) {
 func TestSet_MultipleFields(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "003"
 	setStatus = "in-progress"
 	setPriority = "critical"
@@ -266,7 +266,7 @@ func TestSet_AllValidStatuses(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			tmpDir := createSetTestFiles(t)
 			resetSetFlags()
-			dir = tmpDir
+			taskDir = tmpDir
 			setTaskID = "001"
 			setStatus = status
 
@@ -286,7 +286,7 @@ func TestSet_AllValidStatuses(t *testing.T) {
 func TestSet_CancelledStatus(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setStatus = "cancelled"
 
@@ -311,7 +311,7 @@ func TestSet_AllValidPriorities(t *testing.T) {
 		t.Run(priority, func(t *testing.T) {
 			tmpDir := createSetTestFiles(t)
 			resetSetFlags()
-			dir = tmpDir
+			taskDir = tmpDir
 			setTaskID = "001"
 			setPriority = priority
 
@@ -334,7 +334,7 @@ func TestSet_AllValidEfforts(t *testing.T) {
 		t.Run(effort, func(t *testing.T) {
 			tmpDir := createSetTestFiles(t)
 			resetSetFlags()
-			dir = tmpDir
+			taskDir = tmpDir
 			setTaskID = "002"
 			setEffort = effort
 
@@ -354,7 +354,7 @@ func TestSet_AllValidEfforts(t *testing.T) {
 func TestSet_InvalidStatus(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setStatus = "invalid"
 
@@ -370,7 +370,7 @@ func TestSet_InvalidStatus(t *testing.T) {
 func TestSet_InvalidPriority(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setPriority = "urgent"
 
@@ -386,7 +386,7 @@ func TestSet_InvalidPriority(t *testing.T) {
 func TestSet_InvalidEffort(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setEffort = "huge"
 
@@ -402,7 +402,7 @@ func TestSet_InvalidEffort(t *testing.T) {
 func TestSet_TaskNotFound(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "nonexistent"
 	setStatus = "completed"
 
@@ -418,7 +418,7 @@ func TestSet_TaskNotFound(t *testing.T) {
 func TestSet_NoFlagsProvided(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 
 	_, err := captureSetOutput(t)
@@ -433,7 +433,7 @@ func TestSet_NoFlagsProvided(t *testing.T) {
 func TestSet_DoneWithStatusMutuallyExclusive(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setDone = true
 	setStatus = "blocked"
@@ -457,7 +457,7 @@ func TestSet_DoneWithStatusMutuallyExclusive(t *testing.T) {
 func TestSet_BodyPreserved(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setStatus = "completed"
 
@@ -480,7 +480,7 @@ func TestSet_BodyPreserved(t *testing.T) {
 func TestSet_OtherFieldsPreserved(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setStatus = "completed"
 
@@ -551,7 +551,7 @@ func TestSet_FrontmatterBounds(t *testing.T) {
 func TestSet_MatchByTitle(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "Setup project"
 	setStatus = "completed"
 
@@ -568,7 +568,7 @@ func TestSet_MatchByTitle(t *testing.T) {
 func TestSet_AddSingleTag(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setAddTags = []string{"new-tag"}
 
@@ -590,7 +590,7 @@ func TestSet_AddSingleTag(t *testing.T) {
 func TestSet_AddMultipleTags(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setAddTags = []string{"tag-a", "tag-b"}
 
@@ -612,7 +612,7 @@ func TestSet_AddMultipleTags(t *testing.T) {
 func TestSet_RemoveTag(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setRemoveTags = []string{"security"}
 
@@ -634,7 +634,7 @@ func TestSet_RemoveTag(t *testing.T) {
 func TestSet_AddAndRemoveTag(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setAddTags = []string{"new-feature"}
 	setRemoveTags = []string{"security"}
@@ -657,7 +657,7 @@ func TestSet_AddAndRemoveTag(t *testing.T) {
 func TestSet_AddDuplicateTag(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setAddTags = []string{"infra"}
 
@@ -680,7 +680,7 @@ func TestSet_AddDuplicateTag(t *testing.T) {
 func TestSet_RemoveNonexistentTag(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setRemoveTags = []string{"nonexistent"}
 
@@ -703,7 +703,7 @@ func TestSet_RemoveNonexistentTag(t *testing.T) {
 func TestSet_TagOnlyUpdate(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setAddTags = []string{"new-tag"}
 
@@ -717,7 +717,7 @@ func TestSet_TagOnlyUpdate(t *testing.T) {
 func TestSet_TagsWithOtherFlags(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setStatus = "completed"
 	setAddTags = []string{"done-tag"}
@@ -747,7 +747,7 @@ func TestSet_TagsWithOtherFlags(t *testing.T) {
 func TestSet_TagsPreservedFormat(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setAddTags = []string{"extra"}
 
@@ -776,7 +776,7 @@ func TestSet_TagsPreservedFormat(t *testing.T) {
 func TestSet_MultilineTagFormat(t *testing.T) {
 	tmpDir := createMultilineTagTestFile(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "010"
 	setAddTags = []string{"new-tag"}
 
@@ -809,7 +809,7 @@ func TestSet_MultilineTagFormat(t *testing.T) {
 func TestSet_MultilineTagRemove(t *testing.T) {
 	tmpDir := createMultilineTagTestFile(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "010"
 	setRemoveTags = []string{"api"}
 
@@ -829,7 +829,7 @@ func TestSet_MultilineTagRemove(t *testing.T) {
 func TestSet_TagConfirmationOutput(t *testing.T) {
 	tmpDir := createSetTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "002"
 	setAddTags = []string{"feature"}
 	setRemoveTags = []string{"security"}

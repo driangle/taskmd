@@ -20,7 +20,7 @@ func resetFlags() {
 	stdin = false
 	quiet = false
 	verbose = false
-	dir = "."
+	taskDir = "."
 	webPort = 8080
 	webDev = false
 	webOpen = false
@@ -63,21 +63,21 @@ verbose: true
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 
 	// Initialize config
 	initConfig()
 
 	// Test that config values are loaded
 	flags := GetGlobalFlags()
-	if flags.Dir != "./my-tasks" {
-		t.Errorf("expected dir to be './my-tasks', got '%s'", flags.Dir)
+	if flags.TaskDir != "./my-tasks" {
+		t.Errorf("expected dir to be './my-tasks', got '%s'", flags.TaskDir)
 	}
 	if !flags.Verbose {
 		t.Error("expected verbose to be true from config")
@@ -117,21 +117,21 @@ verbose: true
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 
 	// Initialize config
 	initConfig()
 
 	// Test that global config values are loaded
 	flags := GetGlobalFlags()
-	if flags.Dir != "./global-tasks" {
-		t.Errorf("expected dir to be './global-tasks', got '%s'", flags.Dir)
+	if flags.TaskDir != "./global-tasks" {
+		t.Errorf("expected dir to be './global-tasks', got '%s'", flags.TaskDir)
 	}
 	if !flags.Verbose {
 		t.Error("expected verbose to be true from global config")
@@ -176,21 +176,21 @@ verbose: false
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 
 	// Initialize config
 	initConfig()
 
 	// Test that project config takes precedence
 	flags := GetGlobalFlags()
-	if flags.Dir != "./project-tasks" {
-		t.Errorf("expected project config dir './project-tasks', got '%s'", flags.Dir)
+	if flags.TaskDir != "./project-tasks" {
+		t.Errorf("expected project config dir './project-tasks', got '%s'", flags.TaskDir)
 	}
 	if flags.Verbose {
 		t.Error("expected verbose to be false from project config (not true from global)")
@@ -223,16 +223,16 @@ verbose: true
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 
 	// Set flag explicitly (simulating CLI flag)
-	rootCmd.PersistentFlags().Set("dir", "./flag-tasks")
+	rootCmd.PersistentFlags().Set("task-dir", "./flag-tasks")
 	rootCmd.PersistentFlags().Set("verbose", "false")
 
 	// Initialize config
@@ -240,8 +240,8 @@ verbose: true
 
 	// Test that CLI flags override config
 	flags := GetGlobalFlags()
-	if flags.Dir != "./flag-tasks" {
-		t.Errorf("expected flag dir './flag-tasks', got '%s'", flags.Dir)
+	if flags.TaskDir != "./flag-tasks" {
+		t.Errorf("expected flag dir './flag-tasks', got '%s'", flags.TaskDir)
 	}
 	if flags.Verbose {
 		t.Error("expected verbose to be false from flag (not true from config)")
@@ -328,21 +328,21 @@ func TestConfigFile_Defaults(t *testing.T) {
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 
 	// Initialize config (no config file found)
 	initConfig()
 
 	// Test that defaults are used
 	flags := GetGlobalFlags()
-	if flags.Dir != "." {
-		t.Errorf("expected default dir '.', got '%s'", flags.Dir)
+	if flags.TaskDir != "." {
+		t.Errorf("expected default dir '.', got '%s'", flags.TaskDir)
 	}
 	if flags.Verbose {
 		t.Error("expected default verbose to be false")
@@ -372,13 +372,13 @@ verbose: true
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read from stdin")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 
 	// Set the config flag using cobra
 	rootCmd.PersistentFlags().Set("config", customConfigPath)
@@ -388,8 +388,8 @@ verbose: true
 
 	// Test that custom config file is loaded
 	flags := GetGlobalFlags()
-	if flags.Dir != "./custom-tasks" {
-		t.Errorf("expected dir to be './custom-tasks', got '%s'", flags.Dir)
+	if flags.TaskDir != "./custom-tasks" {
+		t.Errorf("expected dir to be './custom-tasks', got '%s'", flags.TaskDir)
 	}
 	if !flags.Verbose {
 		t.Error("expected verbose to be true from custom config")

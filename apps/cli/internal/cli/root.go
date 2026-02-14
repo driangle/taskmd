@@ -21,7 +21,7 @@ var (
 	verbose bool
 	debug   bool
 	noColor bool
-	dir     string
+	taskDir string
 )
 
 // rootCmd represents the base command
@@ -60,7 +60,11 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output (prints to stderr)")
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
-	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", ".", "task directory to scan")
+	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory to scan")
+
+	// Deprecated alias: --dir still works but is hidden
+	rootCmd.PersistentFlags().StringVar(&taskDir, "dir", "", "task directory (deprecated: use --task-dir)")
+	_ = rootCmd.PersistentFlags().MarkHidden("dir")
 
 	// Bind flags to viper
 	viper.BindPFlag("stdin", rootCmd.PersistentFlags().Lookup("stdin"))
@@ -68,6 +72,7 @@ func init() {
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color"))
+	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
 }
 
@@ -102,14 +107,12 @@ func initConfig() {
 
 // GetGlobalFlags returns a struct with all global flag values
 func GetGlobalFlags() GlobalFlags {
-	// Try to get from viper first (supports config files)
-	// Fall back to flag variables if viper doesn't have the value (for tests)
-	dirVal := viper.GetString("dir")
-	if dirVal == "" && dir != "" {
-		dirVal = dir
-	} else if dirVal == "" {
-		dirVal = "."
-	}
+	// Resolve task directory with proper precedence:
+	// 1. Explicit --task-dir or --dir CLI flag (if changed from default)
+	// 2. Config file value (supports both "task-dir" and "dir" keys)
+	// 3. taskDir variable (for tests that set it directly)
+	// 4. Default "."
+	dirVal := resolveTaskDir()
 
 	return GlobalFlags{
 		Stdin:   viper.GetBool("stdin") || stdin,
@@ -117,8 +120,39 @@ func GetGlobalFlags() GlobalFlags {
 		Verbose: viper.GetBool("verbose") || verbose,
 		Debug:   viper.GetBool("debug") || debug,
 		NoColor: viper.GetBool("no-color") || noColor,
-		Dir:     dirVal,
+		TaskDir: dirVal,
 	}
+}
+
+// resolveTaskDir determines the task directory using proper precedence.
+func resolveTaskDir() string {
+	// Check if --task-dir or --dir was explicitly passed on the CLI
+	taskDirFlag := rootCmd.PersistentFlags().Lookup("task-dir")
+	dirFlag := rootCmd.PersistentFlags().Lookup("dir")
+
+	if taskDirFlag != nil && taskDirFlag.Changed {
+		return taskDirFlag.Value.String()
+	}
+	if dirFlag != nil && dirFlag.Changed {
+		return dirFlag.Value.String()
+	}
+
+	// Check config file: support both "task-dir" and "dir" YAML keys.
+	// We must bypass viper's pflag binding (which returns the flag default)
+	// by checking the config file values directly via viper.InConfig.
+	if viper.InConfig("task-dir") {
+		return viper.GetString("task-dir")
+	}
+	if viper.InConfig("dir") {
+		return viper.GetString("dir")
+	}
+
+	// Fall back to the taskDir variable (set directly in tests)
+	if taskDir != "" {
+		return taskDir
+	}
+
+	return "."
 }
 
 // GlobalFlags holds global flag values
@@ -128,14 +162,14 @@ type GlobalFlags struct {
 	Verbose bool
 	Debug   bool
 	NoColor bool
-	Dir     string
+	TaskDir string
 }
 
-// ResolveScanDir returns the scan directory from positional arg or --dir flag.
+// ResolveScanDir returns the scan directory from positional arg or --task-dir flag.
 // Positional arg takes precedence for backward compatibility.
 func ResolveScanDir(args []string) string {
 	if len(args) > 0 {
 		return args[0]
 	}
-	return GetGlobalFlags().Dir
+	return GetGlobalFlags().TaskDir
 }

@@ -16,7 +16,7 @@ func resetProjectInitFlags(tmpDir string) {
 	projectInitCodex = false
 	projectInitNoSpec = false
 	projectInitNoAgent = false
-	dir = tmpDir
+	taskDir = tmpDir
 }
 
 func TestProjectInit_DefaultWritesBothFiles(t *testing.T) {

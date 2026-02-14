@@ -192,7 +192,7 @@ func TestEdge_InvalidFilterSyntax(t *testing.T) {
 func TestEdge_Set_InvalidStatusSuggestion(t *testing.T) {
 	tmpDir := createEdgeCaseTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setStatus = "pnding"
 
@@ -212,7 +212,7 @@ func TestEdge_Set_InvalidStatusSuggestion(t *testing.T) {
 func TestEdge_Set_InvalidPrioritySuggestion(t *testing.T) {
 	tmpDir := createEdgeCaseTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setPriority = "hgh"
 
@@ -234,7 +234,7 @@ func TestEdge_Set_InvalidPrioritySuggestion(t *testing.T) {
 func TestEdge_Set_DryRunNoWrite(t *testing.T) {
 	tmpDir := createEdgeCaseTestFiles(t)
 	resetSetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	setTaskID = "001"
 	setStatus = "completed"
 	setDryRun = true

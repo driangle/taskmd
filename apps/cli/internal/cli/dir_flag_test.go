@@ -9,7 +9,7 @@ import (
 )
 
 func TestResolveScanDir_NoArgs(t *testing.T) {
-	dir = "."
+	taskDir = "."
 	got := ResolveScanDir([]string{})
 	if got != "." {
 		t.Errorf("ResolveScanDir([]) = %q, want %q", got, ".")
@@ -17,7 +17,7 @@ func TestResolveScanDir_NoArgs(t *testing.T) {
 }
 
 func TestResolveScanDir_WithPositionalArg(t *testing.T) {
-	dir = "."
+	taskDir = "."
 	got := ResolveScanDir([]string{"/some/path"})
 	if got != "/some/path" {
 		t.Errorf("ResolveScanDir([\"/some/path\"]) = %q, want %q", got, "/some/path")
@@ -25,21 +25,21 @@ func TestResolveScanDir_WithPositionalArg(t *testing.T) {
 }
 
 func TestResolveScanDir_DirFlagUsed(t *testing.T) {
-	dir = "/custom/dir"
+	taskDir = "/custom/dir"
 	got := ResolveScanDir([]string{})
 	if got != "/custom/dir" {
 		t.Errorf("ResolveScanDir([]) with dir=%q = %q, want %q", "/custom/dir", got, "/custom/dir")
 	}
-	dir = "." // reset
+	taskDir = "." // reset
 }
 
 func TestResolveScanDir_PositionalArgOverridesFlag(t *testing.T) {
-	dir = "/flag/dir"
+	taskDir = "/flag/dir"
 	got := ResolveScanDir([]string{"/positional/dir"})
 	if got != "/positional/dir" {
 		t.Errorf("ResolveScanDir([\"/positional/dir\"]) with dir=%q = %q, want %q", "/flag/dir", got, "/positional/dir")
 	}
-	dir = "." // reset
+	taskDir = "." // reset
 }
 
 func TestDirFlag_ListIntegration(t *testing.T) {
@@ -60,21 +60,21 @@ priority: high
 	}
 
 	// Save and reset flags
-	oldDir := dir
+	oldDir := taskDir
 	oldListFormat := listFormat
 	oldFilters := listFilters
 	oldSort := listSort
 	oldColumns := listColumns
 	defer func() {
-		dir = oldDir
+		taskDir = oldDir
 		listFormat = oldListFormat
 		listFilters = oldFilters
 		listSort = oldSort
 		listColumns = oldColumns
 	}()
 
-	// Use --dir flag (no positional arg)
-	dir = tmpDir
+	// Use --task-dir flag (no positional arg)
+	taskDir = tmpDir
 	listFormat = "json"
 	listFilters = []string{}
 	listSort = ""

@@ -42,9 +42,9 @@ The server provides:
 
 Examples:
   taskmd web start
-  taskmd web start --dir ./tasks
+  taskmd web start --task-dir ./tasks
   taskmd web start --port 3000
-  taskmd web start --dev --port 8080 --dir ./tasks`,
+  taskmd web start --dev --port 8080 --task-dir ./tasks`,
 	Args: cobra.NoArgs,
 	RunE: runWebStart,
 }
@@ -64,7 +64,7 @@ func init() {
 }
 
 func runWebStart(cmd *cobra.Command, _ []string) error {
-	absDir, err := filepath.Abs(GetGlobalFlags().Dir)
+	absDir, err := filepath.Abs(GetGlobalFlags().TaskDir)
 	if err != nil {
 		return fmt.Errorf("invalid directory: %w", err)
 	}

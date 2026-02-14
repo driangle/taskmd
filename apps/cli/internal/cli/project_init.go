@@ -72,7 +72,7 @@ func runProjectInit(_ *cobra.Command, _ []string) error {
 		return printFilesToStdout(files)
 	}
 
-	targetDir := GetGlobalFlags().Dir
+	targetDir := GetGlobalFlags().TaskDir
 
 	info, err := os.Stat(targetDir)
 	if err != nil {

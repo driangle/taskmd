@@ -78,7 +78,7 @@ func resetGetFlags() {
 	getFormat = "text"
 	getExact = false
 	getThreshold = 0.6
-	dir = "."
+	taskDir = "."
 }
 
 func captureGetOutput(t *testing.T, query string) string {
@@ -106,7 +106,7 @@ func captureGetOutput(t *testing.T, query string) string {
 func TestGet_ExactMatchByID(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	output := captureGetOutput(t, "001")
 
@@ -121,7 +121,7 @@ func TestGet_ExactMatchByID(t *testing.T) {
 func TestGet_ExactMatchByTitle(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	output := captureGetOutput(t, "Setup project")
 
@@ -133,7 +133,7 @@ func TestGet_ExactMatchByTitle(t *testing.T) {
 func TestGet_ExactMatchByTitle_CaseInsensitive(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	output := captureGetOutput(t, "setup PROJECT")
 
@@ -174,7 +174,7 @@ created: 2026-02-08
 	os.WriteFile(filepath.Join(tmpDir, "task2.md"), []byte(task2), 0644)
 
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	output := captureGetOutput(t, "abc")
 
@@ -187,7 +187,7 @@ created: 2026-02-08
 func TestGet_TaskNotFound_ExactMode(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	getExact = true
 
 	err := runGet(getCmd, []string{"nonexistent"})
@@ -202,7 +202,7 @@ func TestGet_TaskNotFound_ExactMode(t *testing.T) {
 func TestGet_TaskNotFound_NoMatches(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	getThreshold = 0.99 // very high threshold so nothing matches
 
 	err := runGet(getCmd, []string{"zzzzzzzzzzzzzzz"})
@@ -217,7 +217,7 @@ func TestGet_TaskNotFound_NoMatches(t *testing.T) {
 func TestGet_TextFormat(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	output := captureGetOutput(t, "002")
 
@@ -246,7 +246,7 @@ func TestGet_TextFormat(t *testing.T) {
 func TestGet_JSONFormat(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	getFormat = "json"
 
 	output := captureGetOutput(t, "002")
@@ -276,7 +276,7 @@ func TestGet_JSONFormat(t *testing.T) {
 func TestGet_YAMLFormat(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	getFormat = "yaml"
 
 	output := captureGetOutput(t, "001")
@@ -292,7 +292,7 @@ func TestGet_YAMLFormat(t *testing.T) {
 func TestGet_UnsupportedFormat(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	getFormat = "csv"
 
 	err := runGet(getCmd, []string{"001"})
@@ -307,7 +307,7 @@ func TestGet_UnsupportedFormat(t *testing.T) {
 func TestGet_FuzzyMatch_Substring(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	// "auth" is a substring of "Implement authentication" — should fuzzy match
 	// Simulate selecting option 1
@@ -324,7 +324,7 @@ func TestGet_FuzzyMatch_Substring(t *testing.T) {
 func TestGet_FuzzyMatch_Selection(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	// "ui" should fuzzy match "Build UI components"
 	getStdinReader = strings.NewReader("1\n")
@@ -340,7 +340,7 @@ func TestGet_FuzzyMatch_Selection(t *testing.T) {
 func TestGet_FuzzyMatch_Cancel(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	getStdinReader = strings.NewReader("0\n")
 	defer func() { getStdinReader = os.Stdin }()
@@ -357,7 +357,7 @@ func TestGet_FuzzyMatch_Cancel(t *testing.T) {
 func TestGet_Threshold(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 	getThreshold = 0.95 // very high threshold
 
 	err := runGet(getCmd, []string{"aut"})
@@ -372,7 +372,7 @@ func TestGet_Threshold(t *testing.T) {
 func TestGet_EmptyDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	err := runGet(getCmd, []string{"anything"})
 	if err == nil {
@@ -386,7 +386,7 @@ func TestGet_EmptyDirectory(t *testing.T) {
 func TestGet_Dependencies(t *testing.T) {
 	tmpDir := createGetTestFiles(t)
 	resetGetFlags()
-	dir = tmpDir
+	taskDir = tmpDir
 
 	// Task 003 depends on 002, and 002 blocks 003
 	output := captureGetOutput(t, "003")
