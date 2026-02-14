@@ -23,78 +23,37 @@ The user's input is in `$ARGUMENTS` (a semver version like `1.2.3` or `v1.2.3`, 
 
 2. **Validate version format**: Must be valid semver (e.g., `0.1.0`, `1.2.3`, `2.0.0-beta.1`).
 
-3. **Validate the working directory is clean**:
+3. **Pre-flight validation**:
    - Run `git status --porcelain` — if there are uncommitted changes, stop and tell the user to commit or stash first.
-   - Run `git fetch origin`.
-   - Verify the current branch exists on the remote.
-   - Verify local and remote are in sync (not ahead, behind, or diverged).
+   - Run `git fetch origin` and verify local/remote are in sync.
+   - Check the tag doesn't already exist locally or on remote.
 
-4. **Check the tag doesn't already exist** (locally and on remote):
-   ```bash
-   git tag -l "v<version>"
-   git ls-remote --tags origin "refs/tags/v<version>"
-   ```
+4. **If `--dry-run`**, stop here and report that validation passed.
 
-5. **If `--dry-run`**, stop here and report that validation passed.
-
-6. **Update all version references** in the project (3 files):
-   - `apps/cli/internal/cli/root.go` — update the `Version` variable (e.g., `Version   = "X.Y.Z"`)
-   - `package.json` — update the `"version"` field
-   - `apps/web/package.json` — update the `"version"` field
-   Use the `Edit` tool to make these changes.
-
-7. **Commit the version changes** with the standardized message:
-   ```
-   chore: bump version to X.Y.Z
-
-   Prepare for release vX.Y.Z
-
-   Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
-   ```
-   Stage only the 3 modified files — do not use `git add -A`.
-
-8. **Create an annotated git tag** with the standard message:
-   ```
-   Release vX.Y.Z
-
-   This release includes pre-built binaries for:
-   - Linux (amd64, arm64)
-   - macOS (amd64/Intel, arm64/Apple Silicon)
-   - Windows (amd64)
-
-   All binaries include the embedded web dashboard.
-   ```
-
-9. **Generate release notes** from the commit history since the last tag:
+5. **Generate release notes** from the commit history since the last tag:
    ```bash
    git log $(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD --pretty=format:"- %s" --no-merges
    ```
    Don't use these raw commit messages as the release notes. Instead, investigate what each commit/task actually did (read task files, check diffs) and write polished, user-facing release notes grouped by category (e.g., New Commands, CLI Improvements, Web Dashboard, Core, Documentation, Removed). Present the release notes to the user before proceeding.
 
-10. **If `--no-push`**, stop here and report what was created locally.
+6. **Write the release notes to a file** at `/tmp/taskmd-release-notes-X.Y.Z.md` using the Write tool.
 
-11. **Push the version commit** (without the tag yet):
+7. **If `--no-push`**, run the script without pushing:
     ```bash
-    git push origin <current-branch>
+    scripts/release.sh --no-push --notes-file /tmp/taskmd-release-notes-X.Y.Z.md X.Y.Z
     ```
+    Report what was created locally and stop.
 
-12. **Create a draft GitHub Release** with the release notes. This must happen **before** pushing the tag so the workflow attaches binaries to this release instead of creating a new one with auto-generated notes:
+8. **Run the release script** to handle the full release lifecycle:
     ```bash
-    gh release create "vX.Y.Z" --draft --title "vX.Y.Z" --notes "<release notes>"
+    scripts/release.sh --notes-file /tmp/taskmd-release-notes-X.Y.Z.md X.Y.Z
     ```
+    The script handles everything: version bumps, commit, tag, push, draft release creation, CI workflow monitoring, and re-applying release notes after CI publishes.
 
-13. **Push the tag** to trigger the release workflow (ask the user for confirmation first):
-    ```bash
-    git push origin "vX.Y.Z"
-    ```
-    The GitHub Actions workflow will build binaries, attach them to the existing draft release, and publish it.
-
-14. **Report success** with the release tag and a link to the GitHub releases page.
+9. **Report success** with the release tag and a link to the GitHub releases page.
 
 ### Error Handling
 
 - Fail fast on any error. Do not continue if a step fails.
-- If a step fails after version files were modified but before pushing, offer to roll back:
-  - Delete the local tag: `git tag -d vX.Y.Z`
-  - Reset the version commit: `git reset --soft HEAD~1`
+- The release script has built-in rollback: if it fails after modifying version files but before pushing, it will automatically reset the commit and delete the local tag.
 - Always provide clear, actionable error messages.

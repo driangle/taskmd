@@ -18,6 +18,7 @@ DRY_RUN=false
 SKIP_CHECKS=false
 NO_PUSH=false
 VERSION=""
+NOTES_FILE=""
 
 # Help message
 usage() {
@@ -34,13 +35,14 @@ OPTIONS:
     -h, --help          Show this help message
     -d, --dry-run       Run without making any changes (validation only)
     -n, --no-push       Create tag locally but don't push (for testing)
+    --notes-file FILE   Path to a file containing release notes (required for GitHub release)
     --skip-checks       Skip git status and branch checks (use with caution)
 
 EXAMPLES:
-    $(basename "$0") 0.0.1              # Create release v0.0.1
-    $(basename "$0") v1.2.3             # Create release v1.2.3
-    $(basename "$0") --dry-run 0.0.2    # Test release process without changes
-    $(basename "$0") --no-push 0.0.1    # Create tag locally only
+    $(basename "$0") 0.0.1 --notes-file notes.md    # Create release with notes
+    $(basename "$0") v1.2.3 --notes-file notes.md    # Create release v1.2.3
+    $(basename "$0") --dry-run 0.0.2                  # Test release process without changes
+    $(basename "$0") --no-push 0.0.1                  # Create tag locally only
 
 PROCESS:
     1. Validate git repository state (clean working directory)
@@ -50,7 +52,8 @@ PROCESS:
     5. Create annotated git tag
     6. Push changes and tag to GitHub
     7. Monitor GitHub Actions release workflow
-    8. Report success with release URL
+    8. Apply release notes to the GitHub release
+    9. Report success with release URL
 
 REQUIREMENTS:
     - git (with GitHub remote configured)
@@ -102,6 +105,13 @@ parse_args() {
             -n|--no-push)
                 NO_PUSH=true
                 shift
+                ;;
+            --notes-file)
+                if [[ -z "${2:-}" ]]; then
+                    error_exit "--notes-file requires a file path argument"
+                fi
+                NOTES_FILE="$2"
+                shift 2
                 ;;
             --skip-checks)
                 SKIP_CHECKS=true
@@ -338,6 +348,43 @@ All binaries include the embedded web dashboard."
     log_success "Created tag $tag"
 }
 
+# Create a draft GitHub release (before pushing the tag)
+create_draft_release() {
+    local version="$1"
+    local tag="v$version"
+    local notes_file="$2"
+
+    if ! command -v gh &> /dev/null; then
+        log_warning "gh CLI not available - skipping draft release creation"
+        return 0
+    fi
+
+    log_step "Creating draft GitHub release"
+
+    gh release create "$tag" --draft --target "$(git rev-parse --abbrev-ref HEAD)" \
+        --title "$tag" --notes-file "$notes_file"
+
+    log_success "Created draft release for $tag"
+}
+
+# Re-apply release notes after CI workflow publishes the release
+update_release_notes() {
+    local version="$1"
+    local tag="v$version"
+    local notes_file="$2"
+
+    if ! command -v gh &> /dev/null; then
+        log_warning "gh CLI not available - cannot update release notes"
+        log_info "Update release notes manually at the GitHub releases page"
+        return 0
+    fi
+
+    log_step "Updating release notes"
+
+    gh release edit "$tag" --notes-file "$notes_file"
+    log_success "Release notes applied to $tag"
+}
+
 # Push changes
 push_changes() {
     local version="$1"
@@ -492,6 +539,15 @@ main() {
         exit 0
     fi
 
+    # Validate notes file if pushing (required for GitHub release)
+    if [[ "$NO_PUSH" == "false" && -z "$NOTES_FILE" ]]; then
+        error_exit "Release notes are required. Provide --notes-file <path> with polished release notes."
+    fi
+
+    if [[ -n "$NOTES_FILE" && ! -f "$NOTES_FILE" ]]; then
+        error_exit "Notes file not found: $NOTES_FILE"
+    fi
+
     # Perform release
     local release_failed=false
     local workflow_failed=false
@@ -502,11 +558,19 @@ main() {
         create_git_tag "$clean_version"
 
         if [[ "$NO_PUSH" == "false" ]]; then
+            # Create draft release before pushing the tag so CI attaches binaries to it
+            create_draft_release "$clean_version" "$NOTES_FILE"
+
             push_changes "$clean_version"
 
             # Monitor workflow
             if ! monitor_workflow "$clean_version"; then
                 workflow_failed=true
+            fi
+
+            # Re-apply release notes (CI may overwrite them when publishing)
+            if [[ "$workflow_failed" == "false" ]]; then
+                update_release_notes "$clean_version" "$NOTES_FILE"
             fi
         else
             log_warning "Skipping push (--no-push enabled)"
