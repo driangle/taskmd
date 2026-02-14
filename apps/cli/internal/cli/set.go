@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/apps/cli/internal/model"
@@ -95,7 +96,8 @@ func runSet(cmd *cobra.Command, _ []string) error {
 
 	if setDryRun {
 		printSetConfirmation(task, changes)
-		fmt.Println("\nDry run — no changes made.")
+		r := getRenderer()
+		fmt.Println("\n" + formatWarning("Dry run — no changes made.", r))
 		return nil
 	}
 
@@ -186,12 +188,30 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 }
 
 func printSetConfirmation(task *model.Task, changes []changeEntry) {
-	fmt.Printf("Updated task %s (%s):\n", task.ID, task.Title)
+	r := getRenderer()
+	fmt.Printf("Updated task %s (%s):\n", formatTaskID(task.ID, r), task.Title)
 	for _, c := range changes {
 		old := c.oldValue
 		if old == "" {
 			old = "(unset)"
 		}
-		fmt.Printf("  %s: %s -> %s\n", c.field, old, c.newValue)
+		fmt.Printf("  %s: %s -> %s\n",
+			formatLabel(c.field, r),
+			formatDim(old, r),
+			colorizeFieldValue(c.field, c.newValue, r),
+		)
+	}
+}
+
+func colorizeFieldValue(field, value string, r *lipgloss.Renderer) string {
+	switch field {
+	case "status":
+		return formatStatus(value, r)
+	case "priority":
+		return formatPriority(value, r)
+	case "effort":
+		return formatEffort(value, r)
+	default:
+		return value
 	}
 }

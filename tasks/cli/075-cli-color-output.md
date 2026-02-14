@@ -1,7 +1,7 @@
 ---
 id: "075"
 title: "Add color and styling to CLI output"
-status: pending
+status: completed
 priority: high
 effort: large
 dependencies: []

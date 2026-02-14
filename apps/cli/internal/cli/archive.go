@@ -92,7 +92,8 @@ func runArchive(_ *cobra.Command, _ []string) error {
 	printArchivePreview(selected, action, absScanDir)
 
 	if archiveDryRun {
-		fmt.Println("\nDry run — no changes made.")
+		r := getRenderer()
+		fmt.Println("\n" + formatWarning("Dry run — no changes made.", r))
 		return nil
 	}
 
@@ -167,27 +168,30 @@ func filterArchiveTasks(tasks []*model.Task) []*model.Task {
 }
 
 func printArchivePreview(tasks []*model.Task, action, absScanDir string) {
+	r := getRenderer()
 	fmt.Printf("%s %d task(s):\n", action, len(tasks))
 	for _, task := range tasks {
 		relPath, err := filepath.Rel(absScanDir, task.FilePath)
 		if err != nil {
 			relPath = task.FilePath
 		}
-		fmt.Printf("  %s  %s  (%s)\n", task.ID, task.Title, relPath)
+		fmt.Printf("  %s  %s  %s\n", formatTaskID(task.ID, r), task.Title, formatDim("("+relPath+")", r))
 	}
 }
 
 func executeDelete(tasks []*model.Task) error {
+	r := getRenderer()
 	for _, task := range tasks {
 		if err := os.Remove(task.FilePath); err != nil {
 			return fmt.Errorf("failed to delete %s: %w", task.FilePath, err)
 		}
 	}
-	fmt.Printf("Deleted %d task(s).\n", len(tasks))
+	fmt.Println(formatSuccess(fmt.Sprintf("Deleted %d task(s).", len(tasks)), r))
 	return nil
 }
 
 func executeArchive(tasks []*model.Task, absScanDir string) error {
+	r := getRenderer()
 	archiveDir := filepath.Join(absScanDir, "archive")
 
 	for _, task := range tasks {
@@ -211,6 +215,6 @@ func executeArchive(tasks []*model.Task, absScanDir string) error {
 		}
 	}
 
-	fmt.Printf("Archived %d task(s).\n", len(tasks))
+	fmt.Println(formatSuccess(fmt.Sprintf("Archived %d task(s).", len(tasks)), r))
 	return nil
 }

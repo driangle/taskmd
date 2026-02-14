@@ -297,6 +297,8 @@ func outputNextYAML(recs []Recommendation) error {
 }
 
 func outputNextTable(recs []Recommendation) error {
+	r := getRenderer()
+
 	if len(recs) == 0 {
 		if nextQuickWins {
 			fmt.Println("No quick wins available.")
@@ -309,11 +311,11 @@ func outputNextTable(recs []Recommendation) error {
 	}
 
 	if nextQuickWins {
-		fmt.Println("Recommended quick wins:")
+		fmt.Println(formatLabel("Recommended quick wins:", r))
 	} else if nextCritical {
-		fmt.Println("Recommended critical path tasks:")
+		fmt.Println(formatLabel("Recommended critical path tasks:", r))
 	} else {
-		fmt.Println("Recommended tasks:")
+		fmt.Println(formatLabel("Recommended tasks:", r))
 	}
 	fmt.Println()
 
@@ -325,7 +327,14 @@ func outputNextTable(recs []Recommendation) error {
 
 	for _, rec := range recs {
 		reason := strings.Join(rec.Reasons, ", ")
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n", rec.Rank, rec.ID, rec.Title, rec.Priority, rec.FilePath, reason)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
+			rec.Rank,
+			formatTaskID(rec.ID, r),
+			rec.Title,
+			formatPriority(rec.Priority, r),
+			formatDim(rec.FilePath, r),
+			reason,
+		)
 	}
 
 	return nil

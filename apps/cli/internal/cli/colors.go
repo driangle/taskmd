@@ -5,15 +5,29 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-isatty"
 	"github.com/muesli/termenv"
+	"github.com/spf13/viper"
 )
 
-// colorsEnabled checks if color output should be enabled based on the global --no-color flag and NO_COLOR env var.
+// forceColor is a test hook to bypass TTY detection.
+var forceColor bool
+
+// colorsEnabled checks if color output should be enabled based on flags, env, config, and TTY detection.
 func colorsEnabled() bool {
 	if noColor {
 		return false
 	}
 	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if viper.GetBool("no-color") {
+		return false
+	}
+	if forceColor {
+		return true
+	}
+	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
 		return false
 	}
 	return true
@@ -58,6 +72,20 @@ func getPriorityColor(priority string, r *lipgloss.Renderer) lipgloss.Style {
 	}
 }
 
+// getEffortColor returns the appropriate color style for an effort level.
+func getEffortColor(effort string, r *lipgloss.Renderer) lipgloss.Style {
+	switch strings.ToLower(effort) {
+	case "small":
+		return r.NewStyle().Foreground(lipgloss.Color("2")) // Green
+	case "medium":
+		return r.NewStyle().Foreground(lipgloss.Color("3")) // Yellow
+	case "large":
+		return r.NewStyle().Foreground(lipgloss.Color("1")) // Red
+	default:
+		return r.NewStyle().Foreground(lipgloss.Color("8")) // Gray
+	}
+}
+
 // formatTaskID formats task IDs with a distinct color.
 func formatTaskID(id string, r *lipgloss.Renderer) string {
 	style := r.NewStyle().Foreground(lipgloss.Color("6")).Bold(true) // Cyan, bold
@@ -78,6 +106,8 @@ func formatHeading(key, groupBy string, r *lipgloss.Renderer) string {
 		style = getStatusColor(key, r)
 	case "priority":
 		style = getPriorityColor(key, r)
+	case "effort":
+		style = getEffortColor(key, r)
 	default:
 		style = r.NewStyle().Bold(true)
 	}
@@ -94,4 +124,35 @@ func formatStatus(status string, r *lipgloss.Renderer) string {
 func formatPriority(priority string, r *lipgloss.Renderer) string {
 	style := getPriorityColor(priority, r)
 	return style.Render(priority)
+}
+
+// formatEffort formats effort text with effort-based color.
+func formatEffort(effort string, r *lipgloss.Renderer) string {
+	style := getEffortColor(effort, r)
+	return style.Render(effort)
+}
+
+// formatSuccess formats a success message in green.
+func formatSuccess(msg string, r *lipgloss.Renderer) string {
+	return r.NewStyle().Foreground(lipgloss.Color("2")).Render(msg)
+}
+
+// formatError formats an error message in red.
+func formatError(msg string, r *lipgloss.Renderer) string {
+	return r.NewStyle().Foreground(lipgloss.Color("1")).Render(msg)
+}
+
+// formatWarning formats a warning message in yellow.
+func formatWarning(msg string, r *lipgloss.Renderer) string {
+	return r.NewStyle().Foreground(lipgloss.Color("3")).Render(msg)
+}
+
+// formatLabel formats a label in bold.
+func formatLabel(label string, r *lipgloss.Renderer) string {
+	return r.NewStyle().Bold(true).Render(label)
+}
+
+// formatDim formats text in gray (dimmed).
+func formatDim(text string, r *lipgloss.Renderer) string {
+	return r.NewStyle().Foreground(lipgloss.Color("8")).Render(text)
 }

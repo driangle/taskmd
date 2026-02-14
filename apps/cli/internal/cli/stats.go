@@ -89,10 +89,12 @@ func outputStatsJSON(m *metrics.Metrics) error {
 //
 //nolint:gocognit,funlen // TODO: refactor to reduce complexity
 func outputStatsTable(m *metrics.Metrics) error {
+	r := getRenderer()
+
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()
 
-	fmt.Fprintln(w, "TASK STATISTICS")
+	fmt.Fprintln(w, formatLabel("TASK STATISTICS", r))
 	fmt.Fprintln(w, strings.Repeat("=", 50))
 	fmt.Fprintln(w)
 
@@ -105,7 +107,7 @@ func outputStatsTable(m *metrics.Metrics) error {
 	fmt.Fprintln(w)
 
 	// Tasks by status
-	fmt.Fprintln(w, "BY STATUS:")
+	fmt.Fprintln(w, formatLabel("BY STATUS:", r))
 	if len(m.TasksByStatus) > 0 {
 		// Order: pending, in-progress, completed, blocked, cancelled
 		statusOrder := []model.Status{
@@ -117,7 +119,7 @@ func outputStatsTable(m *metrics.Metrics) error {
 		}
 		for _, status := range statusOrder {
 			if count, ok := m.TasksByStatus[status]; ok && count > 0 {
-				fmt.Fprintf(w, "  %s:\t%d\n", status, count)
+				fmt.Fprintf(w, "  %s:\t%d\n", formatStatus(string(status), r), count)
 			}
 		}
 	} else {
@@ -126,7 +128,7 @@ func outputStatsTable(m *metrics.Metrics) error {
 	fmt.Fprintln(w)
 
 	// Tasks by priority
-	fmt.Fprintln(w, "BY PRIORITY:")
+	fmt.Fprintln(w, formatLabel("BY PRIORITY:", r))
 	if len(m.TasksByPriority) > 0 {
 		// Order: critical, high, medium, low
 		priorityOrder := []model.Priority{
@@ -137,7 +139,7 @@ func outputStatsTable(m *metrics.Metrics) error {
 		}
 		for _, priority := range priorityOrder {
 			if count, ok := m.TasksByPriority[priority]; ok && count > 0 {
-				fmt.Fprintf(w, "  %s:\t%d\n", priority, count)
+				fmt.Fprintf(w, "  %s:\t%d\n", formatPriority(string(priority), r), count)
 			}
 		}
 	} else {
@@ -146,7 +148,7 @@ func outputStatsTable(m *metrics.Metrics) error {
 	fmt.Fprintln(w)
 
 	// Tasks by effort
-	fmt.Fprintln(w, "BY EFFORT:")
+	fmt.Fprintln(w, formatLabel("BY EFFORT:", r))
 	if len(m.TasksByEffort) > 0 {
 		// Order: small, medium, large
 		effortOrder := []model.Effort{
@@ -156,7 +158,7 @@ func outputStatsTable(m *metrics.Metrics) error {
 		}
 		for _, effort := range effortOrder {
 			if count, ok := m.TasksByEffort[effort]; ok && count > 0 {
-				fmt.Fprintf(w, "  %s:\t%d\n", effort, count)
+				fmt.Fprintf(w, "  %s:\t%d\n", formatEffort(string(effort), r), count)
 			}
 		}
 	} else {

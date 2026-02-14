@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -292,30 +293,41 @@ func outputGet(task *model.Task, deps dependencyInfo, format string) error {
 }
 
 func outputGetText(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	fmt.Fprintf(w, "Task: %s\n", task.ID)
-	fmt.Fprintf(w, "Title: %s\n", task.Title)
-	fmt.Fprintf(w, "Status: %s\n", task.Status)
-	printOptionalField(w, "Priority", string(task.Priority))
-	printOptionalField(w, "Effort", string(task.Effort))
-	printTags(w, task.Tags)
+	r := getRenderer()
+
+	fmt.Fprintf(w, "%s %s\n", formatLabel("Task:", r), formatTaskID(task.ID, r))
+	fmt.Fprintf(w, "%s %s\n", formatLabel("Title:", r), task.Title)
+	fmt.Fprintf(w, "%s %s\n", formatLabel("Status:", r), formatStatus(string(task.Status), r))
+	printOptionalField(w, "Priority", string(task.Priority), r)
+	printOptionalField(w, "Effort", string(task.Effort), r)
+	printTags(w, task.Tags, r)
 	if !task.Created.IsZero() {
-		fmt.Fprintf(w, "Created: %s\n", task.Created.Format("2006-01-02"))
+		fmt.Fprintf(w, "%s %s\n", formatLabel("Created:", r), task.Created.Format("2006-01-02"))
 	}
-	fmt.Fprintf(w, "File: %s\n", task.FilePath)
+	fmt.Fprintf(w, "%s %s\n", formatLabel("File:", r), formatDim(task.FilePath, r))
 	printDescription(w, task.Body)
-	printDependencies(w, deps)
+	printDependencies(w, deps, r)
 	return nil
 }
 
-func printOptionalField(w io.Writer, label, value string) {
+func printOptionalField(w io.Writer, label, value string, r *lipgloss.Renderer) {
 	if value != "" {
-		fmt.Fprintf(w, "%s: %s\n", label, value)
+		var colored string
+		switch label {
+		case "Priority":
+			colored = formatPriority(value, r)
+		case "Effort":
+			colored = formatEffort(value, r)
+		default:
+			colored = value
+		}
+		fmt.Fprintf(w, "%s %s\n", formatLabel(label+":", r), colored)
 	}
 }
 
-func printTags(w io.Writer, tags []string) {
+func printTags(w io.Writer, tags []string, r *lipgloss.Renderer) {
 	if len(tags) > 0 {
-		fmt.Fprintf(w, "Tags: %s\n", strings.Join(tags, ", "))
+		fmt.Fprintf(w, "%s %s\n", formatLabel("Tags:", r), strings.Join(tags, ", "))
 	}
 }
 
@@ -327,26 +339,26 @@ func printDescription(w io.Writer, body string) {
 	fmt.Fprintf(w, "\nDescription:\n%s\n%s\n%s\n", separator, strings.TrimSpace(body), separator)
 }
 
-func printDependencies(w io.Writer, deps dependencyInfo) {
+func printDependencies(w io.Writer, deps dependencyInfo, r *lipgloss.Renderer) {
 	if len(deps.DependsOn) == 0 && len(deps.Blocks) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "\nDependencies:\n")
+	fmt.Fprintf(w, "\n%s\n", formatLabel("Dependencies:", r))
 	if len(deps.DependsOn) > 0 {
-		fmt.Fprintf(w, "  Depends on: %s\n", formatDepList(deps.DependsOn))
+		fmt.Fprintf(w, "  %s %s\n", formatLabel("Depends on:", r), formatDepList(deps.DependsOn, r))
 	}
 	if len(deps.Blocks) > 0 {
-		fmt.Fprintf(w, "  Blocks: %s\n", formatDepList(deps.Blocks))
+		fmt.Fprintf(w, "  %s %s\n", formatLabel("Blocks:", r), formatDepList(deps.Blocks, r))
 	}
 }
 
-func formatDepList(entries []depEntry) string {
+func formatDepList(entries []depEntry, r *lipgloss.Renderer) string {
 	parts := make([]string, len(entries))
 	for i, e := range entries {
 		if e.Title != "" {
-			parts[i] = fmt.Sprintf("%s (%s)", e.ID, e.Title)
+			parts[i] = fmt.Sprintf("%s (%s)", formatTaskID(e.ID, r), e.Title)
 		} else {
-			parts[i] = e.ID
+			parts[i] = formatTaskID(e.ID, r)
 		}
 	}
 	return strings.Join(parts, ", ")

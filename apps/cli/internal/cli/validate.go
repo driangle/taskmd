@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
@@ -104,9 +105,11 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 // outputValidationText outputs validation results in human-readable text format
 func outputValidationText(result *validator.ValidationResult, quiet bool) {
+	r := getRenderer()
+
 	if len(result.Issues) == 0 {
 		if !quiet {
-			fmt.Printf("✓ All %d task(s) are valid\n", result.TaskCount)
+			fmt.Printf("%s All %d task(s) are valid\n", formatSuccess("✓", r), result.TaskCount)
 		}
 		return
 	}
@@ -125,43 +128,45 @@ func outputValidationText(result *validator.ValidationResult, quiet bool) {
 
 	// Print errors
 	if len(errors) > 0 {
-		fmt.Printf("\n❌ Found %d error(s):\n\n", len(errors))
+		fmt.Printf("\n%s Found %d error(s):\n\n", formatError("❌", r), len(errors))
 		for _, issue := range errors {
-			printIssue(issue)
+			printIssue(issue, r)
 		}
 	}
 
 	// Print warnings
 	if len(warnings) > 0 {
-		fmt.Printf("\n⚠️  Found %d warning(s):\n\n", len(warnings))
+		fmt.Printf("\n%s  Found %d warning(s):\n\n", formatWarning("⚠️", r), len(warnings))
 		for _, issue := range warnings {
-			printIssue(issue)
+			printIssue(issue, r)
 		}
 	}
 
 	// Print summary
 	fmt.Println()
 	if result.Errors > 0 {
-		fmt.Printf("Validated %d task(s): %d error(s)", result.TaskCount, result.Errors)
+		fmt.Printf("Validated %d task(s): %s", result.TaskCount,
+			formatError(fmt.Sprintf("%d error(s)", result.Errors), r))
 		if result.Warnings > 0 {
-			fmt.Printf(", %d warning(s)", result.Warnings)
+			fmt.Printf(", %s", formatWarning(fmt.Sprintf("%d warning(s)", result.Warnings), r))
 		}
 		fmt.Println()
 	} else if result.Warnings > 0 {
-		fmt.Printf("Validated %d task(s) with %d warning(s)\n", result.TaskCount, result.Warnings)
+		fmt.Printf("Validated %d task(s) with %s\n", result.TaskCount,
+			formatWarning(fmt.Sprintf("%d warning(s)", result.Warnings), r))
 	}
 }
 
 // printIssue prints a single validation issue
-func printIssue(issue validator.ValidationIssue) {
+func printIssue(issue validator.ValidationIssue, r *lipgloss.Renderer) {
 	if issue.TaskID != "" {
-		fmt.Printf("  [%s] %s\n", issue.TaskID, issue.Message)
+		fmt.Printf("  [%s] %s\n", formatTaskID(issue.TaskID, r), issue.Message)
 	} else {
 		fmt.Printf("  %s\n", issue.Message)
 	}
 
 	if issue.FilePath != "" {
-		fmt.Printf("    File: %s\n", issue.FilePath)
+		fmt.Printf("    %s %s\n", formatLabel("File:", r), formatDim(issue.FilePath, r))
 	}
 }
 

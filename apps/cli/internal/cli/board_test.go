@@ -428,6 +428,8 @@ func TestBoardCommand_ColorEnabled(t *testing.T) {
 	resetBoardFlags()
 	boardFormat = "txt"
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -468,6 +470,8 @@ func TestBoardCommand_NoColorEnvVar(t *testing.T) {
 	resetBoardFlags()
 	boardFormat = "txt"
 	noColor = false // explicitly enable color, then let env var override
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	// Set NO_COLOR environment variable
 	os.Setenv("NO_COLOR", "1")
@@ -491,6 +495,8 @@ func TestBoardCommand_ColorMarkdownFormat(t *testing.T) {
 	resetBoardFlags()
 	boardFormat = "md"
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -535,6 +541,8 @@ func TestBoardCommand_ColorStatusBased(t *testing.T) {
 	resetBoardFlags()
 	boardFormat = "txt"
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -567,6 +575,8 @@ func TestBoardCommand_ColorOutputToFile(t *testing.T) {
 	boardFormat = "txt"
 	boardOut = outFile
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
@@ -593,6 +603,8 @@ func TestBoardCommand_HeadingColoredByStatus(t *testing.T) {
 	resetBoardFlags()
 	boardFormat = "md"
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 
@@ -615,6 +627,8 @@ func TestBoardCommand_HeadingColoredByPriority(t *testing.T) {
 	boardGroupBy = "priority"
 	boardFormat = "txt"
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 

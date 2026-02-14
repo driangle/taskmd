@@ -223,6 +223,8 @@ func colorizeColumn(task *model.Task, column string, r *lipgloss.Renderer) strin
 		return formatStatus(value, r)
 	case "priority":
 		return formatPriority(value, r)
+	case "effort":
+		return formatEffort(value, r)
 	default:
 		return value
 	}

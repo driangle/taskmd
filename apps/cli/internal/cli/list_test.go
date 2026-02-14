@@ -124,6 +124,8 @@ func captureListTableOutput(t *testing.T, tasks []*model.Task, columns string) s
 func TestListCommand_TableColorEnabled(t *testing.T) {
 	resetListFlags()
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 	os.Unsetenv("NO_COLOR")
 
 	tasks := []*model.Task{
@@ -174,6 +176,8 @@ func TestListCommand_TableNoColorFlag(t *testing.T) {
 func TestListCommand_TableNoColorEnvVar(t *testing.T) {
 	resetListFlags()
 	noColor = false // enable via flag, but env var should override
+	forceColor = true
+	defer func() { forceColor = false }()
 
 	os.Setenv("NO_COLOR", "1")
 	defer os.Unsetenv("NO_COLOR")
@@ -193,6 +197,8 @@ func TestListCommand_TableNoColorEnvVar(t *testing.T) {
 func TestListCommand_TableColorColumns(t *testing.T) {
 	resetListFlags()
 	noColor = false
+	forceColor = true
+	defer func() { forceColor = false }()
 	os.Unsetenv("NO_COLOR")
 
 	tasks := []*model.Task{
