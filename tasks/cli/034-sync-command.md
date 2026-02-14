@@ -1,9 +1,15 @@
 ---
 id: "034"
 title: "Sync command with pluggable sources"
-status: pending
+status: cancelled
 priority: low
 effort: large
+superseded_by:
+  - "082"
+  - "083"
+  - "084"
+  - "085"
+  - "086"
 dependencies: []
 tags:
   - cli
