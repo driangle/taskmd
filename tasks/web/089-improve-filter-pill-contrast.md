@@ -1,7 +1,7 @@
 ---
 id: "089"
 title: "Improve filter pill contrast for active vs inactive states"
-status: pending
+status: completed
 priority: medium
 effort: small
 tags:

@@ -56,7 +56,7 @@ export function FilterBar({
               className={`px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
                 active
                   ? STATUS_COLORS[s]
-                  : "bg-white border border-gray-200 text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-500"
+                  : "bg-gray-50 border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
               }`}
             >
               {s}
@@ -76,7 +76,7 @@ export function FilterBar({
               className={`px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
                 active
                   ? PRIORITY_COLORS[p]
-                  : "bg-white border border-gray-200 text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-500"
+                  : "bg-gray-50 border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
               }`}
             >
               {p}

@@ -13,6 +13,7 @@ var (
 	Version   = "0.0.3"
 	GitCommit = "unknown"
 	BuildDate = "unknown"
+	GitDirty  = ""
 
 	// Global flags
 	cfgFile string
@@ -39,6 +40,23 @@ Exit codes:
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Version:       Version,
+}
+
+// FullVersion returns the display version string.
+// Examples: "0.0.3", "0.0.3-abc1234", "0.0.3-abc1234*"
+func FullVersion() string {
+	v := Version
+	if GitCommit != "unknown" && GitCommit != "" {
+		short := GitCommit
+		if len(short) > 7 {
+			short = short[:7]
+		}
+		v += "-" + short
+	}
+	if GitDirty == "true" {
+		v += "*"
+	}
+	return v
 }
 
 // Execute runs the root command

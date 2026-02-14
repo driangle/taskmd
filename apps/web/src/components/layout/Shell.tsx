@@ -17,7 +17,7 @@ interface ShellProps {
 }
 
 export function Shell({ children }: ShellProps) {
-  const { readonly } = useConfig();
+  const { readonly, version } = useConfig();
   const { theme, toggle } = useTheme();
 
   return (
@@ -32,6 +32,11 @@ export function Shell({ children }: ShellProps) {
               >
                 taskmd
               </Link>
+              {version && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {version}
+                </span>
+              )}
               {readonly && (
                 <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                   Read Only

@@ -1,7 +1,7 @@
 ---
 id: "088"
 title: "Add next-id CLI command"
-status: pending
+status: completed
 priority: medium
 effort: small
 tags:

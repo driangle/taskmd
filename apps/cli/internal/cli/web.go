@@ -85,6 +85,7 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 		Dev:      webDev,
 		Verbose:  flags.Verbose,
 		ReadOnly: webReadOnly,
+		Version:  FullVersion(),
 	})
 
 	ctx, cancel := signal.NotifyContext(

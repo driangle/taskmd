@@ -18,12 +18,16 @@ import (
 
 // ConfigResponse is the JSON response for GET /api/config.
 type ConfigResponse struct {
-	ReadOnly bool `json:"readonly"`
+	ReadOnly bool   `json:"readonly"`
+	Version  string `json:"version"`
 }
 
 func handleConfig(cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, ConfigResponse{ReadOnly: cfg.ReadOnly})
+		writeJSON(w, ConfigResponse{
+			ReadOnly: cfg.ReadOnly,
+			Version:  cfg.Version,
+		})
 	}
 }
 

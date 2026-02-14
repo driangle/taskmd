@@ -18,6 +18,7 @@ type Config struct {
 	Dev      bool
 	Verbose  bool
 	ReadOnly bool
+	Version  string
 }
 
 // Server is the taskmd web server.

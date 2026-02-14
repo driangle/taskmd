@@ -21,15 +21,21 @@ install:
 install-full: web-embed
 	go install -tags embed_web ./cmd/taskmd
 
+# ldflags for injecting git info into dev builds
+DEV_COMMIT := $(shell git rev-parse --short HEAD)
+DEV_DIRTY  := $(shell git diff --quiet 2>/dev/null && echo false || echo true)
+DEV_LDFLAGS := -X 'github.com/driangle/taskmd/apps/cli/internal/cli.GitCommit=$(DEV_COMMIT)' \
+               -X 'github.com/driangle/taskmd/apps/cli/internal/cli.GitDirty=$(DEV_DIRTY)'
+
 # Install as taskmd-dev (keeps Homebrew version available)
 install-dev:
-	go build -o ~/bin/taskmd-dev ./cmd/taskmd
+	go build -ldflags "$(DEV_LDFLAGS)" -o ~/bin/taskmd-dev ./cmd/taskmd
 	@echo "Installed development binary to ~/bin/taskmd-dev"
 	@echo "Usage: taskmd-dev [command]"
 
 # Install as taskmd-dev with embedded web assets
 install-dev-full: web-embed
-	go build -tags embed_web -o ~/bin/taskmd-dev ./cmd/taskmd
+	go build -tags embed_web -ldflags "$(DEV_LDFLAGS)" -o ~/bin/taskmd-dev ./cmd/taskmd
 	@echo "Installed development binary (with web) to ~/bin/taskmd-dev"
 	@echo "Usage: taskmd-dev [command]"
 
