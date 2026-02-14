@@ -10,7 +10,7 @@ tags:
   - go
   - commands
   - reports
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 

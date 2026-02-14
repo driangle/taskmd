@@ -10,7 +10,7 @@ tags:
   - go
   - polish
   - quality
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 

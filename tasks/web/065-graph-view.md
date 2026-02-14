@@ -10,6 +10,7 @@ tags:
   - typescript
   - visualization
   - graph
+  - mvp
 created: 2026-02-12
 ---
 

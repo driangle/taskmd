@@ -9,7 +9,7 @@ tags:
   - ui
   - productivity
   - api
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 

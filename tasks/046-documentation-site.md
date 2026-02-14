@@ -11,7 +11,7 @@ tags:
   - website
   - github-pages
   - infrastructure
-  - post-mvp
+  - mvp
 created: 2026-02-09
 ---
 

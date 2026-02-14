@@ -10,7 +10,7 @@ tags:
   - go
   - quality
   - ux
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 
@@ -24,11 +24,11 @@ Standardize the `--format` flag behavior across all CLI commands so users get a 
 
 Each command currently defines its own `--format` flag with different defaults, different supported values, and different output behavior:
 
-| Command | Flag source | Default | Supported formats |
-|---------|------------|---------|-------------------|
-| root (list, stats, etc.) | `PersistentFlags` | `table` | table, json, yaml |
-| graph | local flag | `mermaid` | mermaid, dot, ascii, json |
-| board | local flag | `md` | md, txt, json |
+| Command                  | Flag source       | Default   | Supported formats         |
+| ------------------------ | ----------------- | --------- | ------------------------- |
+| root (list, stats, etc.) | `PersistentFlags` | `table`   | table, json, yaml         |
+| graph                    | local flag        | `mermaid` | mermaid, dot, ascii, json |
+| board                    | local flag        | `md`      | md, txt, json             |
 
 This creates several issues:
 - **Inconsistent defaults**: `table` vs `mermaid` vs `md`

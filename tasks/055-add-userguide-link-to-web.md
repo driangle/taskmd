@@ -10,6 +10,7 @@ tags:
   - documentation
   - user-experience
   - enhancement
+  - mvp
 created: 2026-02-12
 ---
 

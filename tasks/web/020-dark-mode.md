@@ -9,7 +9,7 @@ tags:
   - ui
   - ux
   - polish
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 

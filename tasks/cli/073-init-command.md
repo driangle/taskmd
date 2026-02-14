@@ -12,6 +12,7 @@ tags:
   - go
   - commands
   - dx
+  - mvp
 created: 2026-02-13
 ---
 

@@ -10,7 +10,7 @@ tags:
   - claude-code
   - dx
   - plugin
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 

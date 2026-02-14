@@ -9,7 +9,7 @@ tags:
   - cli
   - go
   - integration
-  - post-mvp
+  - mvp
 created: 2026-02-08
 ---
 
