@@ -11,11 +11,13 @@ import (
 
 // TrackTask holds task metadata for output.
 type TrackTask struct {
-	ID       string `json:"id" yaml:"id"`
-	Title    string `json:"title" yaml:"title"`
-	Priority string `json:"priority,omitempty" yaml:"priority,omitempty"`
-	Score    int    `json:"score" yaml:"score"`
-	FilePath string `json:"file_path" yaml:"file_path"`
+	ID       string   `json:"id" yaml:"id"`
+	Title    string   `json:"title" yaml:"title"`
+	Priority string   `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Effort   string   `json:"effort,omitempty" yaml:"effort,omitempty"`
+	Score    int      `json:"score" yaml:"score"`
+	FilePath string   `json:"file_path" yaml:"file_path"`
+	Touches  []string `json:"touches,omitempty" yaml:"touches,omitempty"`
 }
 
 // Track represents a group of non-overlapping tasks that can run in sequence.
@@ -174,8 +176,10 @@ func addToTrack(track *Track, it scored) {
 		ID:       it.task.ID,
 		Title:    it.task.Title,
 		Priority: string(it.task.Priority),
+		Effort:   string(it.task.Effort),
 		Score:    it.score,
 		FilePath: it.task.FilePath,
+		Touches:  it.task.Touches,
 	})
 	for _, scope := range it.task.Touches {
 		if !track.scopeSet[scope] {
@@ -192,8 +196,10 @@ func toTrackTasks(items []scored) []TrackTask {
 			ID:       it.task.ID,
 			Title:    it.task.Title,
 			Priority: string(it.task.Priority),
+			Effort:   string(it.task.Effort),
 			Score:    it.score,
 			FilePath: it.task.FilePath,
+			Touches:  it.task.Touches,
 		}
 	}
 	return out

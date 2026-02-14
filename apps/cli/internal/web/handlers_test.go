@@ -13,6 +13,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/board"
 	"github.com/driangle/taskmd/apps/cli/internal/metrics"
 	"github.com/driangle/taskmd/apps/cli/internal/next"
+	"github.com/driangle/taskmd/apps/cli/internal/tracks"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
@@ -681,5 +682,138 @@ priority: medium
 	// Default limit is 5
 	if len(recs) != 5 {
 		t.Fatalf("expected 5 recommendations (default limit), got %d", len(recs))
+	}
+}
+
+// GET /api/tracks tests
+
+func createTracksTestDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	task1 := `---
+id: "010"
+title: "Build auth API"
+status: pending
+priority: high
+effort: medium
+touches:
+  - api/auth
+  - db/users
+---
+`
+	task2 := `---
+id: "011"
+title: "Build payment API"
+status: pending
+priority: medium
+effort: large
+touches:
+  - api/payments
+  - db/orders
+---
+`
+	task3 := `---
+id: "012"
+title: "Update docs"
+status: pending
+priority: low
+effort: small
+---
+`
+	os.WriteFile(filepath.Join(dir, "010-auth.md"), []byte(task1), 0644)
+	os.WriteFile(filepath.Join(dir, "011-payments.md"), []byte(task2), 0644)
+	os.WriteFile(filepath.Join(dir, "012-docs.md"), []byte(task3), 0644)
+	return dir
+}
+
+func fetchTracksResult(t *testing.T, dp *DataProvider, query string) tracks.Result {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/tracks"+query, nil)
+	rec := httptest.NewRecorder()
+
+	handleTracks(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var result tracks.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	return result
+}
+
+func findTrackTask(result tracks.Result, id string) *tracks.TrackTask {
+	for _, track := range result.Tracks {
+		for i := range track.Tasks {
+			if track.Tasks[i].ID == id {
+				return &track.Tasks[i]
+			}
+		}
+	}
+	return nil
+}
+
+func TestHandleTracks(t *testing.T) {
+	dir := createTracksTestDir(t)
+	dp := NewDataProvider(dir, false)
+	result := fetchTracksResult(t, dp, "")
+
+	if len(result.Tracks) < 1 {
+		t.Fatal("expected at least one track")
+	}
+
+	if len(result.Flexible) != 1 {
+		t.Fatalf("expected 1 flexible task, got %d", len(result.Flexible))
+	}
+	if result.Flexible[0].ID != "012" {
+		t.Errorf("expected flexible task 012, got %s", result.Flexible[0].ID)
+	}
+}
+
+func TestHandleTracks_EffortAndTouches(t *testing.T) {
+	dir := createTracksTestDir(t)
+	dp := NewDataProvider(dir, false)
+	result := fetchTracksResult(t, dp, "")
+
+	task := findTrackTask(result, "010")
+	if task == nil {
+		t.Fatal("expected task 010 in tracks")
+	}
+	if task.Effort != "medium" {
+		t.Errorf("expected effort 'medium', got %q", task.Effort)
+	}
+	if len(task.Touches) != 2 {
+		t.Errorf("expected 2 touches, got %d", len(task.Touches))
+	}
+}
+
+func TestHandleTracks_WithFilters(t *testing.T) {
+	dir := createTracksTestDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tracks?filter=priority%3Dhigh", nil)
+	rec := httptest.NewRecorder()
+
+	handleTracks(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var result tracks.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Only task 010 is high priority, should be in a track
+	totalTasks := len(result.Flexible)
+	for _, track := range result.Tracks {
+		totalTasks += len(track.Tasks)
+	}
+	if totalTasks != 1 {
+		t.Fatalf("expected 1 total task with priority=high filter, got %d", totalTasks)
 	}
 }

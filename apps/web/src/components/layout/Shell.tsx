@@ -8,6 +8,7 @@ const tabs = [
   { path: "/tasks", label: "Tasks" },
   { path: "/next", label: "Next Up" },
   { path: "/board", label: "Board" },
+  { path: "/tracks", label: "Tracks" },
   { path: "/graph", label: "Graph" },
   { path: "/stats", label: "Stats" },
   { path: "/validate", label: "Validate" },

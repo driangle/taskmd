@@ -103,6 +103,28 @@ export interface TaskUpdateRequest {
   body?: string;
 }
 
+export interface TrackTask {
+  id: string;
+  title: string;
+  priority?: string;
+  effort?: string;
+  score: number;
+  file_path: string;
+  touches?: string[];
+}
+
+export interface Track {
+  id: number;
+  tasks: TrackTask[];
+  scopes: string[];
+}
+
+export interface TracksResult {
+  tracks: Track[];
+  flexible: TrackTask[];
+  warnings?: string[];
+}
+
 export interface ApiError {
   error: string;
   details?: string[];

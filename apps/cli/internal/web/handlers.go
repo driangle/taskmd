@@ -13,6 +13,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/next"
 	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
+	"github.com/driangle/taskmd/apps/cli/internal/tracks"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
@@ -185,6 +186,28 @@ func handleNext(dp *DataProvider) http.HandlerFunc {
 		}
 
 		writeJSON(w, recs)
+	}
+}
+
+func handleTracks(dp *DataProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		filters := r.URL.Query()["filter"]
+
+		result, err := tracks.Assign(tasks, tracks.Options{
+			Filters: filters,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		writeJSON(w, result)
 	}
 }
 
