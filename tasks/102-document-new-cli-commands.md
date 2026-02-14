@@ -1,7 +1,7 @@
 ---
 id: "102"
 title: "Document new CLI commands in the CLI guide (sync, report, tracks, archive, next-id, get, set, tags)"
-status: pending
+status: completed
 priority: medium
 effort: medium
 tags:
@@ -34,15 +34,15 @@ The guide currently documents: `list`, `validate`, `next`, `graph`, `stats`, `bo
 
 ## Tasks
 
-- [ ] Add `### get - View Task Details` section with usage, flags, and examples
-- [ ] Add `### set - Update Task Fields` section with usage, flags, and examples
-- [ ] Add `### tags - List Tags` section with usage and examples
-- [ ] Add `### archive - Archive Completed Tasks` section with usage, flags, and examples
-- [ ] Add `### next-id - Get Next Available ID` section with usage and examples
-- [ ] Add `### report - Generate Reports` section covering md/html/json formats, grouping options, and critical-path analysis
-- [ ] Add `### tracks - Parallel Work Tracks` section explaining scope overlap detection and the `touches` field
-- [ ] Add `### sync - Sync External Sources` section covering GitHub Issues source, `.taskmd-sync.yaml` config, field mapping, and conflict strategies
-- [ ] Add sync configuration to the `## Configuration` section (document `.taskmd-sync.yaml`)
+- [x] Add `### get - View Task Details` section with usage, flags, and examples
+- [x] Add `### set - Update Task Fields` section with usage, flags, and examples
+- [x] Add `### tags - List Tags` section with usage and examples
+- [x] Add `### archive - Archive Completed Tasks` section with usage, flags, and examples
+- [x] Add `### next-id - Get Next Available ID` section with usage and examples
+- [x] Add `### report - Generate Reports` section covering md/html/json formats, grouping options, and critical-path analysis
+- [x] Add `### tracks - Parallel Work Tracks` section explaining scope overlap detection and the `touches` field
+- [x] Add `### sync - Sync External Sources` section covering GitHub Issues source, `.taskmd-sync.yaml` config, field mapping, and conflict strategies
+- [x] Add sync configuration to the `## Configuration` section (document `.taskmd-sync.yaml`)
 
 ## Acceptance Criteria
 
