@@ -1,7 +1,7 @@
 ---
 id: "035"
 title: "report command - Comprehensive report generation"
-status: pending
+status: completed
 priority: low
 effort: large
 dependencies: ["020", "021", "022", "023"]
@@ -22,22 +22,22 @@ Implement the `report` command to generate a single comprehensive report artifac
 
 ## Tasks
 
-- [ ] Create `internal/cli/report.go` for report command
-- [ ] Support output formats:
+- [x] Create `internal/cli/report.go` for report command
+- [x] Support output formats:
   - `md` (default) - Rich markdown report
   - `html` - HTML report with styling
   - `json` - Structured JSON report
-- [ ] Include sections:
+- [x] Include sections:
   - Project summary (stats overview)
   - Tasks grouped by status
   - Critical path analysis
   - Blocked tasks list
   - Dependency graph (optional)
-- [ ] Implement `--include-graph` flag to embed dependency visualization
-- [ ] Implement `--group-by <field>` for main grouping
-- [ ] Implement `--out <file>` to write to file
-- [ ] HTML format should include CSS styling and be self-contained
-- [ ] Markdown format should be well-structured with headers and sections
+- [x] Implement `--include-graph` flag to embed dependency visualization
+- [x] Implement `--group-by <field>` for main grouping
+- [x] Implement `--out <file>` to write to file
+- [x] HTML format should include CSS styling and be self-contained
+- [x] Markdown format should be well-structured with headers and sections
 
 ## Acceptance Criteria
 
