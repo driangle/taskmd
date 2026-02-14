@@ -1,7 +1,7 @@
 ---
 id: "cli-042"
 title: "Add Claude Code Plugin with taskmd skill"
-status: pending
+status: completed
 priority: low
 effort: medium
 tags:
