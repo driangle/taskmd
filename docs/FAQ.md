@@ -2,6 +2,8 @@
 
 Quick answers to common questions about taskmd.
 
+**New to taskmd?** Start with [Why taskmd?](why-taskmd.md) to understand the design philosophy and how it fits into AI-assisted development workflows.
+
 ## Installation & Setup
 
 ### Q: How do I install taskmd?
@@ -223,6 +225,7 @@ Other flags like `format`, `verbose`, and `quiet` are intentionally CLI-only to 
 
 ## Need More Help?
 
+- **Why taskmd?**: See [Why taskmd?](why-taskmd.md) for design philosophy and how it fits AI workflows
 - **Guides**: Check the [guides directory](guides/) for comprehensive tutorials
 - **Specification**: See [taskmd_specification.md](taskmd_specification.md) for complete format details
 - **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/driangle/taskmd/issues)
