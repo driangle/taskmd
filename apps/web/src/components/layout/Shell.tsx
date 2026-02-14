@@ -7,6 +7,7 @@ const tabs = [
   { path: "/board", label: "Board" },
   { path: "/graph", label: "Graph" },
   { path: "/stats", label: "Stats" },
+  { path: "/validate", label: "Validate" },
 ];
 
 interface ShellProps {

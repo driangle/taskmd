@@ -1,7 +1,7 @@
 ---
 id: "web-016"
 title: "Validation page - Display task file issues"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies: ["web-015"]
