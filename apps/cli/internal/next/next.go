@@ -186,7 +186,7 @@ func ScoreTask(
 	downstreamCounts map[string]int,
 ) (int, []string) {
 	score := 0
-	var reasons []string
+	reasons := make([]string, 0)
 
 	switch task.Priority {
 	case model.PriorityCritical:

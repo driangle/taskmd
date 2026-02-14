@@ -30,7 +30,7 @@ export function ErrorState({ error, onRetry }: ErrorStateProps) {
             />
           </svg>
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 mb-2">
           <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
             {connectionError
               ? "Cannot connect to server"

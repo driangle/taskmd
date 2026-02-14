@@ -8,8 +8,8 @@ export function useLiveReload() {
     const es = new EventSource("/api/events");
 
     es.addEventListener("reload", () => {
-      // Revalidate all SWR caches
-      mutate(() => true, undefined, { revalidate: true });
+      // Revalidate all SWR caches without clearing existing data
+      mutate(() => true);
     });
 
     es.addEventListener("error", () => {

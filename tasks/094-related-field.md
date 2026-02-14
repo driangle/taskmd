@@ -1,7 +1,7 @@
 ---
 id: "094"
 title: "Add related field for non-dependency task relations"
-status: pending
+status: completed
 priority: medium
 effort: large
 tags:
