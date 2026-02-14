@@ -92,6 +92,57 @@ export TASKMD_VERBOSE=true
 4. Environment variables
 5. Built-in defaults
 
+## Sync Configuration {#sync-configuration}
+
+The `sync` command reads its configuration from the `sync` section of `.taskmd.yaml`. Each source defines where to fetch tasks from, how to map fields, and where to write files.
+
+```yaml
+# .taskmd.yaml
+dir: ./tasks
+
+sync:
+  sources:
+    - name: github
+      project: "owner/repo"
+      token_env: GITHUB_TOKEN       # Environment variable holding the API token
+      output_dir: ./tasks/synced     # Where to write synced task files
+      field_map:
+        status:
+          open: pending
+          closed: completed
+        priority:
+          urgent: critical
+          high: high
+          medium: medium
+          low: low
+        labels_to_tags: true         # Convert issue labels to task tags
+        assignee_to_owner: true      # Map assignee to owner field
+      filters:
+        state: open                  # Only sync open issues
+```
+
+**Source fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Unique name for this source |
+| `project` | No | Project identifier (e.g., `owner/repo` for GitHub) |
+| `base_url` | No | Custom API base URL |
+| `token_env` | No | Environment variable name for API token |
+| `user_env` | No | Environment variable name for username |
+| `output_dir` | Yes | Directory where synced task files are written |
+| `field_map` | No | How to map external fields to taskmd frontmatter |
+| `filters` | No | Source-specific filters (e.g., `state: open`) |
+
+**Field mapping (`field_map`):**
+
+| Sub-field | Type | Description |
+|-----------|------|-------------|
+| `status` | `map[string]string` | Map external status values to taskmd statuses |
+| `priority` | `map[string]string` | Map external priority values to taskmd priorities |
+| `labels_to_tags` | `bool` | Convert external labels/categories to task tags |
+| `assignee_to_owner` | `bool` | Map external assignee to the `owner` field |
+
 ## Shell Aliases
 
 For quick access, add aliases to your shell config:

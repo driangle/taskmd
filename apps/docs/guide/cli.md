@@ -262,6 +262,253 @@ taskmd snapshot --group-by priority
 taskmd snapshot --out snapshot.json
 ```
 
+### get - View Task Details
+
+Display detailed information about a specific task, identified by ID, title, or file path.
+
+**Matching priority:**
+1. Exact match by task ID (case-sensitive)
+2. Exact match by task title (case-insensitive)
+3. Match by file path or filename
+4. Fuzzy match across IDs and titles (unless `--exact` is set)
+
+```bash
+# Look up by task ID
+taskmd get cli-037
+
+# Look up by title
+taskmd get "Add show command"
+
+# Look up by file path
+taskmd get tasks/cli/037-task.md
+
+# Fuzzy search
+taskmd get sho
+
+# Strict lookup — fail if no exact match
+taskmd get sho --exact
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format` | `text` | Output format (`text`, `json`, `yaml`) |
+| `--exact` | `false` | Disable fuzzy matching |
+| `--threshold` | `0.6` | Fuzzy match sensitivity (0.0–1.0) |
+
+### set - Update Task Fields
+
+Modify a task's frontmatter fields by ID.
+
+```bash
+# Change status
+taskmd set --task-id 042 --status in-progress
+
+# Change priority and effort
+taskmd set --task-id 042 --priority high --effort large
+
+# Mark as completed (shortcut)
+taskmd set --task-id 042 --done
+
+# Preview changes without writing
+taskmd set --task-id 042 --priority critical --dry-run
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--task-id` | *(required)* | Task ID to update |
+| `--status` | | New status (`pending`, `in-progress`, `completed`, `blocked`, `cancelled`) |
+| `--priority` | | New priority (`low`, `medium`, `high`, `critical`) |
+| `--effort` | | New effort (`small`, `medium`, `large`) |
+| `--owner` | | Owner/assignee |
+| `--parent` | | Parent task ID (empty string to clear) |
+| `--done` | `false` | Alias for `--status completed` |
+| `--dry-run` | `false` | Preview changes without writing to disk |
+| `--add-tag` | | Add a tag (repeatable) |
+| `--remove-tag` | | Remove a tag (repeatable) |
+
+**Tag management:**
+```bash
+# Add tags
+taskmd set --task-id 042 --add-tag backend --add-tag api
+
+# Remove a tag
+taskmd set --task-id 042 --remove-tag deprecated
+
+# Add and remove in one command
+taskmd set --task-id 042 --add-tag v2 --remove-tag v1
+```
+
+### tags - List Tags
+
+Display all tags used across task files with usage counts.
+
+```bash
+# List all tags
+taskmd tags
+
+# List tags in specific directory
+taskmd tags ./tasks
+
+# Tags used by pending tasks only
+taskmd tags --filter status=pending
+
+# JSON output
+taskmd tags --format json
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format` | `table` | Output format (`table`, `json`, `yaml`) |
+| `--filter` | | Filter tasks before aggregating (repeatable) |
+
+### archive - Archive Completed Tasks
+
+Move completed or cancelled task files into an `archive/` subdirectory, or permanently delete them.
+
+```bash
+# Archive all completed tasks
+taskmd archive --all-completed -y
+
+# Archive all cancelled tasks
+taskmd archive --all-cancelled -y
+
+# Archive specific tasks by ID
+taskmd archive --id 042 --id 043 -y
+
+# Preview what would be archived
+taskmd archive --all-completed --dry-run
+
+# Permanently delete cancelled tasks
+taskmd archive --all-cancelled --delete -f
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--id` | | Archive task(s) by ID (repeatable) |
+| `--status` | | Archive tasks matching this status |
+| `--all-completed` | `false` | Archive all completed tasks |
+| `--all-cancelled` | `false` | Archive all cancelled tasks |
+| `--tag` | | Archive tasks with this tag |
+| `--dry-run` | `false` | Preview changes without making them |
+| `--yes`, `-y` | `false` | Skip confirmation prompt |
+| `--delete` | `false` | Permanently delete instead of archive |
+| `--force`, `-f` | `false` | Skip confirmation for delete |
+
+### next-id - Get Next Available ID
+
+Scan task files and output the next available sequential ID. Finds the highest numeric ID and returns max + 1, preserving any common prefix and zero-padding.
+
+```bash
+# Get next ID
+taskmd next-id
+
+# Scan specific directory
+taskmd next-id ./tasks/cli
+
+# JSON output with metadata
+taskmd next-id --format json
+```
+
+**Scripting example:**
+```bash
+# Create a new task file with the next ID
+ID=$(taskmd next-id)
+echo "---
+id: \"$ID\"
+title: \"My new task\"
+status: pending
+---" > "tasks/${ID}-my-new-task.md"
+```
+
+### report - Generate Reports
+
+Generate a comprehensive project report combining summary statistics, task groupings, critical-path analysis, and blocked tasks.
+
+```bash
+# Markdown report to stdout
+taskmd report
+
+# HTML report to file
+taskmd report --format html --out report.html
+
+# JSON report grouped by priority
+taskmd report tasks/ --group-by priority --format json
+
+# Include dependency graph
+taskmd report tasks/ --format html --include-graph --out report.html
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format` | `md` | Output format (`md`, `html`, `json`) |
+| `--group-by` | `status` | Field to group by (`status`, `priority`, `effort`, `group`, `tag`) |
+| `--out`, `-o` | | Write output to file |
+| `--include-graph` | `false` | Embed dependency graph in report |
+
+### tracks - Parallel Work Tracks
+
+Assign actionable tasks to parallel work tracks based on the `touches` frontmatter field. Tasks that share a scope are placed in separate tracks so they can be worked on without merge conflicts.
+
+```bash
+# Show work tracks
+taskmd tracks
+
+# Filter to CLI-related tasks
+taskmd tracks --filter tag=cli
+
+# Limit to top 3 tracks
+taskmd tracks --limit 3
+
+# Export track assignments
+taskmd tracks --format json > tracks.json
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format` | `table` | Output format (`table`, `json`, `yaml`) |
+| `--filter` | | Filter tasks (repeatable) |
+| `--limit` | `0` | Maximum number of tracks (0 = unlimited) |
+
+### sync - Sync External Sources
+
+Fetch tasks from configured external sources (e.g., GitHub Issues) and create or update local markdown task files. Configuration is read from `.taskmd.yaml`.
+
+```bash
+# Sync all configured sources
+taskmd sync
+
+# Preview without writing files
+taskmd sync --dry-run
+
+# Sync a specific source
+taskmd sync --source github
+
+# Overwrite local changes with remote data
+taskmd sync --conflict remote
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | `false` | Preview changes without writing files |
+| `--source` | | Sync only the named source |
+| `--conflict` | `skip` | Conflict strategy: `skip`, `remote`, or `local` |
+
+See [Configuration](/reference/configuration#sync-configuration) for how to set up sync sources in `.taskmd.yaml`.
+
 ### web - Web Dashboard
 
 Start the web interface server.

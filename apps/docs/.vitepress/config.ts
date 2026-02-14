@@ -26,6 +26,7 @@ export default defineConfig({
           { text: 'Quick Start', link: '/getting-started/' },
           { text: 'Installation', link: '/getting-started/installation' },
           { text: 'Core Concepts', link: '/getting-started/concepts' },
+          { text: 'Why taskmd?', link: '/guide/why' },
         ],
       },
       {
