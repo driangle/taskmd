@@ -45,6 +45,11 @@ export interface GraphEdge {
   to: string;
 }
 
+export interface TagInfo {
+  tag: string;
+  count: number;
+}
+
 export interface Stats {
   total_tasks: number;
   tasks_by_status: Record<string, number>;
@@ -54,6 +59,7 @@ export interface Stats {
   critical_path_length: number;
   max_dependency_depth: number;
   avg_dependencies_per_task: number;
+  tags_by_count: TagInfo[];
 }
 
 export interface ValidationResult {

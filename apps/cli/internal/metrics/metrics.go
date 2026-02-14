@@ -1,8 +1,16 @@
 package metrics
 
 import (
+	"sort"
+
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 )
+
+// TagInfo holds a tag and how many tasks use it
+type TagInfo struct {
+	Tag   string `json:"tag"`
+	Count int    `json:"count"`
+}
 
 // Metrics contains computed statistics about a task set
 type Metrics struct {
@@ -14,6 +22,7 @@ type Metrics struct {
 	CriticalPathLength     int                    `json:"critical_path_length"`
 	MaxDependencyDepth     int                    `json:"max_dependency_depth"`
 	AvgDependenciesPerTask float64                `json:"avg_dependencies_per_task"`
+	TagsByCount            []TagInfo              `json:"tags_by_count"`
 }
 
 // Calculate computes metrics for a set of tasks
@@ -56,6 +65,9 @@ func Calculate(tasks []*model.Task) *Metrics {
 	if m.TotalTasks > 0 {
 		m.AvgDependenciesPerTask = float64(totalDeps) / float64(m.TotalTasks)
 	}
+
+	// Aggregate tags
+	m.TagsByCount = aggregateTags(tasks)
 
 	// Calculate critical path and max depth
 	m.CriticalPathLength = calculateCriticalPath(tasks, taskMap)
@@ -120,4 +132,29 @@ func calculateMaxDepth(tasks []*model.Task, taskMap map[string]*model.Task) int 
 	// - Critical path: longest path from root to leaf
 	// - Max depth: deepest single task
 	return calculateCriticalPath(tasks, taskMap)
+}
+
+// aggregateTags counts tag usage across tasks and returns sorted results
+// (by count descending, then alphabetical for ties)
+func aggregateTags(tasks []*model.Task) []TagInfo {
+	counts := make(map[string]int)
+	for _, task := range tasks {
+		for _, tag := range task.Tags {
+			counts[tag]++
+		}
+	}
+
+	tags := make([]TagInfo, 0, len(counts))
+	for tag, count := range counts {
+		tags = append(tags, TagInfo{Tag: tag, Count: count})
+	}
+
+	sort.Slice(tags, func(i, j int) bool {
+		if tags[i].Count != tags[j].Count {
+			return tags[i].Count > tags[j].Count
+		}
+		return tags[i].Tag < tags[j].Tag
+	})
+
+	return tags
 }

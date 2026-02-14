@@ -25,6 +25,22 @@ export function StatsView({ stats }: StatsViewProps) {
         <BreakdownCard title="By Priority" data={stats.tasks_by_priority} />
         <BreakdownCard title="By Effort" data={stats.tasks_by_effort} />
       </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Tags</h3>
+        {!stats.tags_by_count || stats.tags_by_count.length === 0 ? (
+          <p className="text-xs text-gray-400">No tags found</p>
+        ) : (
+          <div className="space-y-2">
+            {stats.tags_by_count.map(({ tag, count }) => (
+              <div key={tag} className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">{tag}</span>
+                <span className="text-sm font-medium">{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

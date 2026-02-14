@@ -254,6 +254,18 @@ func TestHandleStats(t *testing.T) {
 	if m.TotalTasks != 2 {
 		t.Fatalf("expected 2 total tasks, got %d", m.TotalTasks)
 	}
+
+	// Verify tags are included (test fixtures have "setup" and "core")
+	if len(m.TagsByCount) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(m.TagsByCount))
+	}
+	// Both have count 1, so alphabetical: core first, setup second
+	if m.TagsByCount[0].Tag != "core" {
+		t.Errorf("expected first tag 'core', got %q", m.TagsByCount[0].Tag)
+	}
+	if m.TagsByCount[1].Tag != "setup" {
+		t.Errorf("expected second tag 'setup', got %q", m.TagsByCount[1].Tag)
+	}
 }
 
 func TestHandleValidate(t *testing.T) {

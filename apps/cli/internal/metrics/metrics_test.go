@@ -311,3 +311,49 @@ func TestCalculate_CancelledStatus(t *testing.T) {
 		t.Errorf("expected 2 cancelled tasks, got %d", m.TasksByStatus[model.StatusCancelled])
 	}
 }
+
+func TestCalculate_TagsAggregation(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "1", Tags: []string{"backend", "api"}},
+		{ID: "2", Tags: []string{"frontend", "api"}},
+		{ID: "3", Tags: []string{"backend", "api", "frontend"}},
+		{ID: "4", Tags: []string{"docs"}},
+	}
+
+	m := Calculate(tasks)
+
+	if len(m.TagsByCount) != 4 {
+		t.Fatalf("expected 4 tags, got %d", len(m.TagsByCount))
+	}
+
+	// api should be first (count 3)
+	if m.TagsByCount[0].Tag != "api" || m.TagsByCount[0].Count != 3 {
+		t.Errorf("expected first tag api:3, got %s:%d", m.TagsByCount[0].Tag, m.TagsByCount[0].Count)
+	}
+
+	// backend and frontend tied at 2 — alphabetical: backend first
+	if m.TagsByCount[1].Tag != "backend" || m.TagsByCount[1].Count != 2 {
+		t.Errorf("expected second tag backend:2, got %s:%d", m.TagsByCount[1].Tag, m.TagsByCount[1].Count)
+	}
+	if m.TagsByCount[2].Tag != "frontend" || m.TagsByCount[2].Count != 2 {
+		t.Errorf("expected third tag frontend:2, got %s:%d", m.TagsByCount[2].Tag, m.TagsByCount[2].Count)
+	}
+
+	// docs last (count 1)
+	if m.TagsByCount[3].Tag != "docs" || m.TagsByCount[3].Count != 1 {
+		t.Errorf("expected fourth tag docs:1, got %s:%d", m.TagsByCount[3].Tag, m.TagsByCount[3].Count)
+	}
+}
+
+func TestCalculate_NoTags(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "1", Tags: nil},
+		{ID: "2", Tags: []string{}},
+	}
+
+	m := Calculate(tasks)
+
+	if len(m.TagsByCount) != 0 {
+		t.Errorf("expected 0 tags, got %d", len(m.TagsByCount))
+	}
+}
