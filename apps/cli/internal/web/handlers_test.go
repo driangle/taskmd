@@ -286,7 +286,7 @@ func TestHandleUpdateTask_Success(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -316,7 +316,7 @@ func TestHandleUpdateTask_NotFound(t *testing.T) {
 	req.SetPathValue("id", "999")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rec.Code)
@@ -332,7 +332,7 @@ func TestHandleUpdateTask_InvalidStatus(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
@@ -356,7 +356,7 @@ func TestHandleUpdateTask_InvalidJSON(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
@@ -372,7 +372,7 @@ func TestHandleUpdateTask_Title(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -393,7 +393,7 @@ func TestHandleUpdateTask_Body(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -418,7 +418,7 @@ func TestHandleUpdateTask_Tags(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -448,7 +448,7 @@ func TestHandleUpdateTask_PartialUpdate(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp)(rec, req)
+	handleUpdateTask(dp, false)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -464,5 +464,73 @@ func TestHandleUpdateTask_PartialUpdate(t *testing.T) {
 	}
 	if !strings.Contains(s, "effort: small") {
 		t.Error("expected effort to be preserved")
+	}
+}
+
+// GET /api/config tests
+
+func TestHandleConfig(t *testing.T) {
+	cfg := Config{ReadOnly: false}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+
+	handleConfig(cfg)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var resp ConfigResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if resp.ReadOnly {
+		t.Error("expected readonly to be false")
+	}
+}
+
+func TestHandleConfig_ReadOnly(t *testing.T) {
+	cfg := Config{ReadOnly: true}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+
+	handleConfig(cfg)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var resp ConfigResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if !resp.ReadOnly {
+		t.Error("expected readonly to be true")
+	}
+}
+
+func TestHandleUpdateTask_ReadOnly(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"status":"completed"}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/001", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleUpdateTask(dp, true)(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if errResp.Error != "server is in read-only mode" {
+		t.Errorf("expected 'server is in read-only mode', got %q", errResp.Error)
 	}
 }

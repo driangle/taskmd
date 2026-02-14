@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { useTaskDetail } from "../hooks/use-task-detail.ts";
+import { useConfig } from "../hooks/use-config.ts";
 import { updateTask, ApiRequestError } from "../api/client.ts";
 import type { TaskUpdateRequest } from "../api/types.ts";
 import { TaskEditForm } from "../components/tasks/TaskEditForm.tsx";
@@ -11,6 +12,7 @@ import { TaskEditForm } from "../components/tasks/TaskEditForm.tsx";
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: task, error, isLoading, mutate } = useTaskDetail(id);
+  const { readonly } = useConfig();
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -50,7 +52,7 @@ export function TaskDetailPage() {
   return (
     <div>
       <div className="bg-white border border-gray-200 rounded-lg p-6">
-        {isEditing ? (
+        {isEditing && !readonly ? (
           <TaskEditForm
             task={task}
             onSave={handleSave}
@@ -71,12 +73,14 @@ export function TaskDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={task.status} />
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-                >
-                  Edit
-                </button>
+                {!readonly && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
 

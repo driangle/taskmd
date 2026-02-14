@@ -14,6 +14,17 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
 
+// ConfigResponse is the JSON response for GET /api/config.
+type ConfigResponse struct {
+	ReadOnly bool `json:"readonly"`
+}
+
+func handleConfig(cfg Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, ConfigResponse{ReadOnly: cfg.ReadOnly})
+	}
+}
+
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
@@ -186,8 +197,13 @@ func findTaskByID(tasks []*model.Task, id string) *model.Task {
 	return nil
 }
 
-func handleUpdateTask(dp *DataProvider) http.HandlerFunc {
+func handleUpdateTask(dp *DataProvider, readonly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if readonly {
+			writeError(w, http.StatusForbidden, "server is in read-only mode", nil)
+			return
+		}
+
 		taskID := r.PathValue("id")
 		if taskID == "" {
 			writeError(w, http.StatusBadRequest, "task ID is required", nil)

@@ -13,10 +13,11 @@ import (
 
 // Config holds server configuration.
 type Config struct {
-	Port    int
-	ScanDir string
-	Dev     bool
-	Verbose bool
+	Port     int
+	ScanDir  string
+	Dev      bool
+	Verbose  bool
+	ReadOnly bool
 }
 
 // Server is the taskmd web server.
@@ -50,9 +51,10 @@ func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 
 	// API routes
+	mux.HandleFunc("GET /api/config", handleConfig(s.config))
 	mux.HandleFunc("GET /api/tasks", handleTasks(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}", handleTaskByID(s.dp))
-	mux.HandleFunc("PUT /api/tasks/{id}", handleUpdateTask(s.dp))
+	mux.HandleFunc("PUT /api/tasks/{id}", handleUpdateTask(s.dp, s.config.ReadOnly))
 	mux.HandleFunc("GET /api/board", handleBoard(s.dp))
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))
 	mux.HandleFunc("GET /api/graph/mermaid", handleGraphMermaid(s.dp))
@@ -94,16 +96,23 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to listen on port %d: %w", s.config.Port, err)
 	}
 
-	fmt.Printf("taskmd web server running at http://localhost:%d\n", s.config.Port)
-	fmt.Printf("Watching %s for changes\n", s.config.ScanDir)
-	if s.config.Dev {
-		fmt.Println("Dev mode: CORS enabled for http://localhost:5173")
-	}
+	s.printBanner()
 
 	if err := srv.Serve(listener); err != http.ErrServerClosed {
 		return err
 	}
 	return nil
+}
+
+func (s *Server) printBanner() {
+	fmt.Printf("taskmd web server running at http://localhost:%d\n", s.config.Port)
+	fmt.Printf("Watching %s for changes\n", s.config.ScanDir)
+	if s.config.ReadOnly {
+		fmt.Println("Read-only mode: editing is disabled")
+	}
+	if s.config.Dev {
+		fmt.Println("Dev mode: CORS enabled for http://localhost:5173")
+	}
 }
 
 func (s *Server) mountStatic(mux *http.ServeMux) {

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { useConfig } from "../../hooks/use-config.ts";
 
 const tabs = [
   { path: "/tasks", label: "Tasks" },
@@ -13,17 +14,26 @@ interface ShellProps {
 }
 
 export function Shell({ children }: ShellProps) {
+  const { readonly } = useConfig();
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
-            <Link
-              to="/tasks"
-              className="text-lg font-semibold tracking-tight"
-            >
-              taskmd
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/tasks"
+                className="text-lg font-semibold tracking-tight"
+              >
+                taskmd
+              </Link>
+              {readonly && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
+                  Read Only
+                </span>
+              )}
+            </div>
             <nav className="flex gap-1">
               {tabs.map((tab) => (
                 <NavLink
