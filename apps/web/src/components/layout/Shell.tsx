@@ -50,6 +50,14 @@ export function Shell({ children }: ShellProps) {
                   {tab.label}
                 </NavLink>
               ))}
+              <a
+                href="https://driangle.github.io/taskmd/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 text-sm rounded-md transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                Docs ↗
+              </a>
             </nav>
           </div>
         </div>

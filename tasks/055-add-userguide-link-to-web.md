@@ -1,7 +1,7 @@
 ---
 id: "055"
 title: "Add link to user guides on GitHub from web UI"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies: []
@@ -26,21 +26,21 @@ Users working in the web interface may need help understanding features, task fo
 
 ## Tasks
 
-- [ ] Determine best location for documentation link
+- [x] Determine best location for documentation link
   - Options: Header navigation, sidebar, footer, help icon
   - Recommended: Header navigation with "Docs" or "Help" link
-- [ ] Add documentation link to web UI header/navigation
+- [x] Add documentation link to web UI header/navigation
   - Link text: "Documentation" or "Help" or "User Guide"
   - Target URL: GitHub repository docs or user guides
   - Opens in new tab (`target="_blank"`)
-- [ ] Choose appropriate icon (optional)
+- [x] Choose appropriate icon (optional)
   - Material Icons: `help_outline`, `menu_book`, or `description`
   - Should be consistent with other UI elements
-- [ ] Ensure link is visible on all pages
+- [x] Ensure link is visible on all pages
   - Dashboard view
   - Graph view
   - Board view
-- [ ] Test link functionality
+- [x] Test link functionality
   - Verify URL is correct
   - Verify new tab behavior
   - Test on mobile responsive view
