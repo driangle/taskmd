@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import { version } from '../../../package.json'
 
 export default defineConfig({
   title: 'taskmd',
@@ -11,6 +12,7 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
+      { text: `v${version}`, link: 'https://github.com/driangle/taskmd/releases' },
       { text: 'Guide', link: '/getting-started/' },
       { text: 'CLI Reference', link: '/guide/cli' },
       { text: 'Specification', link: '/reference/specification' },
@@ -65,7 +67,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Released under the MIT License.',
+      message: `Released under the MIT License. v${version}`,
     },
   },
 })
