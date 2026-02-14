@@ -1,7 +1,7 @@
 ---
 id: "073"
 title: "Add unified init command combining agents init and spec"
-status: pending
+status: completed
 priority: medium
 effort: medium
 dependencies:
