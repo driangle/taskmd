@@ -801,3 +801,93 @@ func TestValidateTouches_NoScopesConfigured(t *testing.T) {
 		t.Errorf("Expected no warnings for empty scopes, got %d", result.Warnings)
 	}
 }
+
+func TestValidateConfig_ScopesWithDescription(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		Scopes: map[string]ScopeConfig{
+			"cli/graph": {
+				Description: "Graph visualization",
+				Paths:       []string{"apps/cli/internal/graph/"},
+			},
+		},
+		TopKeys:    []string{"scopes"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Errors != 0 {
+		t.Errorf("Expected no errors, got %d", result.Errors)
+		for _, issue := range result.Issues {
+			t.Logf("  Issue: [%s] %s", issue.Level, issue.Message)
+		}
+	}
+}
+
+func TestValidateConfig_ScopeDescriptionInErrorMessage(t *testing.T) {
+	v := NewValidator(false)
+
+	t.Run("missing paths with description", func(t *testing.T) {
+		config := &ConfigData{
+			Scopes: map[string]ScopeConfig{
+				"cli/graph": {Description: "Graph visualization", Paths: nil},
+			},
+			TopKeys:    []string{"scopes"},
+			ConfigPath: ".taskmd.yaml",
+		}
+
+		result := v.ValidateConfig(config)
+
+		if result.Errors != 1 {
+			t.Fatalf("Expected 1 error, got %d", result.Errors)
+		}
+
+		want := "scope 'cli/graph' (Graph visualization) is missing required field: paths"
+		if result.Issues[0].Message != want {
+			t.Errorf("got message %q, want %q", result.Issues[0].Message, want)
+		}
+	})
+
+	t.Run("empty paths with description", func(t *testing.T) {
+		config := &ConfigData{
+			Scopes: map[string]ScopeConfig{
+				"cli/graph": {Description: "Graph visualization", Paths: []string{}},
+			},
+			TopKeys:    []string{"scopes"},
+			ConfigPath: ".taskmd.yaml",
+		}
+
+		result := v.ValidateConfig(config)
+
+		if result.Errors != 1 {
+			t.Fatalf("Expected 1 error, got %d", result.Errors)
+		}
+
+		want := "scope 'cli/graph' (Graph visualization) has empty paths array"
+		if result.Issues[0].Message != want {
+			t.Errorf("got message %q, want %q", result.Issues[0].Message, want)
+		}
+	})
+
+	t.Run("missing paths without description unchanged", func(t *testing.T) {
+		config := &ConfigData{
+			Scopes: map[string]ScopeConfig{
+				"cli/graph": {Paths: nil},
+			},
+			TopKeys:    []string{"scopes"},
+			ConfigPath: ".taskmd.yaml",
+		}
+
+		result := v.ValidateConfig(config)
+
+		if result.Errors != 1 {
+			t.Fatalf("Expected 1 error, got %d", result.Errors)
+		}
+
+		want := "scope 'cli/graph' is missing required field: paths"
+		if result.Issues[0].Message != want {
+			t.Errorf("got message %q, want %q", result.Issues[0].Message, want)
+		}
+	})
+}

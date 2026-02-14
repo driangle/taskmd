@@ -67,7 +67,8 @@ type ConfigData struct {
 
 // ScopeConfig holds the configuration for a single scope entry.
 type ScopeConfig struct {
-	Paths []string // nil means the paths field was absent
+	Description string   // optional human-readable description
+	Paths       []string // nil means the paths field was absent
 }
 
 // Validator validates task collections
@@ -328,14 +329,23 @@ func (v *Validator) ValidateConfig(config *ConfigData) *ValidationResult {
 // checkConfigScopes validates each scope entry has a non-empty paths array.
 func (v *Validator) checkConfigScopes(config *ConfigData, result *ValidationResult) {
 	for name, scope := range config.Scopes {
+		label := scopeLabel(name, scope.Description)
 		if scope.Paths == nil {
 			result.AddIssue(LevelError, "", config.ConfigPath,
-				fmt.Sprintf("scope '%s' is missing required field: paths", name))
+				fmt.Sprintf("%s is missing required field: paths", label))
 		} else if len(scope.Paths) == 0 {
 			result.AddIssue(LevelError, "", config.ConfigPath,
-				fmt.Sprintf("scope '%s' has empty paths array", name))
+				fmt.Sprintf("%s has empty paths array", label))
 		}
 	}
+}
+
+// scopeLabel returns a formatted label like "scope 'name' (description)" or "scope 'name'".
+func scopeLabel(name, description string) string {
+	if description != "" {
+		return fmt.Sprintf("scope '%s' (%s)", name, description)
+	}
+	return fmt.Sprintf("scope '%s'", name)
 }
 
 var knownConfigKeys = map[string]bool{

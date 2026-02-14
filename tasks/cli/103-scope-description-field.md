@@ -1,7 +1,7 @@
 ---
 id: "103"
 title: "Add description field to scopes in .taskmd.yaml"
-status: pending
+status: in-progress
 priority: low
 effort: small
 tags:

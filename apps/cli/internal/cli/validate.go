@@ -249,6 +249,10 @@ func parseScopeEntries(scopeMap map[string]any) map[string]validator.ScopeConfig
 			continue
 		}
 
+		if desc, ok := entryMap["description"].(string); ok {
+			sc.Description = desc
+		}
+
 		pathsRaw, exists := entryMap["paths"]
 		if !exists {
 			scopes[name] = sc

@@ -113,6 +113,7 @@ Scopes are user-defined identifiers. Concrete scope-to-path mappings can be conf
 # .taskmd.yaml
 scopes:
   cli/graph:
+    description: "Graph visualization and dependency rendering"
     paths:
       - "apps/cli/internal/graph/"
       - "apps/cli/internal/cli/graph.go"
@@ -120,6 +121,8 @@ scopes:
     paths:
       - "apps/cli/internal/cli/format.go"
 ```
+
+The optional `description` field provides a human-readable explanation of what a scope covers. When present, it is included in validation error messages for easier debugging.
 
 When scopes are configured, `touches` values not found in the config produce a warning. When no scopes config exists, all values are accepted silently.
 
