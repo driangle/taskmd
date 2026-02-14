@@ -4,7 +4,9 @@ title: "Add drag-and-drop to board view"
 status: pending
 priority: medium
 effort: medium
-tags: []
+tags:
+  - web
+  - mvp
 created: 2026-02-14
 ---
 

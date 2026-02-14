@@ -1,0 +1,8 @@
+sources:
+  - name: github
+    project: driangle/taskmd
+    token_env: GITHUB_TOKEN_TASKMD
+    output_dir: tasks/github
+    field_map:
+      labels_to_tags: true
+      assignee_to_owner: true
