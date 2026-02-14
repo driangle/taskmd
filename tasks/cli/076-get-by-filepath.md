@@ -1,7 +1,7 @@
 ---
 id: "076"
 title: "Allow passing filepath or filename to get command"
-status: pending
+status: completed
 priority: medium
 effort: small
 tags:

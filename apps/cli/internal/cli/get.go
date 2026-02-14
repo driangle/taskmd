@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -30,16 +31,20 @@ var getCmd = &cobra.Command{
 	Use:        "get <query>",
 	SuggestFor: []string{"view", "info", "detail", "details", "describe"},
 	Short:      "Get detailed information about a specific task",
-	Long: `Get displays detailed information about a specific task, identified by ID or title.
+	Long: `Get displays detailed information about a specific task, identified by ID, title, or file path.
 
 Matching priority:
   1. Exact match by task ID (case-sensitive)
   2. Exact match by task title (case-insensitive)
-  3. Fuzzy match across IDs and titles (unless --exact is set)
+  3. Match by file path or filename
+  4. Fuzzy match across IDs and titles (unless --exact is set)
 
 Examples:
   taskmd get cli-037
   taskmd get "Add show command"
+  taskmd get tasks/cli/037-task.md  # match by file path
+  taskmd get 037-task.md            # match by filename
+  taskmd get 037-task               # match by filename without extension
   taskmd get sho                    # fuzzy match
   taskmd get sho --exact            # no fuzzy, returns "task not found"
   taskmd get cli-037 --format json
@@ -108,11 +113,20 @@ type depEntry struct {
 	Title string `json:"title" yaml:"title"`
 }
 
-// resolveTask finds a task by exact match or fuzzy match.
+// resolveTask finds a task by exact match, file path, or fuzzy match.
 func resolveTask(query string, tasks []*model.Task, exactOnly bool, threshold float64) (*model.Task, error) {
 	if task := findExactMatch(query, tasks); task != nil {
 		return task, nil
 	}
+
+	task, err := findFilePathMatch(query, tasks)
+	if err != nil {
+		return nil, err
+	}
+	if task != nil {
+		return task, nil
+	}
+
 	if exactOnly {
 		return nil, fmt.Errorf("task not found: %s", query)
 	}
@@ -139,6 +153,46 @@ func findExactMatch(query string, tasks []*model.Task) *model.Task {
 		}
 	}
 	return nil
+}
+
+// findFilePathMatch tries to match the query against task file paths and filenames.
+func findFilePathMatch(query string, tasks []*model.Task) (*model.Task, error) {
+	queryBase := filepath.Base(query)
+	queryNoExt := strings.TrimSuffix(queryBase, ".md")
+
+	var matches []*model.Task
+	for _, t := range tasks {
+		// Exact full path match — return immediately
+		if t.FilePath == query {
+			return t, nil
+		}
+
+		taskBase := filepath.Base(t.FilePath)
+		taskNoExt := strings.TrimSuffix(taskBase, ".md")
+
+		if taskBase == queryBase || taskNoExt == queryNoExt {
+			matches = append(matches, t)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return nil, nil
+	case 1:
+		return matches[0], nil
+	default:
+		return nil, fmt.Errorf("ambiguous filename %q matches multiple tasks: %s",
+			query, formatAmbiguousMatches(matches))
+	}
+}
+
+// formatAmbiguousMatches formats a list of tasks for an ambiguity error message.
+func formatAmbiguousMatches(tasks []*model.Task) string {
+	parts := make([]string, len(tasks))
+	for i, t := range tasks {
+		parts[i] = fmt.Sprintf("%s [%s]", t.ID, t.FilePath)
+	}
+	return strings.Join(parts, ", ")
 }
 
 // fuzzyMatch holds a task and its similarity score.

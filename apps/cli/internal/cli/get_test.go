@@ -470,6 +470,215 @@ func TestLevenshtein(t *testing.T) {
 	}
 }
 
+// --- File path matching tests ---
+
+func createGetTestFilesWithSubdirs(t *testing.T) string {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
+	dirs := []string{"cli", "backend"}
+	for _, d := range dirs {
+		if err := os.MkdirAll(filepath.Join(tmpDir, d), 0755); err != nil {
+			t.Fatalf("Failed to create directory %s: %v", d, err)
+		}
+	}
+
+	files := map[string]string{
+		"cli/042-task.md": `---
+id: "cli-042"
+title: "CLI task"
+status: pending
+priority: medium
+dependencies: []
+tags: []
+created: 2026-02-08
+---
+
+# CLI task
+`,
+		"backend/055-api.md": `---
+id: "backend-055"
+title: "API task"
+status: pending
+priority: high
+dependencies: []
+tags: []
+created: 2026-02-08
+---
+
+# API task
+`,
+		"cli/055-api.md": `---
+id: "cli-055"
+title: "CLI API task"
+status: pending
+priority: low
+dependencies: []
+tags: []
+created: 2026-02-08
+---
+
+# CLI API task
+`,
+	}
+
+	for relPath, content := range files {
+		path := filepath.Join(tmpDir, relPath)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", relPath, err)
+		}
+	}
+
+	return tmpDir
+}
+
+func TestGet_FilePathMatch_FullRelativePath(t *testing.T) {
+	tmpDir := createGetTestFilesWithSubdirs(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	output := captureGetOutput(t, "cli/042-task.md")
+
+	if !strings.Contains(output, "Task: cli-042") {
+		t.Error("Expected full relative path to match task cli-042")
+	}
+}
+
+func TestGet_FilePathMatch_FilenameWithExtension(t *testing.T) {
+	tmpDir := createGetTestFilesWithSubdirs(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	output := captureGetOutput(t, "042-task.md")
+
+	if !strings.Contains(output, "Task: cli-042") {
+		t.Error("Expected filename with extension to match task cli-042")
+	}
+}
+
+func TestGet_FilePathMatch_FilenameWithoutExtension(t *testing.T) {
+	tmpDir := createGetTestFilesWithSubdirs(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	output := captureGetOutput(t, "042-task")
+
+	if !strings.Contains(output, "Task: cli-042") {
+		t.Error("Expected filename without extension to match task cli-042")
+	}
+}
+
+func TestGet_FilePathMatch_AmbiguousFilename(t *testing.T) {
+	tmpDir := createGetTestFilesWithSubdirs(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	// "055-api.md" exists in both cli/ and backend/ — should be ambiguous
+	err := runGet(getCmd, []string{"055-api.md"})
+	if err == nil {
+		t.Fatal("Expected error for ambiguous filename")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("Expected 'ambiguous' error, got: %v", err)
+	}
+}
+
+func TestGet_FilePathMatch_ExactPathResolvesAmbiguity(t *testing.T) {
+	tmpDir := createGetTestFilesWithSubdirs(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	// Full relative path should resolve ambiguity
+	output := captureGetOutput(t, "backend/055-api.md")
+
+	if !strings.Contains(output, "Task: backend-055") {
+		t.Error("Expected exact path to resolve ambiguity and match backend-055")
+	}
+}
+
+func TestGet_FilePathMatch_IDStillTakesPriority(t *testing.T) {
+	tmpDir := createGetTestFilesWithSubdirs(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	// "cli-042" is a task ID — should match by ID, not filepath
+	output := captureGetOutput(t, "cli-042")
+
+	if !strings.Contains(output, "Task: cli-042") {
+		t.Error("Expected ID match to still work")
+	}
+	if !strings.Contains(output, "Title: CLI task") {
+		t.Error("Expected ID match to return CLI task")
+	}
+}
+
+func TestFindFilePathMatch(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task A", FilePath: "cli/001-setup.md"},
+		{ID: "002", Title: "Task B", FilePath: "backend/002-api.md"},
+		{ID: "003", Title: "Task C", FilePath: "cli/003-shared.md"},
+		{ID: "004", Title: "Task D", FilePath: "backend/003-shared.md"},
+	}
+
+	// Exact full path match
+	task, err := findFilePathMatch("cli/001-setup.md", tasks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if task == nil || task.ID != "001" {
+		t.Error("Expected exact path match to find task 001")
+	}
+
+	// Filename with extension (unique)
+	task, err = findFilePathMatch("002-api.md", tasks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if task == nil || task.ID != "002" {
+		t.Error("Expected filename match to find task 002")
+	}
+
+	// Filename without extension (unique)
+	task, err = findFilePathMatch("001-setup", tasks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if task == nil || task.ID != "001" {
+		t.Error("Expected filename without extension to find task 001")
+	}
+
+	// Ambiguous filename
+	task, err = findFilePathMatch("003-shared.md", tasks)
+	if err == nil {
+		t.Fatal("Expected error for ambiguous filename")
+	}
+	if !strings.Contains(err.Error(), "ambiguous") {
+		t.Errorf("Expected 'ambiguous' error, got: %v", err)
+	}
+	if task != nil {
+		t.Error("Expected nil task for ambiguous match")
+	}
+
+	// No match
+	task, err = findFilePathMatch("nonexistent.md", tasks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if task != nil {
+		t.Error("Expected nil for no match")
+	}
+
+	// Exact path takes priority over ambiguous filename
+	task, err = findFilePathMatch("cli/003-shared.md", tasks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if task == nil || task.ID != "003" {
+		t.Error("Expected exact path to resolve ambiguity")
+	}
+}
+
 func TestFuzzyMatchTasks(t *testing.T) {
 	tasks := []*model.Task{
 		{ID: "001", Title: "Setup project"},
