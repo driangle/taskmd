@@ -1,4 +1,4 @@
-.PHONY: build run clean install install-full install-dev test lint lint-fix tidy check web-build web-embed build-full man
+.PHONY: build run clean install install-full install-dev install-dev-full test lint lint-fix tidy check web-build web-embed build-full man
 
 # Build the binary
 build:
@@ -25,6 +25,12 @@ install-full: web-embed
 install-dev:
 	go build -o ~/bin/taskmd-dev ./cmd/taskmd
 	@echo "Installed development binary to ~/bin/taskmd-dev"
+	@echo "Usage: taskmd-dev [command]"
+
+# Install as taskmd-dev with embedded web assets
+install-dev-full: web-embed
+	go build -tags embed_web -o ~/bin/taskmd-dev ./cmd/taskmd
+	@echo "Installed development binary (with web) to ~/bin/taskmd-dev"
 	@echo "Usage: taskmd-dev [command]"
 
 # Run tests

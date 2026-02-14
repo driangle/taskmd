@@ -27,6 +27,11 @@ type tasksRefreshedMsg struct {
 	tasks []*model.Task
 }
 
+// detailRenderedMsg contains the rendered detail content for a task.
+type detailRenderedMsg struct {
+	content string
+}
+
 // hideRefreshIndicatorMsg signals to hide the refresh indicator.
 type hideRefreshIndicatorMsg struct{}
 
@@ -59,6 +64,7 @@ type App struct {
 	watcher              *watcher.Watcher
 	verbose              bool
 	showRefreshIndicator bool
+	detailLoading        bool
 	fileChangeChan       chan struct{}
 }
 
@@ -156,6 +162,11 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.waitForFileChange(), // Continue listening for changes
 			m.hideRefreshIndicator(),
 		)
+
+	case detailRenderedMsg:
+		m.renderedDetail = msg.content
+		m.detailLoading = false
+		return m, nil
 
 	case hideRefreshIndicatorMsg:
 		m.showRefreshIndicator = false
@@ -313,7 +324,11 @@ func (m App) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(filteredTasks) > 0 && m.selectedIndex < len(filteredTasks) {
 			m.viewMode = viewDetail
 			m.detailScrollOffset = 0
-			m.renderedDetail = m.buildDetailContent(filteredTasks[m.selectedIndex])
+			m.detailLoading = true
+			m.renderedDetail = ""
+			task := filteredTasks[m.selectedIndex]
+			width := m.width
+			return m, m.renderDetailAsync(task, width)
 		}
 	default:
 		m.navigateList(msg.String())
@@ -336,7 +351,11 @@ func (m App) View() string {
 	var content string
 	switch m.viewMode {
 	case viewDetail:
-		content = m.renderDetailView(contentHeight)
+		if m.detailLoading {
+			content = contentStyle.Width(m.width).Height(contentHeight).Render("Loading...")
+		} else {
+			content = m.renderDetailView(contentHeight)
+		}
 	default:
 		content = m.renderContent(contentHeight)
 	}
@@ -491,7 +510,15 @@ func (m App) renderContent(height int) string {
 	return contentStyle.Width(m.width).Height(height).Render(strings.Join(lines, "\n"))
 }
 
-func (m App) buildDetailContent(task *model.Task) string {
+// renderDetailAsync returns a tea.Cmd that renders detail content in a goroutine.
+func (m App) renderDetailAsync(task *model.Task, width int) tea.Cmd {
+	return func() tea.Msg {
+		content := buildDetailContent(task, width)
+		return detailRenderedMsg{content: content}
+	}
+}
+
+func buildDetailContent(task *model.Task, appWidth int) string {
 	var sb strings.Builder
 
 	// Title
@@ -500,7 +527,7 @@ func (m App) buildDetailContent(task *model.Task) string {
 
 	// Metadata
 	sb.WriteString(detailLabelStyle.Render("ID:       ") + detailValueStyle.Render(task.ID) + "\n")
-	sb.WriteString(detailLabelStyle.Render("Status:   ") + m.statusString(task.Status) + "\n")
+	sb.WriteString(detailLabelStyle.Render("Status:   ") + statusString(task.Status) + "\n")
 
 	if task.Priority != "" {
 		sb.WriteString(detailLabelStyle.Render("Priority: ") + detailValueStyle.Render(string(task.Priority)) + "\n")
@@ -523,7 +550,7 @@ func (m App) buildDetailContent(task *model.Task) string {
 
 	// Body rendered as markdown
 	if task.Body != "" {
-		width := m.width - 6 // Account for content padding
+		width := appWidth - 6 // Account for content padding
 		if width < 40 {
 			width = 40
 		}
@@ -583,7 +610,7 @@ func priorityColor(p model.Priority) lipgloss.Color {
 	}
 }
 
-func (m App) statusString(status model.Status) string {
+func statusString(status model.Status) string {
 	icon, color := statusIconAndColor(status)
 	return lipgloss.NewStyle().Foreground(color).Render(icon + " " + string(status))
 }

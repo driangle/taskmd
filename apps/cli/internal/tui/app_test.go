@@ -497,8 +497,17 @@ func pressKey(m App, key string) App {
 	default:
 		msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
 	}
-	updated, _ := m.Update(msg)
-	return updated.(App)
+	updated, cmd := m.Update(msg)
+	app := updated.(App)
+	// If the update returned a command (e.g. async detail rendering), execute it
+	// and feed the resulting message back into Update to complete the cycle.
+	if cmd != nil {
+		if result := cmd(); result != nil {
+			updated, _ = app.Update(result)
+			app = updated.(App)
+		}
+	}
+	return app
 }
 
 func TestDetailView_EnterOpensDetail(t *testing.T) {
