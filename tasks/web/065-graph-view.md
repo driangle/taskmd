@@ -1,7 +1,7 @@
 ---
 id: "065"
 title: "Implement Graph view for task dependencies"
-status: pending
+status: completed
 priority: medium
 effort: large
 dependencies: ["007"]
