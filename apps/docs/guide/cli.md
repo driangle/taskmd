@@ -4,6 +4,31 @@ Complete reference for using taskmd from the command line.
 
 ## Command Reference
 
+### Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `list` | List tasks in a quick textual format |
+| `get` | Get detailed information about a specific task |
+| `set` | Set a task's frontmatter fields |
+| `next` | Recommend what task to work on next |
+| `validate` | Lint and validate tasks |
+| `graph` | Export task dependency graph |
+| `board` | Display tasks grouped in a kanban-like board view |
+| `stats` | Show computed metrics about tasks |
+| `tags` | List all tags with task counts |
+| `snapshot` | Produce a frozen, machine-readable representation of tasks |
+| `report` | Generate a comprehensive project report |
+| `tracks` | Show parallel work tracks based on scope overlap |
+| `archive` | Archive or delete completed/cancelled tasks |
+| `next-id` | Show the next available task ID |
+| `sync` | Sync tasks from external sources |
+| `web` | Web dashboard commands |
+| `init` | Initialize a project with agent configuration and spec files |
+| `completion` | Generate shell completion scripts |
+
+---
+
 ### list - View and Filter Tasks
 
 Display tasks in various formats with filtering and sorting.
