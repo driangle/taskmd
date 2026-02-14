@@ -33,12 +33,12 @@ export function FilterBar({
           value={globalFilter}
           onChange={(e) => onGlobalFilterChange(e.target.value)}
           placeholder="Filter tasks..."
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
+          className="px-3 py-2 border border-gray-300 rounded-md text-sm w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
         />
         {hasActiveFilters && (
           <button
             onClick={onClearFilters}
-            className="text-xs text-gray-500 hover:text-gray-700 underline"
+            className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
           >
             Clear filters
           </button>
@@ -46,7 +46,7 @@ export function FilterBar({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-gray-500 font-medium">Status:</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Status:</span>
         {STATUSES.map((s) => {
           const active = selectedStatuses.has(s);
           return (
@@ -56,7 +56,7 @@ export function FilterBar({
               className={`px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
                 active
                   ? STATUS_COLORS[s]
-                  : "bg-white border border-gray-200 text-gray-400"
+                  : "bg-white border border-gray-200 text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-500"
               }`}
             >
               {s}
@@ -66,7 +66,7 @@ export function FilterBar({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-gray-500 font-medium">Priority:</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Priority:</span>
         {PRIORITIES.map((p) => {
           const active = selectedPriorities.has(p);
           return (
@@ -76,7 +76,7 @@ export function FilterBar({
               className={`px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
                 active
                   ? PRIORITY_COLORS[p]
-                  : "bg-white border border-gray-200 text-gray-400"
+                  : "bg-white border border-gray-200 text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-500"
               }`}
             >
               {p}
@@ -87,15 +87,15 @@ export function FilterBar({
 
       {selectedTags.size > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500 font-medium">Tags:</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Tags:</span>
           {[...selectedTags].map((tag) => (
             <button
               key={tag}
               onClick={() => onRemoveTag(tag)}
-              className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full ring-1 ring-blue-300 flex items-center gap-1 transition-colors duration-150 hover:bg-blue-200"
+              className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full ring-1 ring-blue-300 flex items-center gap-1 transition-colors duration-150 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-700 dark:hover:bg-blue-900/50"
             >
               {tag}
-              <span className="text-blue-400">&times;</span>
+              <span className="text-blue-400 dark:text-blue-500">&times;</span>
             </button>
           ))}
         </div>

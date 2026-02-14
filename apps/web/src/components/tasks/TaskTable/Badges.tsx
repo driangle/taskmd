@@ -3,7 +3,7 @@ import { STATUS_COLORS, PRIORITY_COLORS } from "./constants.ts";
 export function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-800"}`}
+      className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"}`}
     >
       {status}
     </span>
@@ -13,7 +13,7 @@ export function StatusBadge({ status }: { status: string }) {
 export function PriorityBadge({ priority }: { priority: string }) {
   return (
     <span
-      className={`px-2 py-0.5 text-xs font-medium rounded-full ${PRIORITY_COLORS[priority] ?? "bg-gray-100 text-gray-500"}`}
+      className={`px-2 py-0.5 text-xs font-medium rounded-full ${PRIORITY_COLORS[priority] ?? "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}
     >
       {priority}
     </span>
@@ -31,7 +31,7 @@ export function BlockedStatusBadge({
   if (!isBlocked) {
     return (
       <span
-        className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800 inline-flex items-center gap-1"
+        className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 inline-flex items-center gap-1"
         aria-label="Task is ready to work on"
       >
         <span aria-hidden="true">✓</span>
@@ -44,7 +44,7 @@ export function BlockedStatusBadge({
 
   return (
     <span
-      className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 inline-flex items-center gap-1 cursor-help"
+      className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 inline-flex items-center gap-1 cursor-help"
       title={tooltipText}
       aria-label={tooltipText}
     >

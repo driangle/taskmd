@@ -11,18 +11,18 @@ export function GraphStats({ data, visibleCount }: GraphStatsProps) {
   const hasCycles = data.cycles && data.cycles.length > 0;
 
   return (
-    <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
       <span>
-        Showing <span className="font-medium text-gray-700">{visibleCount}</span> of{" "}
-        <span className="font-medium text-gray-700">{totalCount}</span> tasks
+        Showing <span className="font-medium text-gray-700 dark:text-gray-200">{visibleCount}</span> of{" "}
+        <span className="font-medium text-gray-700 dark:text-gray-200">{totalCount}</span> tasks
       </span>
       {blockedCount > 0 && (
-        <span className="text-red-600">
+        <span className="text-red-600 dark:text-red-400">
           {blockedCount} blocked
         </span>
       )}
       {hasCycles && (
-        <span className="text-amber-600 font-medium">
+        <span className="text-amber-600 dark:text-amber-400 font-medium">
           Circular dependencies detected
         </span>
       )}

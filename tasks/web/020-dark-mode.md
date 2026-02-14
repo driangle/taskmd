@@ -1,7 +1,7 @@
 ---
 id: "web-020"
 title: "Dark mode support"
-status: pending
+status: completed
 priority: low
 effort: medium
 dependencies: ["web-015"]
@@ -21,17 +21,17 @@ Add dark mode to the web dashboard, respecting system preference by default with
 
 ## Tasks
 
-- [ ] Configure Tailwind v4 dark mode (class-based strategy)
-- [ ] Add dark mode color tokens for all UI elements:
+- [x] Configure Tailwind v4 dark mode (class-based strategy)
+- [x] Add dark mode color tokens for all UI elements:
   - Background, text, borders
   - Status/priority badge colors
   - Table row hover/stripe colors
   - Board column backgrounds
-  - Graph/Mermaid theme
-- [ ] Create a theme toggle button in the Shell header
-- [ ] Persist preference in localStorage
-- [ ] Default to system preference (`prefers-color-scheme: dark`)
-- [ ] Ensure Mermaid diagrams render correctly in dark mode
+  - Graph/React Flow theme
+- [x] Create a theme toggle button in the Shell header
+- [x] Persist preference in localStorage
+- [x] Default to system preference (`prefers-color-scheme: dark`)
+- [x] Ensure React Flow graphs render correctly in dark mode
 
 ## Acceptance Criteria
 
@@ -39,4 +39,4 @@ Add dark mode to the web dashboard, respecting system preference by default with
 - Toggle switches between light and dark modes
 - Preference persists across page refreshes
 - All UI elements are readable in both modes
-- Mermaid graphs adapt to the active theme
+- React Flow graphs adapt to the active theme

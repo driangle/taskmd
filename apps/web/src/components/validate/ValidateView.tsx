@@ -18,8 +18,8 @@ export function ValidateView({ result }: ValidateViewProps) {
       </div>
 
       {issues.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-          <p className="text-sm text-green-600 font-medium">
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center dark:bg-gray-800 dark:border-gray-700">
+          <p className="text-sm text-green-600 dark:text-green-400 font-medium">
             All tasks are valid
           </p>
         </div>
@@ -28,9 +28,9 @@ export function ValidateView({ result }: ValidateViewProps) {
           {Object.entries(grouped).map(([filePath, fileIssues]) => (
             <div
               key={filePath}
-              className="bg-white rounded-lg border border-gray-200 p-4"
+              className="bg-white rounded-lg border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700"
             >
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 font-mono">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 font-mono">
                 {filePath}
               </h3>
               <div className="space-y-2">
@@ -55,10 +55,12 @@ function SummaryCard({
   value: number;
   color: "red" | "yellow";
 }) {
-  const textColor = color === "red" ? "text-red-600" : "text-yellow-600";
+  const textColor = color === "red"
+    ? "text-red-600 dark:text-red-400"
+    : "text-yellow-600 dark:text-yellow-400";
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
+    <div className="bg-white rounded-lg border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
+      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
       <p className={`mt-1 text-2xl font-semibold ${textColor}`}>{value}</p>
     </div>
   );
@@ -76,12 +78,12 @@ function IssueRow({ issue }: { issue: ValidationIssue }) {
       {issue.task_id && (
         <Link
           to={`/tasks/${issue.task_id}`}
-          className="font-mono text-blue-600 hover:underline flex-shrink-0"
+          className="font-mono text-blue-600 hover:underline dark:text-blue-400 flex-shrink-0"
         >
           {issue.task_id}
         </Link>
       )}
-      <span className="text-gray-700">{issue.message}</span>
+      <span className="text-gray-700 dark:text-gray-300">{issue.message}</span>
     </div>
   );
 }

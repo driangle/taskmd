@@ -26,15 +26,15 @@ export function StatsView({ stats }: StatsViewProps) {
         <BreakdownCard title="By Effort" data={stats.tasks_by_effort} />
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Tags</h3>
+      <div className="bg-white rounded-lg border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">Tags</h3>
         {!stats.tags_by_count || stats.tags_by_count.length === 0 ? (
           <p className="text-xs text-gray-400">No tags found</p>
         ) : (
           <div className="space-y-2">
             {stats.tags_by_count.map(({ tag, count }) => (
               <div key={tag} className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">{tag}</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">{tag}</span>
                 <span className="text-sm font-medium">{count}</span>
               </div>
             ))}
@@ -53,8 +53,8 @@ function MetricCard({
   value: number | string;
 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
+    <div className="bg-white rounded-lg border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
+      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </div>
   );
@@ -69,15 +69,15 @@ function BreakdownCard({
 }) {
   const entries = Object.entries(data).filter(([, v]) => v > 0);
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
+    <div className="bg-white rounded-lg border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{title}</h3>
       {entries.length === 0 ? (
         <p className="text-xs text-gray-400">No data</p>
       ) : (
         <div className="space-y-2">
           {entries.map(([key, val]) => (
             <div key={key} className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">{key}</span>
+              <span className="text-sm text-gray-600 dark:text-gray-300">{key}</span>
               <span className="text-sm font-medium">{val}</span>
             </div>
           ))}

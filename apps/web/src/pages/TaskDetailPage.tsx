@@ -10,6 +10,7 @@ import type { TaskUpdateRequest } from "../api/types.ts";
 import { TaskEditForm } from "../components/tasks/TaskEditForm.tsx";
 import { LoadingState } from "../components/shared/LoadingState.tsx";
 import { ErrorState } from "../components/shared/ErrorState.tsx";
+import { StatusBadge } from "../components/tasks/TaskTable/Badges.tsx";
 
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,8 +25,8 @@ export function TaskDetailPage() {
   if (!task) {
     return (
       <div>
-        <p className="text-sm text-gray-500">Task not found: {id}</p>
-        <Link to="/tasks" className="text-sm text-blue-600 hover:underline">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Task not found: {id}</p>
+        <Link to="/tasks" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
           Back to tasks
         </Link>
       </div>
@@ -52,7 +53,7 @@ export function TaskDetailPage() {
 
   return (
     <div>
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-6 dark:bg-gray-800 dark:border-gray-700">
         {isEditing && !readonly ? (
           <TaskEditForm
             task={task}
@@ -77,7 +78,7 @@ export function TaskDetailPage() {
                 {!readonly && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                    className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
                   >
                     Edit
                   </button>
@@ -96,7 +97,7 @@ export function TaskDetailPage() {
 
             {task.dependencies && task.dependencies.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-xs font-medium text-gray-500 uppercase mb-2">
+                <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
                   Dependencies
                 </h3>
                 <div className="flex gap-2 flex-wrap">
@@ -104,7 +105,7 @@ export function TaskDetailPage() {
                     <Link
                       key={dep}
                       to={`/tasks/${dep}`}
-                      className="px-2 py-1 text-xs font-mono bg-gray-100 rounded hover:bg-gray-200"
+                      className="px-2 py-1 text-xs font-mono bg-gray-100 rounded hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
                     >
                       {dep}
                     </Link>
@@ -115,7 +116,7 @@ export function TaskDetailPage() {
 
             {task.tags && task.tags.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-xs font-medium text-gray-500 uppercase mb-2">
+                <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
                   Tags
                 </h3>
                 <div className="flex gap-1 flex-wrap">
@@ -123,7 +124,7 @@ export function TaskDetailPage() {
                     <Link
                       key={t}
                       to={`/tasks?tag=${encodeURIComponent(t)}`}
-                      className="px-1.5 py-0.5 text-xs bg-gray-100 rounded cursor-pointer hover:bg-gray-200 transition-colors duration-150"
+                      className="px-1.5 py-0.5 text-xs bg-gray-100 rounded cursor-pointer hover:bg-gray-200 transition-colors duration-150 dark:bg-gray-700 dark:hover:bg-gray-600"
                     >
                       {t}
                     </Link>
@@ -133,8 +134,8 @@ export function TaskDetailPage() {
             )}
 
             {task.body && (
-              <div className="border-t border-gray-200 pt-4">
-                <div className="prose prose-sm max-w-none">
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="prose prose-sm max-w-none dark:prose-invert">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeRaw]}
@@ -160,24 +161,8 @@ export function TaskDetailPage() {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-gray-500">{label}</dt>
+      <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
       <dd className="font-medium">{value}</dd>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    "in-progress": "bg-blue-100 text-blue-800",
-    completed: "bg-green-100 text-green-800",
-    blocked: "bg-red-100 text-red-800",
-  };
-  return (
-    <span
-      className={`px-2 py-0.5 text-xs font-medium rounded-full ${colors[status] ?? "bg-gray-100 text-gray-800"}`}
-    >
-      {status}
-    </span>
   );
 }

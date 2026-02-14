@@ -15,7 +15,7 @@ export function createTaskColumns(
       cell: (info) => (
         <Link
           to={`/tasks/${info.getValue()}`}
-          className="font-mono text-xs text-blue-600 hover:underline"
+          className="font-mono text-xs text-blue-600 hover:underline dark:text-blue-400"
         >
           {info.getValue()}
         </Link>
@@ -26,7 +26,7 @@ export function createTaskColumns(
       cell: (info) => (
         <Link
           to={`/tasks/${info.row.original.id}`}
-          className="font-medium text-blue-600 hover:underline"
+          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
         >
           {info.getValue()}
         </Link>
@@ -72,8 +72,8 @@ export function createTaskColumns(
                   onClick={() => toggleTag(t)}
                   className={`px-1.5 py-0.5 text-xs rounded cursor-pointer transition-colors duration-150 ${
                     isActive
-                      ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-700"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   }`}
                 >
                   {t}

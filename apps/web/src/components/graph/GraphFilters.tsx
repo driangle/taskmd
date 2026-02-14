@@ -11,7 +11,7 @@ export function GraphFilters({ selectedStatuses, onToggleStatus, onClearFilters 
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-xs text-gray-500 font-medium">Status:</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Status:</span>
       {STATUSES.map((s) => {
         const active = selectedStatuses.has(s);
         return (
@@ -21,7 +21,7 @@ export function GraphFilters({ selectedStatuses, onToggleStatus, onClearFilters 
             className={`px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
               active
                 ? STATUS_COLORS[s]
-                : "bg-white border border-gray-200 text-gray-400"
+                : "bg-white border border-gray-200 text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-500"
             }`}
           >
             {s}
@@ -31,7 +31,7 @@ export function GraphFilters({ selectedStatuses, onToggleStatus, onClearFilters 
       {hasFilters && (
         <button
           onClick={onClearFilters}
-          className="text-xs text-gray-500 hover:text-gray-700 underline ml-1"
+          className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline ml-1"
         >
           Clear
         </button>

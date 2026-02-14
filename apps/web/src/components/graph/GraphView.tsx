@@ -13,6 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { TaskNode } from "./TaskNode.tsx";
+import { useTheme } from "../../hooks/use-theme.ts";
 
 const nodeTypes: NodeTypes = { task: TaskNode };
 const fitViewOptions = { maxZoom: 0.85, padding: 0.15 };
@@ -35,6 +36,7 @@ export function GraphView({
   searchActive,
 }: GraphViewProps) {
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
@@ -57,13 +59,14 @@ export function GraphView({
 
   if (nodes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-500">
+      <div className="flex items-center justify-center h-full text-sm text-gray-500 dark:text-gray-400">
         No tasks to display
       </div>
     );
   }
 
   const hasRestoredViewport = defaultViewport !== undefined;
+  const dotColor = theme === "dark" ? "#374151" : "#e5e7eb";
 
   return (
     <ReactFlow
@@ -80,7 +83,7 @@ export function GraphView({
       proOptions={{ hideAttribution: true }}
     >
       <Controls position="bottom-right" />
-      <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e5e7eb" />
+      <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={dotColor} />
     </ReactFlow>
   );
 }

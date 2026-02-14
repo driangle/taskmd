@@ -57,35 +57,37 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
     }
   };
 
+  const inputClasses = "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200";
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
           {error}
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">
+        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
           Title
         </label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={inputClasses}
         />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Status
           </label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={inputClasses}
           >
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -96,13 +98,13 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Priority
           </label>
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={inputClasses}
           >
             <option value="">-</option>
             {PRIORITIES.map((p) => (
@@ -114,13 +116,13 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Effort
           </label>
           <select
             value={effort}
             onChange={(e) => setEffort(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className={inputClasses}
           >
             <option value="">-</option>
             {EFFORTS.map((e) => (
@@ -133,7 +135,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">
+        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
           Tags (comma-separated)
         </label>
         <input
@@ -141,19 +143,19 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           placeholder="e.g. backend, api, feature"
-          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={inputClasses}
         />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">
+        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
           Body (Markdown)
         </label>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={24}
-          className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`${inputClasses} font-mono`}
         />
       </div>
 
@@ -162,7 +164,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+          className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 dark:text-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600"
         >
           Cancel
         </button>

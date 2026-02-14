@@ -75,7 +75,7 @@ export function GraphPage() {
 
   if (data.nodes.length === 0) {
     return (
-      <p className="text-sm text-gray-500 py-8 text-center">
+      <p className="text-sm text-gray-500 dark:text-gray-400 py-8 text-center">
         No dependencies to display.
       </p>
     );
@@ -94,7 +94,7 @@ export function GraphPage() {
         </div>
       </div>
       <ReactFlowProvider>
-        <div className="relative bg-white rounded-lg border border-gray-200 h-[calc(100vh-200px)] min-h-[500px]">
+        <div className="relative bg-white rounded-lg border border-gray-200 h-[calc(100vh-200px)] min-h-[500px] dark:bg-gray-800 dark:border-gray-700">
           <div className="absolute top-3 left-3 z-10">
             <GraphSearch
               query={searchQuery}

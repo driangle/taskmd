@@ -46,16 +46,16 @@ export function GraphSearch({ query, onQueryChange, matchedNodeIds }: GraphSearc
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Search tasks..."
-        className="w-48 px-2.5 py-1 text-xs border border-gray-200 rounded-full bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+        className="w-48 px-2.5 py-1 text-xs border border-gray-200 rounded-full bg-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
       />
       {query && (
         <>
-          <span className="text-[10px] text-gray-500">
+          <span className="text-[10px] text-gray-500 dark:text-gray-400">
             {matchedNodeIds.size} found
           </span>
           <button
             onClick={() => onQueryChange("")}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             aria-label="Clear search"
           >
             &times;
