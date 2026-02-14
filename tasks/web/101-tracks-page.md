@@ -1,7 +1,7 @@
 ---
 id: "101"
 title: "Tracks page for parallel work visualization"
-status: in-progress
+status: completed
 priority: medium
 effort: large
 tags:

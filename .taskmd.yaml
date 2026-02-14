@@ -1,8 +1,19 @@
 dir: ./tasks
 web:
   auto_open_browser: false
-
+sync:
+  sources:
+    - name: github
+      project: driangle/taskmd
+      token_env: GITHUB_TOKEN_TASKMD
+      output_dir: tasks/github
+      field_map:
+        labels_to_tags: true
+        assignee_to_owner: true
 scopes:
+  cli:
+    paths:
+      - "apps/cli/"
   cli/report:
     paths:
       - "apps/cli/internal/cli/report.go"
@@ -33,6 +44,9 @@ scopes:
   vscode:
     paths:
       - "apps/vscode/"
+  web:
+    paths:
+      - "apps/web/"
   web/layout:
     paths:
       - "apps/web/src/components/layout/"
