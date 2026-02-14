@@ -1,7 +1,7 @@
 ---
 id: "078"
 title: "tags command - List all tags with task counts"
-status: pending
+status: completed
 priority: medium
 effort: small
 tags:

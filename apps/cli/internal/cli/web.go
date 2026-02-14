@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	webPort int
-	webDev  bool
-	webOpen bool
+	webPort     int
+	webDev      bool
+	webOpen     bool
+	webReadOnly bool
 )
 
 var webCmd = &cobra.Command{
@@ -55,6 +56,7 @@ func init() {
 	webStartCmd.Flags().IntVar(&webPort, "port", 8080, "server port")
 	webStartCmd.Flags().BoolVar(&webDev, "dev", false, "enable dev mode (CORS for Vite dev server)")
 	webStartCmd.Flags().BoolVar(&webOpen, "open", false, "open browser on start")
+	webStartCmd.Flags().BoolVar(&webReadOnly, "readonly", false, "start in read-only mode (disables editing)")
 
 	// Bind flags to viper for config file support
 	viper.BindPFlag("web.port", webStartCmd.Flags().Lookup("port"))
@@ -78,10 +80,11 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 	flags := GetGlobalFlags()
 
 	srv := web.NewServer(web.Config{
-		Port:    port,
-		ScanDir: absDir,
-		Dev:     webDev,
-		Verbose: flags.Verbose,
+		Port:     port,
+		ScanDir:  absDir,
+		Dev:      webDev,
+		Verbose:  flags.Verbose,
+		ReadOnly: webReadOnly,
 	})
 
 	ctx, cancel := signal.NotifyContext(
