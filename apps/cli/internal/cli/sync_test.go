@@ -24,7 +24,7 @@ func TestSyncCommand_MissingConfig(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when config is missing")
 	}
-	if !strings.Contains(err.Error(), "sync config") {
+	if !strings.Contains(err.Error(), ".taskmd.yaml") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
@@ -47,8 +47,8 @@ func TestSyncCommand_DryRun(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	configContent := "sources:\n  - name: " + sourceName + "\n    output_dir: \"tasks\"\n    field_map:\n      status:\n        open: pending\n"
-	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd-sync.yaml"), []byte(configContent), 0644); err != nil {
+	configContent := "sync:\n  sources:\n    - name: " + sourceName + "\n      output_dir: \"tasks\"\n      field_map:\n        status:\n          open: pending\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(configContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,8 +78,8 @@ func TestSyncCommand_SourceFilter(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	configContent := "sources:\n  - name: some-source\n    output_dir: \"tasks\"\n"
-	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd-sync.yaml"), []byte(configContent), 0644); err != nil {
+	configContent := "sync:\n  sources:\n    - name: some-source\n      output_dir: \"tasks\"\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(configContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,8 +110,8 @@ func TestSyncCommand_FullSync(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	configContent := "sources:\n  - name: " + sourceName + "\n    output_dir: \"tasks\"\n    field_map:\n      status:\n        open: pending\n"
-	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd-sync.yaml"), []byte(configContent), 0644); err != nil {
+	configContent := "sync:\n  sources:\n    - name: " + sourceName + "\n      output_dir: \"tasks\"\n      field_map:\n        status:\n          open: pending\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(configContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,8 +151,8 @@ func TestSyncCommand_SourceFilterMatch(t *testing.T) {
 	}
 	defer os.Chdir(origDir)
 
-	configContent := "sources:\n  - name: " + sourceName + "\n    output_dir: \"tasks\"\n    field_map:\n      status:\n        open: pending\n"
-	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd-sync.yaml"), []byte(configContent), 0644); err != nil {
+	configContent := "sync:\n  sources:\n    - name: " + sourceName + "\n      output_dir: \"tasks\"\n      field_map:\n        status:\n          open: pending\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(configContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,12 +168,43 @@ func TestSyncCommand_SourceFilterMatch(t *testing.T) {
 func TestSyncCommand_FlagDefaults(t *testing.T) {
 	syncDryRun = false
 	syncSource = ""
+	syncConflict = "skip"
 
 	if syncDryRun {
 		t.Error("syncDryRun should be false by default")
 	}
 	if syncSource != "" {
 		t.Error("syncSource should be empty by default")
+	}
+	if syncConflict != "skip" {
+		t.Errorf("syncConflict should be 'skip' by default, got %q", syncConflict)
+	}
+}
+
+func TestSyncCommand_InvalidConflictFlag(t *testing.T) {
+	syncDryRun = false
+	syncSource = ""
+	syncConflict = "invalid"
+
+	tmpDir := t.TempDir()
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(origDir)
+
+	// Write a valid config so we get past config loading
+	configContent := "sync:\n  sources:\n    - name: test\n      output_dir: \"tasks\"\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(configContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := runSync(syncCmd, nil)
+	if err == nil {
+		t.Fatal("expected error for invalid --conflict value")
+	}
+	if !strings.Contains(err.Error(), "invalid --conflict") {
+		t.Errorf("unexpected error message: %v", err)
 	}
 }
 

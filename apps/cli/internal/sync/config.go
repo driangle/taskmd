@@ -8,9 +8,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const configFileName = ".taskmd-sync.yaml"
+const configFileName = ".taskmd.yaml"
 
-// SyncConfig is the top-level sync configuration.
+// Config is the top-level project configuration.
+type Config struct {
+	Sync SyncConfig `yaml:"sync"`
+}
+
+// SyncConfig holds the sync-specific configuration.
 type SyncConfig struct {
 	Sources []SourceConfig `yaml:"sources"`
 }
@@ -36,24 +41,26 @@ type FieldMap struct {
 	AssigneeToOwner bool              `yaml:"assignee_to_owner"`
 }
 
-// LoadConfig reads the sync config from dir/.taskmd-sync.yaml.
+// LoadConfig reads the project config from dir/.taskmd.yaml and returns the sync section.
 func LoadConfig(dir string) (*SyncConfig, error) {
 	path := filepath.Join(dir, configFileName)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read sync config: %w", err)
+		return nil, fmt.Errorf("failed to read config %s: %w", configFileName, err)
 	}
 
-	var cfg SyncConfig
+	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse sync config: %w", err)
+		return nil, fmt.Errorf("failed to parse config %s: %w", configFileName, err)
 	}
 
-	if len(cfg.Sources) == 0 {
-		return nil, fmt.Errorf("sync config has no sources defined")
+	syncCfg := &cfg.Sync
+
+	if len(syncCfg.Sources) == 0 {
+		return nil, fmt.Errorf("no sync sources defined in %s", configFileName)
 	}
 
-	for i, s := range cfg.Sources {
+	for i, s := range syncCfg.Sources {
 		if s.Name == "" {
 			return nil, fmt.Errorf("source at index %d has no name", i)
 		}
@@ -62,5 +69,5 @@ func LoadConfig(dir string) (*SyncConfig, error) {
 		}
 	}
 
-	return &cfg, nil
+	return syncCfg, nil
 }

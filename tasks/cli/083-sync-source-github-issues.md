@@ -1,7 +1,7 @@
 ---
 id: "083"
 title: "Sync source: GitHub Issues"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies:

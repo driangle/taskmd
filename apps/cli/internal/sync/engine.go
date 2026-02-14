@@ -10,11 +10,19 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 )
 
+// ConflictStrategy controls how conflicts are resolved during sync.
+const (
+	ConflictSkip   = "skip"   // default: skip conflicting tasks
+	ConflictRemote = "remote" // overwrite local with remote
+	ConflictLocal  = "local"  // keep local, update state hashes
+)
+
 // Engine orchestrates syncing tasks from external sources.
 type Engine struct {
-	ConfigDir string
-	Verbose   bool
-	DryRun    bool
+	ConfigDir        string
+	Verbose          bool
+	DryRun           bool
+	ConflictStrategy string
 }
 
 // SyncAction describes a single sync operation.
@@ -201,11 +209,55 @@ func (e *Engine) updateTask(
 	}
 
 	if localChanged {
-		action.Reason = "conflict"
-		return action, nil
+		return e.resolveConflict(action, ext, mapped, extHash, ts, state, now)
 	}
 
 	return e.applyExternalUpdate(action, ext, mapped, extHash, ts, state, now)
+}
+
+func (e *Engine) resolveConflict(
+	action SyncAction,
+	ext ExternalTask,
+	mapped MappedTask,
+	extHash string,
+	ts TaskState,
+	state *SyncState,
+	now time.Time,
+) (SyncAction, error) {
+	switch e.ConflictStrategy {
+	case ConflictRemote:
+		return e.applyExternalUpdate(action, ext, mapped, extHash, ts, state, now)
+	case ConflictLocal:
+		return e.acceptLocal(action, extHash, ts, state, now)
+	default:
+		action.Reason = "conflict"
+		return action, nil
+	}
+}
+
+func (e *Engine) acceptLocal(
+	action SyncAction,
+	extHash string,
+	ts TaskState,
+	state *SyncState,
+	now time.Time,
+) (SyncAction, error) {
+	action.Reason = "updated"
+	if e.DryRun {
+		return action, nil
+	}
+
+	localHash, err := HashLocalFile(ts.FilePath)
+	if err != nil {
+		return SyncAction{}, fmt.Errorf("failed to hash local file: %w", err)
+	}
+
+	ts.ExternalHash = extHash
+	ts.LocalHash = localHash
+	ts.LastSynced = now
+	state.Tasks[action.ExternalID] = ts
+
+	return action, nil
 }
 
 func (e *Engine) recreateMissingFile(

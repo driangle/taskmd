@@ -230,6 +230,130 @@ func TestEngine_ConflictOnLocalChange(t *testing.T) {
 	}
 }
 
+func TestEngine_ConflictRemote(t *testing.T) {
+	sourceName := "test-conflict-remote"
+	defer cleanupRegistry(sourceName)
+
+	setupMockSource(sourceName, []ExternalTask{
+		{ExternalID: "EXT-1", Title: "A task", Status: "open"},
+	})
+
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "tasks")
+
+	engine := &Engine{ConfigDir: dir, ConflictStrategy: ConflictRemote}
+	srcCfg := SourceConfig{
+		Name:      sourceName,
+		OutputDir: outputDir,
+		FieldMap:  FieldMap{Status: map[string]string{"open": "pending"}},
+	}
+
+	// First sync creates the file
+	result1, err := engine.RunSync(srcCfg)
+	if err != nil {
+		t.Fatalf("first sync error: %v", err)
+	}
+	filePath := result1.Created[0].FilePath
+
+	// Modify the local file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	modified := strings.Replace(string(data), "pending", "in-progress", 1)
+	if err := os.WriteFile(filePath, []byte(modified), 0644); err != nil {
+		t.Fatalf("failed to modify file: %v", err)
+	}
+
+	// Second sync with ConflictRemote — should overwrite local
+	result2, err := engine.RunSync(srcCfg)
+	if err != nil {
+		t.Fatalf("second sync error: %v", err)
+	}
+	if len(result2.Conflicts) != 0 {
+		t.Errorf("expected 0 conflicts, got %d", len(result2.Conflicts))
+	}
+	if len(result2.Updated) != 1 {
+		t.Errorf("expected 1 updated, got %d", len(result2.Updated))
+	}
+
+	// Verify file was overwritten with remote content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if strings.Contains(string(content), "in-progress") {
+		t.Error("expected local changes to be overwritten")
+	}
+}
+
+func TestEngine_ConflictLocal(t *testing.T) {
+	sourceName := "test-conflict-local"
+	defer cleanupRegistry(sourceName)
+
+	setupMockSource(sourceName, []ExternalTask{
+		{ExternalID: "EXT-1", Title: "A task", Status: "open"},
+	})
+
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "tasks")
+
+	engine := &Engine{ConfigDir: dir, ConflictStrategy: ConflictLocal}
+	srcCfg := SourceConfig{
+		Name:      sourceName,
+		OutputDir: outputDir,
+		FieldMap:  FieldMap{Status: map[string]string{"open": "pending"}},
+	}
+
+	// First sync creates the file
+	result1, err := engine.RunSync(srcCfg)
+	if err != nil {
+		t.Fatalf("first sync error: %v", err)
+	}
+	filePath := result1.Created[0].FilePath
+
+	// Modify the local file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	modified := strings.Replace(string(data), "pending", "in-progress", 1)
+	if err := os.WriteFile(filePath, []byte(modified), 0644); err != nil {
+		t.Fatalf("failed to modify file: %v", err)
+	}
+
+	// Second sync with ConflictLocal — should keep local, update state
+	result2, err := engine.RunSync(srcCfg)
+	if err != nil {
+		t.Fatalf("second sync error: %v", err)
+	}
+	if len(result2.Conflicts) != 0 {
+		t.Errorf("expected 0 conflicts, got %d", len(result2.Conflicts))
+	}
+	if len(result2.Updated) != 1 {
+		t.Errorf("expected 1 updated, got %d", len(result2.Updated))
+	}
+
+	// Verify local changes are preserved
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if !strings.Contains(string(content), "in-progress") {
+		t.Error("expected local changes to be preserved")
+	}
+
+	// Third sync — should skip (state is now up to date)
+	result3, err := engine.RunSync(srcCfg)
+	if err != nil {
+		t.Fatalf("third sync error: %v", err)
+	}
+	if len(result3.Skipped) != 1 {
+		t.Errorf("expected 1 skipped on third sync, got %d (conflicts=%d, updated=%d, created=%d)",
+			len(result3.Skipped), len(result3.Conflicts), len(result3.Updated), len(result3.Created))
+	}
+}
+
 func TestEngine_DryRun(t *testing.T) {
 	sourceName := "test-dryrun"
 	defer cleanupRegistry(sourceName)

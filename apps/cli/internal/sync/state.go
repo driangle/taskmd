@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const stateDirName = ".taskmd-sync-state"
+const stateSubDir = ".taskmd/sync-state"
 
 // SyncState tracks the last-synced state for a single source.
 type SyncState struct {
@@ -56,7 +56,7 @@ func LoadState(dir, sourceName string) (*SyncState, error) {
 
 // SaveState writes the state file for a source.
 func SaveState(dir, sourceName string, state *SyncState) error {
-	stateDir := filepath.Join(dir, stateDirName)
+	stateDir := filepath.Join(dir, stateSubDir)
 	if err := os.MkdirAll(stateDir, 0755); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
@@ -75,5 +75,5 @@ func SaveState(dir, sourceName string, state *SyncState) error {
 }
 
 func stateFilePath(dir, sourceName string) string {
-	return filepath.Join(dir, stateDirName, sourceName+".yaml")
+	return filepath.Join(dir, stateSubDir, sourceName+".yaml")
 }

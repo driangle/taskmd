@@ -7,11 +7,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/apps/cli/internal/sync"
+	_ "github.com/driangle/taskmd/apps/cli/internal/sync/github" // register github sync source
 )
 
 var (
-	syncDryRun bool
-	syncSource string
+	syncDryRun   bool
+	syncSource   string
+	syncConflict string
 )
 
 var syncCmd = &cobra.Command{
@@ -20,12 +22,14 @@ var syncCmd = &cobra.Command{
 	Long: `Sync fetches tasks from configured external sources (GitHub Issues, Jira, etc.)
 and creates or updates local markdown task files.
 
-Configuration is read from .taskmd-sync.yaml in the current directory.
+Configuration is read from .taskmd.yaml in the current directory.
 
 Examples:
   taskmd sync
   taskmd sync --dry-run
-  taskmd sync --source github`,
+  taskmd sync --source github
+  taskmd sync --conflict remote
+  taskmd sync --conflict local`,
 	Args: cobra.NoArgs,
 	RunE: runSync,
 }
@@ -35,10 +39,17 @@ func init() {
 
 	syncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "preview changes without writing files")
 	syncCmd.Flags().StringVar(&syncSource, "source", "", "sync only the named source")
+	syncCmd.Flags().StringVar(&syncConflict, "conflict", "skip", "conflict resolution strategy: skip, remote, local")
 }
 
 func runSync(_ *cobra.Command, _ []string) error {
 	flags := GetGlobalFlags()
+
+	switch syncConflict {
+	case sync.ConflictSkip, sync.ConflictRemote, sync.ConflictLocal:
+	default:
+		return fmt.Errorf("invalid --conflict value %q: must be skip, remote, or local", syncConflict)
+	}
 
 	cfg, err := sync.LoadConfig(".")
 	if err != nil {
@@ -46,9 +57,10 @@ func runSync(_ *cobra.Command, _ []string) error {
 	}
 
 	engine := &sync.Engine{
-		ConfigDir: ".",
-		Verbose:   flags.Verbose,
-		DryRun:    syncDryRun,
+		ConfigDir:        ".",
+		Verbose:          flags.Verbose,
+		DryRun:           syncDryRun,
+		ConflictStrategy: syncConflict,
 	}
 
 	sources := cfg.Sources

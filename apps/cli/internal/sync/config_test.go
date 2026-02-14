@@ -8,23 +8,24 @@ import (
 
 func TestLoadConfig_Valid(t *testing.T) {
 	dir := t.TempDir()
-	content := `sources:
-  - name: github
-    project: "owner/repo"
-    token_env: "GITHUB_TOKEN"
-    output_dir: "tasks/github"
-    field_map:
-      status:
-        open: pending
-        closed: completed
-      priority:
-        p0: critical
-      labels_to_tags: true
-      assignee_to_owner: true
-    filters:
-      labels: ["task"]
+	content := `sync:
+  sources:
+    - name: github
+      project: "owner/repo"
+      token_env: "GITHUB_TOKEN"
+      output_dir: "tasks/github"
+      field_map:
+        status:
+          open: pending
+          closed: completed
+        priority:
+          p0: critical
+        labels_to_tags: true
+        assignee_to_owner: true
+      filters:
+        labels: ["task"]
 `
-	writeFile(t, filepath.Join(dir, ".taskmd-sync.yaml"), content)
+	writeFile(t, filepath.Join(dir, ".taskmd.yaml"), content)
 
 	cfg, err := LoadConfig(dir)
 	if err != nil {
@@ -58,13 +59,14 @@ func TestLoadConfig_Valid(t *testing.T) {
 
 func TestLoadConfig_MultipleSources(t *testing.T) {
 	dir := t.TempDir()
-	content := `sources:
-  - name: github
-    output_dir: "tasks/github"
-  - name: jira
-    output_dir: "tasks/jira"
+	content := `sync:
+  sources:
+    - name: github
+      output_dir: "tasks/github"
+    - name: jira
+      output_dir: "tasks/jira"
 `
-	writeFile(t, filepath.Join(dir, ".taskmd-sync.yaml"), content)
+	writeFile(t, filepath.Join(dir, ".taskmd.yaml"), content)
 
 	cfg, err := LoadConfig(dir)
 	if err != nil {
@@ -87,7 +89,7 @@ func TestLoadConfig_MissingFile(t *testing.T) {
 
 func TestLoadConfig_MalformedYAML(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, ".taskmd-sync.yaml"), "{{invalid yaml")
+	writeFile(t, filepath.Join(dir, ".taskmd.yaml"), "{{invalid yaml")
 
 	_, err := LoadConfig(dir)
 	if err == nil {
@@ -97,7 +99,7 @@ func TestLoadConfig_MalformedYAML(t *testing.T) {
 
 func TestLoadConfig_NoSources(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, ".taskmd-sync.yaml"), "sources: []\n")
+	writeFile(t, filepath.Join(dir, ".taskmd.yaml"), "sync:\n  sources: []\n")
 
 	_, err := LoadConfig(dir)
 	if err == nil {
@@ -107,10 +109,11 @@ func TestLoadConfig_NoSources(t *testing.T) {
 
 func TestLoadConfig_MissingName(t *testing.T) {
 	dir := t.TempDir()
-	content := `sources:
-  - output_dir: "tasks/foo"
+	content := `sync:
+  sources:
+    - output_dir: "tasks/foo"
 `
-	writeFile(t, filepath.Join(dir, ".taskmd-sync.yaml"), content)
+	writeFile(t, filepath.Join(dir, ".taskmd.yaml"), content)
 
 	_, err := LoadConfig(dir)
 	if err == nil {
@@ -120,10 +123,11 @@ func TestLoadConfig_MissingName(t *testing.T) {
 
 func TestLoadConfig_MissingOutputDir(t *testing.T) {
 	dir := t.TempDir()
-	content := `sources:
-  - name: github
+	content := `sync:
+  sources:
+    - name: github
 `
-	writeFile(t, filepath.Join(dir, ".taskmd-sync.yaml"), content)
+	writeFile(t, filepath.Join(dir, ".taskmd.yaml"), content)
 
 	_, err := LoadConfig(dir)
 	if err == nil {
