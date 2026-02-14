@@ -57,6 +57,19 @@ func (vr *ValidationResult) AddIssue(level ValidationLevel, taskID, filePath, me
 	}
 }
 
+// ConfigData holds parsed config file data for validation.
+// Extracted in the CLI layer so the validator stays viper-free.
+type ConfigData struct {
+	Scopes     map[string]ScopeConfig
+	TopKeys    []string
+	ConfigPath string
+}
+
+// ScopeConfig holds the configuration for a single scope entry.
+type ScopeConfig struct {
+	Paths []string // nil means the paths field was absent
+}
+
 // Validator validates task collections
 type Validator struct {
 	strict bool
@@ -294,6 +307,78 @@ func (v *Validator) checkParentCycles(tasks []*model.Task, taskMap map[string]*m
 			current = parent.Parent
 		}
 	}
+}
+
+// ValidateConfig checks the .taskmd.yaml config file for issues.
+// Returns an empty result if config is nil.
+func (v *Validator) ValidateConfig(config *ConfigData) *ValidationResult {
+	result := &ValidationResult{
+		Issues: make([]ValidationIssue, 0),
+	}
+	if config == nil {
+		return result
+	}
+
+	v.checkConfigScopes(config, result)
+	v.checkUnknownConfigKeys(config, result)
+
+	return result
+}
+
+// checkConfigScopes validates each scope entry has a non-empty paths array.
+func (v *Validator) checkConfigScopes(config *ConfigData, result *ValidationResult) {
+	for name, scope := range config.Scopes {
+		if scope.Paths == nil {
+			result.AddIssue(LevelError, "", config.ConfigPath,
+				fmt.Sprintf("scope '%s' is missing required field: paths", name))
+		} else if len(scope.Paths) == 0 {
+			result.AddIssue(LevelError, "", config.ConfigPath,
+				fmt.Sprintf("scope '%s' has empty paths array", name))
+		}
+	}
+}
+
+var knownConfigKeys = map[string]bool{
+	"dir":      true,
+	"task-dir": true,
+	"web":      true,
+	"scopes":   true,
+	"sync":     true,
+	"ignore":   true,
+}
+
+// checkUnknownConfigKeys warns about unrecognized top-level config keys.
+func (v *Validator) checkUnknownConfigKeys(config *ConfigData, result *ValidationResult) {
+	for _, key := range config.TopKeys {
+		if !knownConfigKeys[key] {
+			result.AddIssue(LevelWarning, "", config.ConfigPath,
+				fmt.Sprintf("unknown config key: '%s'", key))
+		}
+	}
+}
+
+// ValidateTouchesAgainstScopes warns when tasks reference undefined scopes.
+// Skips validation if knownScopes is nil or empty.
+func (v *Validator) ValidateTouchesAgainstScopes(tasks []*model.Task, knownScopes map[string]bool) *ValidationResult {
+	result := &ValidationResult{
+		Issues: make([]ValidationIssue, 0),
+	}
+	if len(knownScopes) == 0 {
+		return result
+	}
+
+	reported := make(map[string]bool)
+	for _, task := range tasks {
+		for _, scope := range task.Touches {
+			if !knownScopes[scope] && !reported[scope] {
+				reported[scope] = true
+				result.AddIssue(LevelWarning, task.ID, task.FilePath,
+					fmt.Sprintf("touches references undefined scope: '%s'", scope))
+			}
+		}
+	}
+
+	return result
 }
 
 // checkStrictWarnings performs additional checks in strict mode

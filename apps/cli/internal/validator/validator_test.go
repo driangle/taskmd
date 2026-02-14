@@ -609,3 +609,195 @@ func TestValidate_ValidParent(t *testing.T) {
 		t.Errorf("Expected no warnings for valid parent, got %d", result.Warnings)
 	}
 }
+
+// --- Config validation tests ---
+
+func TestValidateConfig_ValidScopes(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		Scopes: map[string]ScopeConfig{
+			"cli/graph": {Paths: []string{"apps/cli/internal/graph/"}},
+			"web/board": {Paths: []string{"apps/web/src/components/board/"}},
+		},
+		TopKeys:    []string{"scopes", "dir", "web"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Errors != 0 {
+		t.Errorf("Expected no errors, got %d", result.Errors)
+		for _, issue := range result.Issues {
+			t.Logf("  Issue: [%s] %s", issue.Level, issue.Message)
+		}
+	}
+	if result.Warnings != 0 {
+		t.Errorf("Expected no warnings, got %d", result.Warnings)
+	}
+}
+
+func TestValidateConfig_MissingPaths(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		Scopes: map[string]ScopeConfig{
+			"cli/graph": {Paths: nil}, // missing paths field
+		},
+		TopKeys:    []string{"scopes"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Errors != 1 {
+		t.Errorf("Expected 1 error for missing paths, got %d", result.Errors)
+	}
+
+	found := false
+	for _, issue := range result.Issues {
+		if issue.Level == LevelError && issue.Message == "scope 'cli/graph' is missing required field: paths" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Expected missing paths error for scope cli/graph")
+	}
+}
+
+func TestValidateConfig_EmptyPaths(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		Scopes: map[string]ScopeConfig{
+			"cli/graph": {Paths: []string{}}, // empty array
+		},
+		TopKeys:    []string{"scopes"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Errors != 1 {
+		t.Errorf("Expected 1 error for empty paths, got %d", result.Errors)
+	}
+
+	found := false
+	for _, issue := range result.Issues {
+		if issue.Level == LevelError && issue.Message == "scope 'cli/graph' has empty paths array" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Expected empty paths error for scope cli/graph")
+	}
+}
+
+func TestValidateConfig_UnknownKeys(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		Scopes:     map[string]ScopeConfig{},
+		TopKeys:    []string{"scopes", "dir", "banana", "foobar"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Warnings != 2 {
+		t.Errorf("Expected 2 warnings for unknown keys, got %d", result.Warnings)
+		for _, issue := range result.Issues {
+			t.Logf("  Issue: [%s] %s", issue.Level, issue.Message)
+		}
+	}
+	if result.Errors != 0 {
+		t.Errorf("Expected no errors, got %d", result.Errors)
+	}
+}
+
+func TestValidateConfig_NilConfig(t *testing.T) {
+	v := NewValidator(false)
+	result := v.ValidateConfig(nil)
+
+	if result.Errors != 0 || result.Warnings != 0 {
+		t.Errorf("Expected no issues for nil config, got %d errors, %d warnings", result.Errors, result.Warnings)
+	}
+}
+
+func TestValidateConfig_NoScopes(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		Scopes:     nil,
+		TopKeys:    []string{"dir", "web"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Errors != 0 || result.Warnings != 0 {
+		t.Errorf("Expected no issues when no scopes section, got %d errors, %d warnings", result.Errors, result.Warnings)
+	}
+}
+
+func TestValidateTouches_ValidReferences(t *testing.T) {
+	v := NewValidator(false)
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task 1", Touches: []string{"cli/graph", "web/board"}},
+		{ID: "002", Title: "Task 2", Touches: []string{"cli/graph"}},
+	}
+	scopes := map[string]bool{"cli/graph": true, "web/board": true}
+
+	result := v.ValidateTouchesAgainstScopes(tasks, scopes)
+
+	if result.Warnings != 0 {
+		t.Errorf("Expected no warnings, got %d", result.Warnings)
+		for _, issue := range result.Issues {
+			t.Logf("  Issue: [%s] %s", issue.Level, issue.Message)
+		}
+	}
+}
+
+func TestValidateTouches_UndefinedScope(t *testing.T) {
+	v := NewValidator(false)
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task 1", Touches: []string{"cli/graph", "unknown/scope"}},
+		{ID: "002", Title: "Task 2", Touches: []string{"unknown/scope"}}, // same unknown scope, should not duplicate
+		{ID: "003", Title: "Task 3", Touches: []string{"another/missing"}},
+	}
+	scopes := map[string]bool{"cli/graph": true}
+
+	result := v.ValidateTouchesAgainstScopes(tasks, scopes)
+
+	if result.Warnings != 2 {
+		t.Errorf("Expected 2 deduplicated warnings, got %d", result.Warnings)
+		for _, issue := range result.Issues {
+			t.Logf("  Issue: [%s] task=%s %s", issue.Level, issue.TaskID, issue.Message)
+		}
+	}
+
+	// Verify the first occurrence is reported (task 001 for unknown/scope)
+	found := false
+	for _, issue := range result.Issues {
+		if issue.TaskID == "001" && issue.Message == "touches references undefined scope: 'unknown/scope'" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Expected warning for task 001 referencing unknown/scope")
+	}
+}
+
+func TestValidateTouches_NoScopesConfigured(t *testing.T) {
+	v := NewValidator(false)
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task 1", Touches: []string{"anything"}},
+	}
+
+	// nil scopes
+	result := v.ValidateTouchesAgainstScopes(tasks, nil)
+	if result.Warnings != 0 {
+		t.Errorf("Expected no warnings for nil scopes, got %d", result.Warnings)
+	}
+
+	// empty scopes
+	result = v.ValidateTouchesAgainstScopes(tasks, map[string]bool{})
+	if result.Warnings != 0 {
+		t.Errorf("Expected no warnings for empty scopes, got %d", result.Warnings)
+	}
+}

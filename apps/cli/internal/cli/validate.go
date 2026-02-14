@@ -3,10 +3,13 @@ package cli
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
+	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
@@ -21,14 +24,19 @@ var validateCmd = &cobra.Command{
 	Use:        "validate",
 	SuggestFor: []string{"check", "verify", "lint"},
 	Short:      "Lint and validate tasks",
-	Long: `Validate checks task files for common errors and issues.
+	Long: `Validate checks task files and the .taskmd.yaml config file for errors.
 
-Validation checks include:
+Task validation checks:
   - Required fields (id, title)
   - Invalid field values (status, priority, effort)
   - Duplicate task IDs
   - Missing dependencies (references to non-existent tasks)
   - Circular dependencies (cycles in dependency graph)
+
+Config validation checks (when .taskmd.yaml is present):
+  - Scope definitions have non-empty paths arrays
+  - No unknown top-level config keys
+  - Task touches reference defined scopes
 
 Use --strict to enable additional warnings for missing optional fields.
 
@@ -83,6 +91,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	// Run validation
 	v := validator.NewValidator(validateStrict)
 	validationResult := v.Validate(tasks)
+	validateConfig(v, validationResult, tasks)
 
 	// Output results
 	switch validateFormat {
@@ -176,4 +185,97 @@ func printIssue(issue validator.ValidationIssue, r *lipgloss.Renderer) {
 // outputValidationJSON outputs validation results as JSON
 func outputValidationJSON(result *validator.ValidationResult) error {
 	return WriteJSON(os.Stdout, result)
+}
+
+// validateConfig runs config and cross-validation checks, merging results into validationResult.
+func validateConfig(v *validator.Validator, validationResult *validator.ValidationResult, tasks []*model.Task) {
+	configData := loadConfigForValidation()
+	mergeValidationResults(validationResult, v.ValidateConfig(configData))
+
+	if configData != nil && len(configData.Scopes) > 0 {
+		knownScopes := make(map[string]bool, len(configData.Scopes))
+		for name := range configData.Scopes {
+			knownScopes[name] = true
+		}
+		mergeValidationResults(validationResult, v.ValidateTouchesAgainstScopes(tasks, knownScopes))
+	}
+}
+
+// loadConfigForValidation extracts config data from viper for validation.
+// Returns nil if no config file was loaded.
+func loadConfigForValidation() *validator.ConfigData {
+	configPath := viper.ConfigFileUsed()
+	if configPath == "" {
+		return nil
+	}
+
+	// Only include keys actually present in the config file, not pflag-bound defaults
+	allSettings := viper.AllSettings()
+	topKeys := make([]string, 0, len(allSettings))
+	for k := range allSettings {
+		if viper.InConfig(k) {
+			topKeys = append(topKeys, k)
+		}
+	}
+	sort.Strings(topKeys)
+
+	config := &validator.ConfigData{
+		TopKeys:    topKeys,
+		ConfigPath: configPath,
+	}
+
+	raw := viper.Get("scopes")
+	if raw == nil {
+		return config
+	}
+	scopeMap, ok := raw.(map[string]any)
+	if !ok {
+		return config
+	}
+
+	config.Scopes = parseScopeEntries(scopeMap)
+	return config
+}
+
+// parseScopeEntries converts raw viper scope data into typed ScopeConfig entries.
+func parseScopeEntries(scopeMap map[string]any) map[string]validator.ScopeConfig {
+	scopes := make(map[string]validator.ScopeConfig, len(scopeMap))
+	for name, val := range scopeMap {
+		sc := validator.ScopeConfig{} // Paths stays nil if not found
+
+		entryMap, ok := val.(map[string]any)
+		if !ok {
+			scopes[name] = sc
+			continue
+		}
+
+		pathsRaw, exists := entryMap["paths"]
+		if !exists {
+			scopes[name] = sc
+			continue
+		}
+
+		pathsSlice, ok := pathsRaw.([]any)
+		if !ok {
+			scopes[name] = sc
+			continue
+		}
+
+		paths := make([]string, 0, len(pathsSlice))
+		for _, p := range pathsSlice {
+			if s, ok := p.(string); ok {
+				paths = append(paths, s)
+			}
+		}
+		sc.Paths = paths
+		scopes[name] = sc
+	}
+	return scopes
+}
+
+// mergeValidationResults appends issues from source into target and updates counters.
+func mergeValidationResults(target, source *validator.ValidationResult) {
+	target.Issues = append(target.Issues, source.Issues...)
+	target.Errors += source.Errors
+	target.Warnings += source.Warnings
 }
