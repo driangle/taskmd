@@ -109,6 +109,7 @@ func resetSetFlags() {
 	setPriority = ""
 	setEffort = ""
 	setOwner = ""
+	setParent = ""
 	setDone = false
 	setDryRun = false
 	setAddTags = nil
@@ -905,6 +906,74 @@ func TestSet_TagConfirmationOutput(t *testing.T) {
 	}
 	if !strings.Contains(output, "tags: [backend, security] -> [backend, feature]") {
 		t.Errorf("Expected formatted tag change, got: %s", output)
+	}
+}
+
+func TestSet_Parent(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "001"
+	setParent = "002"
+
+	// Mark the --parent flag as changed
+	setCmd.Flags().Set("parent", "002")
+	defer setCmd.Flags().Set("parent", "")
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output, "parent: (unset) -> 002") {
+		t.Errorf("Expected parent change in output, got: %s", output)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	if !strings.Contains(string(content), "parent: 002") {
+		t.Errorf("Expected file to contain parent: 002, got:\n%s", string(content))
+	}
+}
+
+func TestSet_ParentClear(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `---
+id: "030"
+title: "Task with parent"
+status: pending
+parent: "001"
+created: 2026-02-08
+---
+
+# Task with parent
+`
+	path := filepath.Join(tmpDir, "030-child.md")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "030"
+	setParent = ""
+
+	// Mark the --parent flag as changed (to clear)
+	setCmd.Flags().Set("parent", "")
+	defer setCmd.Flags().Set("parent", "")
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output, "parent: 001 ->") {
+		t.Errorf("Expected parent change in output, got: %s", output)
+	}
+
+	updated, _ := os.ReadFile(path)
+	if strings.Contains(string(updated), "parent: 001") {
+		t.Error("Expected parent to be cleared, but still found 'parent: 001'")
 	}
 }
 

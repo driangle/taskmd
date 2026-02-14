@@ -93,6 +93,19 @@ export function TaskDetailPage() {
               {task.effort && <Field label="Effort" value={task.effort} />}
               {task.owner && <Field label="Owner" value={task.owner} />}
               {task.group && <Field label="Group" value={task.group} />}
+              {task.parent && (
+                <div>
+                  <dt className="text-xs text-gray-500 dark:text-gray-400">Parent</dt>
+                  <dd className="font-medium">
+                    <Link
+                      to={`/tasks/${task.parent}`}
+                      className="text-blue-600 hover:underline dark:text-blue-400 font-mono"
+                    >
+                      {task.parent}
+                    </Link>
+                  </dd>
+                </div>
+              )}
               {task.created && <Field label="Created" value={task.created} />}
             </div>
 

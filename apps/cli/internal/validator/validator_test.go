@@ -523,3 +523,89 @@ func TestValidate_ComplexScenario(t *testing.T) {
 		t.Error("Expected validation to fail with multiple errors")
 	}
 }
+
+func TestValidate_MissingParent(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task 1", Parent: "999"},
+	}
+
+	v := NewValidator(false)
+	result := v.Validate(tasks)
+
+	if result.Errors != 1 {
+		t.Errorf("Expected 1 error for missing parent, got %d", result.Errors)
+	}
+
+	found := false
+	for _, issue := range result.Issues {
+		if issue.TaskID == "001" && issue.Level == LevelError {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Expected missing parent error for task 001")
+	}
+}
+
+func TestValidate_ParentSelfReference(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task 1", Parent: "001"},
+	}
+
+	v := NewValidator(false)
+	result := v.Validate(tasks)
+
+	if result.Warnings != 1 {
+		t.Errorf("Expected 1 warning for self-referencing parent, got %d", result.Warnings)
+	}
+
+	found := false
+	for _, issue := range result.Issues {
+		if issue.TaskID == "001" && issue.Level == LevelWarning {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Expected self-reference warning for task 001")
+	}
+}
+
+func TestValidate_ParentCycle(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "Task 1", Parent: "002"},
+		{ID: "002", Title: "Task 2", Parent: "001"},
+	}
+
+	v := NewValidator(false)
+	result := v.Validate(tasks)
+
+	foundCycleError := false
+	for _, issue := range result.Issues {
+		if issue.Level == LevelError && issue.Message != "" {
+			foundCycleError = true
+		}
+	}
+	if !foundCycleError {
+		t.Error("Expected parent cycle error")
+	}
+}
+
+func TestValidate_ValidParent(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "Parent Task"},
+		{ID: "002", Title: "Child Task", Parent: "001"},
+	}
+
+	v := NewValidator(false)
+	result := v.Validate(tasks)
+
+	if result.Errors != 0 {
+		t.Errorf("Expected no errors for valid parent, got %d", result.Errors)
+		for _, issue := range result.Issues {
+			t.Logf("  Issue: [%s] %s: %s", issue.Level, issue.TaskID, issue.Message)
+		}
+	}
+	if result.Warnings != 0 {
+		t.Errorf("Expected no warnings for valid parent, got %d", result.Warnings)
+	}
+}

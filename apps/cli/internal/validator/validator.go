@@ -86,6 +86,9 @@ func (v *Validator) Validate(tasks []*model.Task) *ValidationResult {
 	v.checkDuplicateIDs(tasks, result)
 	v.checkMissingDependencies(tasks, taskMap, result)
 	v.checkCircularDependencies(tasks, taskMap, result)
+	v.checkMissingParent(tasks, taskMap, result)
+	v.checkParentSelfReference(tasks, result)
+	v.checkParentCycles(tasks, taskMap, result)
 
 	// Strict mode additional checks
 	if v.strict {
@@ -242,6 +245,53 @@ func (v *Validator) checkCircularDependencies(tasks []*model.Task, taskMap map[s
 	for taskID := range taskMap {
 		if visitState[taskID] == 0 {
 			hasCycle(taskID)
+		}
+	}
+}
+
+// checkMissingParent checks that parent references an existing task
+func (v *Validator) checkMissingParent(tasks []*model.Task, taskMap map[string]*model.Task, result *ValidationResult) {
+	for _, task := range tasks {
+		if task.Parent == "" {
+			continue
+		}
+		if _, exists := taskMap[task.Parent]; !exists {
+			result.AddIssue(LevelError, task.ID, task.FilePath,
+				fmt.Sprintf("parent references non-existent task: '%s'", task.Parent))
+		}
+	}
+}
+
+// checkParentSelfReference warns if a task lists itself as parent
+func (v *Validator) checkParentSelfReference(tasks []*model.Task, result *ValidationResult) {
+	for _, task := range tasks {
+		if task.Parent != "" && task.Parent == task.ID {
+			result.AddIssue(LevelWarning, task.ID, task.FilePath,
+				"task references itself as parent")
+		}
+	}
+}
+
+// checkParentCycles detects cycles in the parent chain (e.g. A→B→A)
+func (v *Validator) checkParentCycles(tasks []*model.Task, taskMap map[string]*model.Task, result *ValidationResult) {
+	for _, task := range tasks {
+		if task.Parent == "" {
+			continue
+		}
+		visited := map[string]bool{task.ID: true}
+		current := task.Parent
+		for current != "" {
+			if visited[current] {
+				result.AddIssue(LevelError, task.ID, task.FilePath,
+					fmt.Sprintf("parent cycle detected: task '%s' creates a cycle via '%s'", task.ID, current))
+				break
+			}
+			visited[current] = true
+			parent, exists := taskMap[current]
+			if !exists {
+				break // missing parent already reported
+			}
+			current = parent.Parent
 		}
 	}
 }

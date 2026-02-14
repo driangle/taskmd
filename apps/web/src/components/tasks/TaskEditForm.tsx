@@ -19,6 +19,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
   const [priority, setPriority] = useState(task.priority);
   const [effort, setEffort] = useState(task.effort);
   const [owner, setOwner] = useState(task.owner ?? "");
+  const [parent, setParent] = useState(task.parent ?? "");
   const [tags, setTags] = useState((task.tags ?? []).join(", "));
   const [body, setBody] = useState(task.body ?? "");
   const [saving, setSaving] = useState(false);
@@ -34,6 +35,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
     if (priority !== task.priority) data.priority = priority;
     if (effort !== task.effort) data.effort = effort;
     if (owner !== (task.owner ?? "")) data.owner = owner;
+    if (parent !== (task.parent ?? "")) data.parent = parent;
 
     const newTags = tags
       .split(",")
@@ -136,7 +138,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Owner
@@ -146,6 +148,18 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
             placeholder="e.g. alice"
+            className={inputClasses}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Parent
+          </label>
+          <input
+            type="text"
+            value={parent}
+            onChange={(e) => setParent(e.target.value)}
+            placeholder="e.g. 045"
             className={inputClasses}
           />
         </div>

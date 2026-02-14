@@ -105,6 +105,8 @@ func runGet(cmd *cobra.Command, args []string) error {
 type dependencyInfo struct {
 	DependsOn []depEntry `json:"depends_on" yaml:"depends_on"`
 	Blocks    []depEntry `json:"blocks" yaml:"blocks"`
+	Parent    *depEntry  `json:"parent,omitempty" yaml:"parent,omitempty"`
+	Children  []depEntry `json:"children,omitempty" yaml:"children,omitempty"`
 }
 
 // depEntry is a single dependency reference.
@@ -327,6 +329,19 @@ func buildDependencyInfo(task *model.Task, allTasks []*model.Task) dependencyInf
 		}
 		info.Blocks = append(info.Blocks, entry)
 	}
+	if task.Parent != "" {
+		entry := depEntry{ID: task.Parent}
+		if p, ok := taskMap[task.Parent]; ok {
+			entry.Title = p.Title
+		}
+		info.Parent = &entry
+	}
+	for _, t := range allTasks {
+		if t.Parent == task.ID {
+			entry := depEntry{ID: t.ID, Title: t.Title}
+			info.Children = append(info.Children, entry)
+		}
+	}
 	return info
 }
 
@@ -353,12 +368,16 @@ func outputGetText(task *model.Task, deps dependencyInfo, w io.Writer) error {
 	printOptionalField(w, "Priority", string(task.Priority), r)
 	printOptionalField(w, "Effort", string(task.Effort), r)
 	printTags(w, task.Tags, r)
+	if deps.Parent != nil {
+		fmt.Fprintf(w, "%s %s\n", formatLabel("Parent:", r), formatDepEntry(*deps.Parent, r))
+	}
 	if !task.Created.IsZero() {
 		fmt.Fprintf(w, "%s %s\n", formatLabel("Created:", r), task.Created.Format("2006-01-02"))
 	}
 	fmt.Fprintf(w, "%s %s\n", formatLabel("File:", r), formatDim(task.FilePath, r))
 	printDescription(w, task.Body)
 	printDependencies(w, deps, r)
+	printChildren(w, deps.Children, r)
 	return nil
 }
 
@@ -404,6 +423,23 @@ func printDependencies(w io.Writer, deps dependencyInfo, r *lipgloss.Renderer) {
 	}
 }
 
+func formatDepEntry(e depEntry, r *lipgloss.Renderer) string {
+	if e.Title != "" {
+		return fmt.Sprintf("%s (%s)", formatTaskID(e.ID, r), e.Title)
+	}
+	return formatTaskID(e.ID, r)
+}
+
+func printChildren(w io.Writer, children []depEntry, r *lipgloss.Renderer) {
+	if len(children) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "\n%s\n", formatLabel("Children:", r))
+	for _, c := range children {
+		fmt.Fprintf(w, "  %s\n", formatDepEntry(c, r))
+	}
+}
+
 func formatDepList(entries []depEntry, r *lipgloss.Renderer) string {
 	parts := make([]string, len(entries))
 	for i, e := range entries {
@@ -424,10 +460,12 @@ type getOutput struct {
 	Priority     string      `json:"priority,omitempty" yaml:"priority,omitempty"`
 	Effort       string      `json:"effort,omitempty" yaml:"effort,omitempty"`
 	Tags         []string    `json:"tags" yaml:"tags"`
+	Parent       *depEntry   `json:"parent,omitempty" yaml:"parent,omitempty"`
 	Created      string      `json:"created,omitempty" yaml:"created,omitempty"`
 	FilePath     string      `json:"file_path" yaml:"file_path"`
 	Content      string      `json:"content" yaml:"content"`
 	Dependencies getDepsJSON `json:"dependencies" yaml:"dependencies"`
+	Children     []depEntry  `json:"children,omitempty" yaml:"children,omitempty"`
 }
 
 type getDepsJSON struct {
@@ -441,16 +479,21 @@ func buildGetOutput(task *model.Task, deps dependencyInfo) getOutput {
 		created = task.Created.Format("2006-01-02")
 	}
 	return getOutput{
-		ID:           task.ID,
-		Title:        task.Title,
-		Status:       string(task.Status),
-		Priority:     string(task.Priority),
-		Effort:       string(task.Effort),
-		Tags:         task.Tags,
-		Created:      created,
-		FilePath:     task.FilePath,
-		Content:      strings.TrimSpace(task.Body),
-		Dependencies: getDepsJSON(deps),
+		ID:       task.ID,
+		Title:    task.Title,
+		Status:   string(task.Status),
+		Priority: string(task.Priority),
+		Effort:   string(task.Effort),
+		Tags:     task.Tags,
+		Parent:   deps.Parent,
+		Created:  created,
+		FilePath: task.FilePath,
+		Content:  strings.TrimSpace(task.Body),
+		Dependencies: getDepsJSON{
+			DependsOn: deps.DependsOn,
+			Blocks:    deps.Blocks,
+		},
+		Children: deps.Children,
 	}
 }
 

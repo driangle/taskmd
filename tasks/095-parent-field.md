@@ -1,7 +1,7 @@
 ---
 id: "095"
 title: "Add parent field for hierarchical task relations"
-status: pending
+status: completed
 priority: medium
 effort: large
 related: ["094"]
@@ -25,43 +25,43 @@ This complements `dependencies` (blocking order) and `related` (loose associatio
 ## Tasks
 
 ### Specification
-- [ ] Add `parent` field to `docs/taskmd_specification.md` as an optional string (single task ID)
-- [ ] Document semantics: hierarchical grouping, no implicit blocking, no status cascading
-- [ ] Clarify that children are computed (not stored) — find all tasks whose `parent` matches a given ID
+- [x] Add `parent` field to `docs/taskmd_specification.md` as an optional string (single task ID)
+- [x] Document semantics: hierarchical grouping, no implicit blocking, no status cascading
+- [x] Clarify that children are computed (not stored) — find all tasks whose `parent` matches a given ID
 
 ### Model & Parser
-- [ ] Add `Parent string` field to the Task struct in `internal/model/task.go`
-- [ ] Ensure YAML/JSON serialization tags are correct (`yaml:"parent,omitempty" json:"parent,omitempty"`)
-- [ ] Verify parser handles `parent` field correctly
+- [x] Add `Parent string` field to the Task struct in `internal/model/task.go`
+- [x] Ensure YAML/JSON serialization tags are correct (`yaml:"parent,omitempty" json:"parent,omitempty"`)
+- [x] Verify parser handles `parent` field correctly
 
 ### Validation
-- [ ] Validate that parent task ID references an existing task
-- [ ] Warn if a task lists itself as parent
-- [ ] Detect parent cycles (A parent of B, B parent of A)
-- [ ] Add tests for parent field validation
+- [x] Validate that parent task ID references an existing task
+- [x] Warn if a task lists itself as parent
+- [x] Detect parent cycles (A parent of B, B parent of A)
+- [x] Add tests for parent field validation
 
 ### CLI — `get` command
-- [ ] Display parent task in `taskmd get` output (e.g., "Parent: #045 — Homebrew distribution")
-- [ ] Display computed children list when viewing a parent task
-- [ ] Add tests
+- [x] Display parent task in `taskmd get` output (e.g., "Parent: #045 — Homebrew distribution")
+- [x] Display computed children list when viewing a parent task
+- [x] Add tests
 
 ### CLI — `set` command
-- [ ] Support `--parent 045` flag to set parent task
-- [ ] Support `--parent ""` to clear parent
-- [ ] Add tests
+- [x] Support `--parent 045` flag to set parent task
+- [x] Support `--parent ""` to clear parent
+- [x] Add tests
 
 ### CLI — `list` command
-- [ ] Support `--parent 045` filter to show only children of a task
-- [ ] Support `parent=true/false` filter to find tasks that have/don't have a parent
-- [ ] Add tests
+- [x] Support `--parent 045` filter to show only children of a task
+- [x] Support `parent=true/false` filter to find tasks that have/don't have a parent
+- [x] Add tests
 
 ### CLI — `graph` command
-- [ ] Consider rendering parent-child as a distinct edge style (or subgraph clustering)
-- [ ] Add tests
+- [x] Consider rendering parent-child as a distinct edge style (or subgraph clustering)
+  - Decided: skip adding parent edges to graph; parent-child is organizational, not blocking. Use `--filter parent=X` for scoping instead.
 
 ### Web UI
-- [ ] Display parent task as a clickable link in task detail view
-- [ ] Display children list in parent task's detail view
+- [x] Display parent task as a clickable link in task detail view
+- [x] Display children list in parent task's detail view (via parent field on tasks; client-side filtering)
 
 ## Design Decisions
 

@@ -46,6 +46,7 @@ type Task struct {
 	Tags         []string  `yaml:"tags" json:"tags"`
 	Group        string    `yaml:"group" json:"group,omitempty"`
 	Owner        string    `yaml:"owner" json:"owner,omitempty"`
+	Parent       string    `yaml:"parent,omitempty" json:"parent,omitempty"`
 	Created      time.Time `yaml:"created" json:"created"`
 
 	// Content fields

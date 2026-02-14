@@ -8,6 +8,7 @@ export interface Task {
   tags: string[] | null;
   group: string;
   owner: string;
+  parent: string;
   created: string;
   body: string;
   file_path: string;
@@ -97,6 +98,7 @@ export interface TaskUpdateRequest {
   priority?: string;
   effort?: string;
   owner?: string;
+  parent?: string;
   tags?: string[];
   body?: string;
 }

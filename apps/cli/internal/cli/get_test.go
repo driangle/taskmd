@@ -701,3 +701,118 @@ func TestFuzzyMatchTasks(t *testing.T) {
 		t.Errorf("Expected no matches with threshold 0.99, got %d", len(matches))
 	}
 }
+
+func createParentTestFiles(t *testing.T) string {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
+	tasks := map[string]string{
+		"010-parent.md": `---
+id: "010"
+title: "Parent task"
+status: pending
+priority: high
+dependencies: []
+tags: []
+created: 2026-02-08
+---
+
+# Parent task
+`,
+		"011-child.md": `---
+id: "011"
+title: "Child task"
+status: pending
+priority: medium
+parent: "010"
+dependencies: []
+tags: []
+created: 2026-02-08
+---
+
+# Child task
+`,
+	}
+
+	for filename, content := range tasks {
+		path := filepath.Join(tmpDir, filename)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+
+	return tmpDir
+}
+
+func TestGet_ParentDisplay(t *testing.T) {
+	tmpDir := createParentTestFiles(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	output := captureGetOutput(t, "011")
+
+	if !strings.Contains(output, "Parent:") {
+		t.Error("Expected output to contain 'Parent:'")
+	}
+	if !strings.Contains(output, "010") {
+		t.Error("Expected output to contain parent ID '010'")
+	}
+}
+
+func TestGet_ChildrenDisplay(t *testing.T) {
+	tmpDir := createParentTestFiles(t)
+	resetGetFlags()
+	taskDir = tmpDir
+
+	output := captureGetOutput(t, "010")
+
+	if !strings.Contains(output, "Children:") {
+		t.Error("Expected output to contain 'Children:'")
+	}
+	if !strings.Contains(output, "011") {
+		t.Error("Expected output to contain child ID '011'")
+	}
+}
+
+func TestGet_ParentJSON(t *testing.T) {
+	tmpDir := createParentTestFiles(t)
+	resetGetFlags()
+	taskDir = tmpDir
+	getFormat = "json"
+
+	output := captureGetOutput(t, "011")
+
+	var result getOutput
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+
+	if result.Parent == nil {
+		t.Fatal("Expected parent in JSON output")
+	}
+	if result.Parent.ID != "010" {
+		t.Errorf("Expected parent ID '010', got %q", result.Parent.ID)
+	}
+}
+
+func TestGet_ChildrenJSON(t *testing.T) {
+	tmpDir := createParentTestFiles(t)
+	resetGetFlags()
+	taskDir = tmpDir
+	getFormat = "json"
+
+	output := captureGetOutput(t, "010")
+
+	var result getOutput
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+
+	if len(result.Children) != 1 {
+		t.Fatalf("Expected 1 child, got %d", len(result.Children))
+	}
+	if result.Children[0].ID != "011" {
+		t.Errorf("Expected child ID '011', got %q", result.Children[0].ID)
+	}
+}

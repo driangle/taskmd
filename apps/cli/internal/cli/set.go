@@ -18,6 +18,7 @@ var (
 	setPriority   string
 	setEffort     string
 	setOwner      string
+	setParent     string
 	setDone       bool
 	setDryRun     bool
 	setAddTags    []string
@@ -62,6 +63,7 @@ func init() {
 		cmd.Flags().StringVar(&setPriority, "priority", "", "new priority (low, medium, high, critical)")
 		cmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large)")
 		cmd.Flags().StringVar(&setOwner, "owner", "", "owner/assignee of the task")
+		cmd.Flags().StringVar(&setParent, "parent", "", "parent task ID (use empty string to clear)")
 		cmd.Flags().BoolVar(&setDone, "done", false, "mark task as completed (alias for --status completed)")
 		cmd.Flags().BoolVar(&setDryRun, "dry-run", false, "preview changes without writing to disk")
 		cmd.Flags().StringArrayVar(&setAddTags, "add-tag", nil, "add a tag (repeatable)")
@@ -134,6 +136,10 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 	setStringField(&req.Effort, setEffort)
 	setStringField(&req.Owner, setOwner)
 
+	if cmd.Flags().Changed("parent") {
+		req.Parent = &setParent
+	}
+
 	if len(setAddTags) > 0 {
 		req.AddTags = setAddTags
 	}
@@ -145,10 +151,10 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 		return taskfile.UpdateRequest{}, err
 	}
 
-	hasScalar := req.Status != nil || req.Priority != nil || req.Effort != nil || req.Owner != nil
+	hasScalar := req.Status != nil || req.Priority != nil || req.Effort != nil || req.Owner != nil || req.Parent != nil
 	hasTags := len(req.AddTags) > 0 || len(req.RemTags) > 0
 	if !hasScalar && !hasTags {
-		return taskfile.UpdateRequest{}, fmt.Errorf("nothing to update: provide --status, --priority, --effort, --owner, --done, --add-tag, or --remove-tag")
+		return taskfile.UpdateRequest{}, fmt.Errorf("nothing to update: provide --status, --priority, --effort, --owner, --parent, --done, --add-tag, or --remove-tag")
 	}
 
 	return req, nil
@@ -166,6 +172,7 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 		"priority": string(task.Priority),
 		"effort":   string(task.Effort),
 		"owner":    task.Owner,
+		"parent":   task.Parent,
 	}
 
 	var changes []changeEntry
@@ -181,6 +188,9 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 	}
 	if req.Owner != nil {
 		changes = append(changes, changeEntry{field: "owner", oldValue: oldValues["owner"], newValue: *req.Owner})
+	}
+	if req.Parent != nil {
+		changes = append(changes, changeEntry{field: "parent", oldValue: oldValues["parent"], newValue: *req.Parent})
 	}
 
 	if len(req.AddTags) > 0 || len(req.RemTags) > 0 {

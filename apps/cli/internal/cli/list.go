@@ -243,6 +243,27 @@ func makeFilePathsRelative(tasks []*model.Task, baseDir string) {
 
 // getColumnValue extracts the value for a specific column from a task
 func getColumnValue(task *model.Task, column string) string {
+	scalar := getScalarColumnValue(task, column)
+	if scalar != "" {
+		return scalar
+	}
+	switch column {
+	case "created":
+		if task.Created.IsZero() {
+			return ""
+		}
+		return task.Created.Format("2006-01-02")
+	case "deps":
+		return strings.Join(task.Dependencies, ",")
+	case "tags":
+		return strings.Join(task.Tags, ",")
+	default:
+		return ""
+	}
+}
+
+// getScalarColumnValue returns simple string field values.
+func getScalarColumnValue(task *model.Task, column string) string {
 	switch column {
 	case "id":
 		return task.ID
@@ -258,21 +279,8 @@ func getColumnValue(task *model.Task, column string) string {
 		return task.Group
 	case "owner":
 		return task.Owner
-	case "created":
-		if task.Created.IsZero() {
-			return ""
-		}
-		return task.Created.Format("2006-01-02")
-	case "deps":
-		if len(task.Dependencies) == 0 {
-			return ""
-		}
-		return strings.Join(task.Dependencies, ",")
-	case "tags":
-		if len(task.Tags) == 0 {
-			return ""
-		}
-		return strings.Join(task.Tags, ",")
+	case "parent":
+		return task.Parent
 	case "file":
 		return task.FilePath
 	default:

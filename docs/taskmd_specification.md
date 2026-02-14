@@ -32,6 +32,7 @@ Description and subtasks go here.
 | `tags` | array | No | Lowercase, hyphen-separated strings |
 | `group` | string | No | Logical grouping (derived from directory if omitted) |
 | `owner` | string | No | Free-form assignee name or identifier |
+| `parent` | string | No | Single task ID (e.g., `"045"`) |
 | `created` | date | No | `YYYY-MM-DD` |
 
 ## Frontmatter Schema
@@ -97,6 +98,16 @@ tags:
 
 **`owner`** — Free-form string for assigning a task to a person or team. Used for filtering and display; no validation is applied.
 
+**`parent`** — Task ID of the parent task for hierarchical grouping. A task can have at most one parent. Children are computed dynamically (not stored in frontmatter) by finding all tasks whose `parent` matches a given ID.
+
+- Purely organizational — does not imply blocking or dependency
+- No status cascading — completing all children does not auto-complete the parent
+- Must reference an existing task ID; self-references and cycles are flagged by validation
+
+```yaml
+parent: "045"
+```
+
 **`created`** — Date when the task was created, in `YYYY-MM-DD` format.
 
 Unknown frontmatter fields are preserved during read/write operations.
@@ -148,6 +159,7 @@ A valid taskmd file **must**:
 4. Have unique IDs across the project
 5. Reference only existing tasks in `dependencies`
 6. Have no circular dependency chains
+7. Reference an existing task in `parent` (if set), with no self-reference or parent cycles
 
 A valid taskmd file **should**:
 
@@ -181,6 +193,7 @@ status: in-progress
 priority: high
 effort: large
 dependencies: ["012", "013"]
+parent: "012"
 tags:
   - auth
   - security

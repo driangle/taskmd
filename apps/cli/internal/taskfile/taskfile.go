@@ -15,6 +15,7 @@ type UpdateRequest struct {
 	Priority *string
 	Effort   *string
 	Owner    *string
+	Parent   *string
 	Tags     *[]string // replace tags entirely
 	AddTags  []string  // add to existing tags
 	RemTags  []string  // remove from existing tags
@@ -132,6 +133,9 @@ func buildScalarUpdates(req UpdateRequest) []scalarUpdate {
 	}
 	if req.Owner != nil {
 		updates = append(updates, scalarUpdate{key: "owner", value: *req.Owner})
+	}
+	if req.Parent != nil {
+		updates = append(updates, scalarUpdate{key: "parent", value: *req.Parent})
 	}
 	return updates
 }

@@ -221,3 +221,41 @@ func TestListCommand_TableColorColumns(t *testing.T) {
 		t.Error("Expected title in output")
 	}
 }
+
+func TestGetColumnValue_Parent(t *testing.T) {
+	task := &model.Task{
+		ID:     "001",
+		Title:  "Test Task",
+		Parent: "010",
+	}
+
+	result := getColumnValue(task, "parent")
+	if result != "010" {
+		t.Errorf("getColumnValue(parent) = %s, want 010", result)
+	}
+
+	// Empty parent
+	task2 := &model.Task{ID: "002", Title: "No Parent"}
+	result2 := getColumnValue(task2, "parent")
+	if result2 != "" {
+		t.Errorf("getColumnValue(parent) for task without parent = %q, want empty", result2)
+	}
+}
+
+func TestListCommand_ParentColumn(t *testing.T) {
+	resetListFlags()
+
+	tasks := []*model.Task{
+		{ID: "001", Title: "Parent", Status: model.StatusPending},
+		{ID: "002", Title: "Child", Status: model.StatusPending, Parent: "001"},
+	}
+
+	output := captureListTableOutput(t, tasks, "id,title,parent")
+
+	if !strings.Contains(output, "parent") {
+		t.Error("Expected 'parent' column header in output")
+	}
+	if !strings.Contains(output, "001") {
+		t.Error("Expected parent value '001' in output")
+	}
+}

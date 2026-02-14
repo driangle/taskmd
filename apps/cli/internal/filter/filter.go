@@ -48,27 +48,51 @@ func matchesAll(task *model.Task, filters []Criteria) bool {
 }
 
 func matches(task *model.Task, field, value string) bool {
+	if v, ok := getFieldValue(task, field); ok {
+		return v == value
+	}
 	switch field {
-	case "status":
-		return string(task.Status) == value
-	case "priority":
-		return string(task.Priority) == value
-	case "effort":
-		return string(task.Effort) == value
-	case "id":
-		return task.ID == value
 	case "title":
 		return strings.Contains(strings.ToLower(task.Title), strings.ToLower(value))
-	case "group":
-		return task.Group == value
-	case "owner":
-		return task.Owner == value
 	case "blocked":
 		isBlocked := len(task.Dependencies) > 0
 		return (value == "true" && isBlocked) || (value == "false" && !isBlocked)
 	case "tag":
 		return slices.Contains(task.Tags, value)
+	case "parent":
+		return matchBoolOrValue(task.Parent, value)
 	default:
 		return false
 	}
+}
+
+// getFieldValue returns the string value for simple equality fields.
+func getFieldValue(task *model.Task, field string) (string, bool) {
+	switch field {
+	case "status":
+		return string(task.Status), true
+	case "priority":
+		return string(task.Priority), true
+	case "effort":
+		return string(task.Effort), true
+	case "id":
+		return task.ID, true
+	case "group":
+		return task.Group, true
+	case "owner":
+		return task.Owner, true
+	default:
+		return "", false
+	}
+}
+
+// matchBoolOrValue matches "true"/"false" as presence check, or exact value.
+func matchBoolOrValue(fieldValue, filterValue string) bool {
+	if filterValue == "true" {
+		return fieldValue != ""
+	}
+	if filterValue == "false" {
+		return fieldValue == ""
+	}
+	return fieldValue == filterValue
 }
