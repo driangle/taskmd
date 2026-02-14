@@ -18,6 +18,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
   const [status, setStatus] = useState(task.status);
   const [priority, setPriority] = useState(task.priority);
   const [effort, setEffort] = useState(task.effort);
+  const [owner, setOwner] = useState(task.owner ?? "");
   const [tags, setTags] = useState((task.tags ?? []).join(", "));
   const [body, setBody] = useState(task.body ?? "");
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
     if (status !== task.status) data.status = status;
     if (priority !== task.priority) data.priority = priority;
     if (effort !== task.effort) data.effort = effort;
+    if (owner !== (task.owner ?? "")) data.owner = owner;
 
     const newTags = tags
       .split(",")
@@ -134,17 +136,31 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-          Tags (comma-separated)
-        </label>
-        <input
-          type="text"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="e.g. backend, api, feature"
-          className={inputClasses}
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Owner
+          </label>
+          <input
+            type="text"
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            placeholder="e.g. alice"
+            className={inputClasses}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Tags (comma-separated)
+          </label>
+          <input
+            type="text"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="e.g. backend, api, feature"
+            className={inputClasses}
+          />
+        </div>
       </div>
 
       <div>

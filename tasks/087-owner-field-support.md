@@ -1,7 +1,7 @@
 ---
 id: "087"
 title: "Add owner field to task specification and code"
-status: pending
+status: completed
 priority: medium
 effort: medium
 tags:

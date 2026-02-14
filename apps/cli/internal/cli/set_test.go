@@ -108,6 +108,7 @@ func resetSetFlags() {
 	setStatus = ""
 	setPriority = ""
 	setEffort = ""
+	setOwner = ""
 	setDone = false
 	setDryRun = false
 	setAddTags = nil
@@ -198,6 +199,66 @@ func TestSet_Effort(t *testing.T) {
 	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
 	if !strings.Contains(string(content), "effort: small") {
 		t.Error("Expected file to contain updated effort")
+	}
+}
+
+func TestSet_Owner(t *testing.T) {
+	tmpDir := createSetTestFiles(t)
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "001"
+	setOwner = "alice"
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output, "owner: (unset) -> alice") {
+		t.Errorf("Expected owner change in output, got: %s", output)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	if !strings.Contains(string(content), "owner: alice") {
+		t.Errorf("Expected file to contain owner: alice, got:\n%s", string(content))
+	}
+}
+
+func TestSet_OwnerUpdateExisting(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `---
+id: "020"
+title: "Task with owner"
+status: pending
+owner: alice
+created: 2026-02-08
+---
+
+# Task with owner
+`
+	path := filepath.Join(tmpDir, "020-owned.md")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "020"
+	setOwner = "bob"
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output, "owner: alice -> bob") {
+		t.Errorf("Expected owner change in output, got: %s", output)
+	}
+
+	updated, _ := os.ReadFile(path)
+	if !strings.Contains(string(updated), "owner: bob") {
+		t.Errorf("Expected file to contain owner: bob, got:\n%s", string(updated))
 	}
 }
 

@@ -484,7 +484,7 @@ func TestHandleUpdateTask_PartialUpdate(t *testing.T) {
 // GET /api/config tests
 
 func TestHandleConfig(t *testing.T) {
-	cfg := Config{ReadOnly: false}
+	cfg := Config{ReadOnly: false, Version: "1.2.3-abc1234"}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	rec := httptest.NewRecorder()
@@ -501,6 +501,9 @@ func TestHandleConfig(t *testing.T) {
 	}
 	if resp.ReadOnly {
 		t.Error("expected readonly to be false")
+	}
+	if resp.Version != "1.2.3-abc1234" {
+		t.Errorf("expected version '1.2.3-abc1234', got %q", resp.Version)
 	}
 }
 

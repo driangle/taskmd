@@ -208,6 +208,7 @@ type TaskUpdateRequest struct {
 	Status   *string   `json:"status"`
 	Priority *string   `json:"priority"`
 	Effort   *string   `json:"effort"`
+	Owner    *string   `json:"owner"`
 	Tags     *[]string `json:"tags"`
 	Body     *string   `json:"body"`
 }
@@ -294,6 +295,7 @@ func toUpdateRequest(body TaskUpdateRequest) taskfile.UpdateRequest {
 		Status:   body.Status,
 		Priority: body.Priority,
 		Effort:   body.Effort,
+		Owner:    body.Owner,
 		Tags:     body.Tags,
 		Body:     body.Body,
 	}

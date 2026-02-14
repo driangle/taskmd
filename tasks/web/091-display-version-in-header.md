@@ -1,7 +1,7 @@
 ---
 id: "091"
 title: "Display taskmd version in web header"
-status: in-progress
+status: completed
 priority: low
 effort: small
 tags:
@@ -17,11 +17,11 @@ Show the current version of the taskmd program in the top-left corner of the web
 
 ## Tasks
 
-- [ ] Expose the taskmd version from the Go backend via an API endpoint or embed it in the initial page data
-- [ ] Display the version string next to the logo in the web header/sidebar
-- [ ] Style the version label to be subtle and non-intrusive (e.g., smaller font, muted color)
-- [ ] Ensure the version updates correctly across builds (uses the same version injected via ldflags)
-- [ ] Write tests for the version endpoint or data injection
+- [x] Expose the taskmd version from the Go backend via an API endpoint or embed it in the initial page data
+- [x] Display the version string next to the logo in the web header/sidebar
+- [x] Style the version label to be subtle and non-intrusive (e.g., smaller font, muted color)
+- [x] Ensure the version updates correctly across builds (uses the same version injected via ldflags)
+- [x] Write tests for the version endpoint or data injection
 
 ## Acceptance Criteria
 

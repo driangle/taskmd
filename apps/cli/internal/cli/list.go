@@ -256,6 +256,8 @@ func getColumnValue(task *model.Task, column string) string {
 		return string(task.Effort)
 	case "group":
 		return task.Group
+	case "owner":
+		return task.Owner
 	case "created":
 		if task.Created.IsZero() {
 			return ""

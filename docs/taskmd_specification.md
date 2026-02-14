@@ -31,6 +31,7 @@ Description and subtasks go here.
 | `dependencies` | array | No | List of task ID strings (e.g., `["001", "015"]`) |
 | `tags` | array | No | Lowercase, hyphen-separated strings |
 | `group` | string | No | Logical grouping (derived from directory if omitted) |
+| `owner` | string | No | Free-form assignee name or identifier |
 | `created` | date | No | `YYYY-MM-DD` |
 
 ## Frontmatter Schema
@@ -93,6 +94,8 @@ tags:
 ```
 
 **`group`** — Logical grouping. If omitted, derived from the parent directory name. Root-level tasks have no group.
+
+**`owner`** — Free-form string for assigning a task to a person or team. Used for filtering and display; no validation is applied.
 
 **`created`** — Date when the task was created, in `YYYY-MM-DD` format.
 

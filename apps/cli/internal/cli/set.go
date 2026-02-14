@@ -17,6 +17,7 @@ var (
 	setStatus     string
 	setPriority   string
 	setEffort     string
+	setOwner      string
 	setDone       bool
 	setDryRun     bool
 	setAddTags    []string
@@ -60,6 +61,7 @@ func init() {
 		cmd.Flags().StringVar(&setStatus, "status", "", "new status (pending, in-progress, completed, blocked, cancelled)")
 		cmd.Flags().StringVar(&setPriority, "priority", "", "new priority (low, medium, high, critical)")
 		cmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large)")
+		cmd.Flags().StringVar(&setOwner, "owner", "", "owner/assignee of the task")
 		cmd.Flags().BoolVar(&setDone, "done", false, "mark task as completed (alias for --status completed)")
 		cmd.Flags().BoolVar(&setDryRun, "dry-run", false, "preview changes without writing to disk")
 		cmd.Flags().StringArrayVar(&setAddTags, "add-tag", nil, "add a tag (repeatable)")
@@ -109,6 +111,13 @@ func runSet(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+// setStringField sets a pointer field if the value is non-empty.
+func setStringField(dst **string, value string) {
+	if value != "" {
+		*dst = &value
+	}
+}
+
 func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 	if setDone && cmd.Flags().Changed("status") {
 		return taskfile.UpdateRequest{}, fmt.Errorf("--done and --status are mutually exclusive")
@@ -120,15 +129,11 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 
 	var req taskfile.UpdateRequest
 
-	if setStatus != "" {
-		req.Status = &setStatus
-	}
-	if setPriority != "" {
-		req.Priority = &setPriority
-	}
-	if setEffort != "" {
-		req.Effort = &setEffort
-	}
+	setStringField(&req.Status, setStatus)
+	setStringField(&req.Priority, setPriority)
+	setStringField(&req.Effort, setEffort)
+	setStringField(&req.Owner, setOwner)
+
 	if len(setAddTags) > 0 {
 		req.AddTags = setAddTags
 	}
@@ -136,15 +141,14 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 		req.RemTags = setRemoveTags
 	}
 
-	// Validate enum values with suggestions
 	if err := validateSetEnums(req); err != nil {
 		return taskfile.UpdateRequest{}, err
 	}
 
-	hasScalar := req.Status != nil || req.Priority != nil || req.Effort != nil
+	hasScalar := req.Status != nil || req.Priority != nil || req.Effort != nil || req.Owner != nil
 	hasTags := len(req.AddTags) > 0 || len(req.RemTags) > 0
 	if !hasScalar && !hasTags {
-		return taskfile.UpdateRequest{}, fmt.Errorf("nothing to update: provide --status, --priority, --effort, --done, --add-tag, or --remove-tag")
+		return taskfile.UpdateRequest{}, fmt.Errorf("nothing to update: provide --status, --priority, --effort, --owner, --done, --add-tag, or --remove-tag")
 	}
 
 	return req, nil
@@ -161,6 +165,7 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 		"status":   string(task.Status),
 		"priority": string(task.Priority),
 		"effort":   string(task.Effort),
+		"owner":    task.Owner,
 	}
 
 	var changes []changeEntry
@@ -173,6 +178,9 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 	}
 	if req.Effort != nil {
 		changes = append(changes, changeEntry{field: "effort", oldValue: oldValues["effort"], newValue: *req.Effort})
+	}
+	if req.Owner != nil {
+		changes = append(changes, changeEntry{field: "owner", oldValue: oldValues["owner"], newValue: *req.Owner})
 	}
 
 	if len(req.AddTags) > 0 || len(req.RemTags) > 0 {

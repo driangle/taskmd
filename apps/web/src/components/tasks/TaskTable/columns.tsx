@@ -57,6 +57,10 @@ export function createTaskColumns(
       header: "Effort",
       cell: (info) => info.getValue() || "-",
     }),
+    columnHelper.accessor("owner", {
+      header: "Owner",
+      cell: (info) => info.getValue() || "-",
+    }),
     columnHelper.accessor("tags", {
       header: "Tags",
       cell: (info) => {

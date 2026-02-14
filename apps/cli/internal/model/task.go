@@ -45,6 +45,7 @@ type Task struct {
 	Dependencies []string  `yaml:"dependencies" json:"dependencies"`
 	Tags         []string  `yaml:"tags" json:"tags"`
 	Group        string    `yaml:"group" json:"group,omitempty"`
+	Owner        string    `yaml:"owner" json:"owner,omitempty"`
 	Created      time.Time `yaml:"created" json:"created"`
 
 	// Content fields

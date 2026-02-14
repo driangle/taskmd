@@ -61,6 +61,8 @@ func matches(task *model.Task, field, value string) bool {
 		return strings.Contains(strings.ToLower(task.Title), strings.ToLower(value))
 	case "group":
 		return task.Group == value
+	case "owner":
+		return task.Owner == value
 	case "blocked":
 		isBlocked := len(task.Dependencies) > 0
 		return (value == "true" && isBlocked) || (value == "false" && !isBlocked)

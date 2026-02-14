@@ -14,6 +14,7 @@ type UpdateRequest struct {
 	Status   *string
 	Priority *string
 	Effort   *string
+	Owner    *string
 	Tags     *[]string // replace tags entirely
 	AddTags  []string  // add to existing tags
 	RemTags  []string  // remove from existing tags
@@ -72,13 +73,24 @@ func UpdateTaskFile(filePath string, req UpdateRequest) error {
 
 	// Apply scalar field updates within frontmatter.
 	scalarUpdates := buildScalarUpdates(req)
+	found := make([]bool, len(scalarUpdates))
 	for i := openIdx + 1; i < closeIdx; i++ {
-		for _, u := range scalarUpdates {
+		for j, u := range scalarUpdates {
 			prefix := u.key + ":"
 			if strings.HasPrefix(strings.TrimSpace(lines[i]), prefix) {
 				lines[i] = u.key + ": " + u.value
+				found[j] = true
 				break
 			}
+		}
+	}
+
+	// Insert any scalar fields that weren't found in existing frontmatter.
+	for j := len(scalarUpdates) - 1; j >= 0; j-- {
+		if !found[j] {
+			u := scalarUpdates[j]
+			lines = insertLine(lines, closeIdx, u.key+": "+u.value)
+			closeIdx++
 		}
 	}
 
@@ -117,6 +129,9 @@ func buildScalarUpdates(req UpdateRequest) []scalarUpdate {
 	}
 	if req.Effort != nil {
 		updates = append(updates, scalarUpdate{key: "effort", value: *req.Effort})
+	}
+	if req.Owner != nil {
+		updates = append(updates, scalarUpdate{key: "owner", value: *req.Owner})
 	}
 	return updates
 }

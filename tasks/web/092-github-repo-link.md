@@ -1,7 +1,7 @@
 ---
 id: "092"
 title: "Add GitHub repository link to web interface"
-status: pending
+status: completed
 priority: low
 effort: small
 tags:
@@ -17,12 +17,12 @@ Add a link to the taskmd GitHub repository somewhere accessible in the web inter
 
 ## Tasks
 
-- [ ] Decide on placement for the GitHub link (sidebar footer, header icon, etc.)
-- [ ] Add a GitHub icon/link component pointing to the repository URL
-- [ ] Make the repository URL configurable or derive it from build-time config
-- [ ] Style the link to fit naturally within the existing UI
-- [ ] Ensure the link opens in a new tab
-- [ ] Verify appearance in both light and dark modes
+- [x] Decide on placement for the GitHub link (sidebar footer, header icon, etc.)
+- [x] Add a GitHub icon/link component pointing to the repository URL
+- [x] Make the repository URL configurable or derive it from build-time config
+- [x] Style the link to fit naturally within the existing UI
+- [x] Ensure the link opens in a new tab
+- [x] Verify appearance in both light and dark modes
 
 ## Acceptance Criteria
 

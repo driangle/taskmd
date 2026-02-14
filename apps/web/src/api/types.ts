@@ -7,6 +7,7 @@ export interface Task {
   dependencies: string[] | null;
   tags: string[] | null;
   group: string;
+  owner: string;
   created: string;
   body: string;
   file_path: string;
@@ -94,6 +95,7 @@ export interface TaskUpdateRequest {
   status?: string;
   priority?: string;
   effort?: string;
+  owner?: string;
   tags?: string[];
   body?: string;
 }
