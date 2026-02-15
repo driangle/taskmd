@@ -1,7 +1,7 @@
 ---
 id: "107"
 title: "Create MCP server wrapping taskmd commands"
-status: pending
+status: in-progress
 priority: medium
 effort: large
 tags:
