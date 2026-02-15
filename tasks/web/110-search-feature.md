@@ -1,7 +1,7 @@
 ---
 id: "110"
 title: "Add full-text search to web interface"
-status: pending
+status: in-progress
 priority: medium
 effort: medium
 tags:

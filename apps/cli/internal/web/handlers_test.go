@@ -13,6 +13,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/board"
 	"github.com/driangle/taskmd/apps/cli/internal/metrics"
 	"github.com/driangle/taskmd/apps/cli/internal/next"
+	"github.com/driangle/taskmd/apps/cli/internal/search"
 	"github.com/driangle/taskmd/apps/cli/internal/tracks"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
 )
@@ -844,5 +845,90 @@ func TestHandleTracks_WithLimit(t *testing.T) {
 	limited := fetchTracksResult(t, dp, "?limit=1")
 	if len(limited.Tracks) != 1 {
 		t.Fatalf("expected 1 track with limit=1, got %d", len(limited.Tracks))
+	}
+}
+
+// GET /api/search tests
+
+func TestHandleSearch_Success(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=Task", nil)
+	rec := httptest.NewRecorder()
+
+	handleSearch(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var results []search.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestHandleSearch_EmptyQuery(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/search", nil)
+	rec := httptest.NewRecorder()
+
+	handleSearch(dp)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandleSearch_NoResults(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=zzzznonexistent", nil)
+	rec := httptest.NewRecorder()
+
+	handleSearch(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var results []search.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(results))
+	}
+}
+
+func TestHandleSearch_CaseInsensitive(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/search?q=TASK", nil)
+	rec := httptest.NewRecorder()
+
+	handleSearch(dp)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var results []search.Result
+	if err := json.Unmarshal(rec.Body.Bytes(), &results); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results for case-insensitive search, got %d", len(results))
 	}
 }

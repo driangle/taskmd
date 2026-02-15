@@ -53,6 +53,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// API routes
 	mux.HandleFunc("GET /api/config", handleConfig(s.config))
+	mux.HandleFunc("GET /api/search", handleSearch(s.dp))
 	mux.HandleFunc("GET /api/tasks", handleTasks(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}", handleTaskByID(s.dp))
 	mux.HandleFunc("PUT /api/tasks/{id}", handleUpdateTask(s.dp, s.config.ReadOnly))

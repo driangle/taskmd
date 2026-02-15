@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/driangle/taskmd/apps/cli/internal/model"
+	"github.com/driangle/taskmd/apps/cli/internal/search"
 )
 
 func resetSearchFlags() {
@@ -81,7 +82,7 @@ Document all REST endpoints including request and response schemas.
 func captureSearchOutput(t *testing.T, tasks []*model.Task, query, format string) (string, error) {
 	t.Helper()
 
-	results := searchTasks(tasks, query)
+	results := search.Search(tasks, query)
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -119,7 +120,7 @@ func TestSearch_MatchInTitle(t *testing.T) {
 		{ID: "002", Title: "Set up deployment", Status: model.StatusInProgress, Body: "Other content"},
 	}
 
-	results := searchTasks(tasks, "authentication")
+	results := search.Search(tasks, "authentication")
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
@@ -140,7 +141,7 @@ func TestSearch_MatchInBody(t *testing.T) {
 		{ID: "002", Title: "Task two", Status: model.StatusPending, Body: "Nothing relevant"},
 	}
 
-	results := searchTasks(tasks, "deployment")
+	results := search.Search(tasks, "deployment")
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
@@ -160,7 +161,7 @@ func TestSearch_CaseInsensitive(t *testing.T) {
 		{ID: "001", Title: "AUTHENTICATION Module", Status: model.StatusPending},
 	}
 
-	results := searchTasks(tasks, "authentication")
+	results := search.Search(tasks, "authentication")
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result for case-insensitive match, got %d", len(results))
@@ -179,7 +180,7 @@ func TestSearch_MultipleResults(t *testing.T) {
 		{ID: "003", Title: "Write docs", Status: model.StatusCompleted, Body: "No match here"},
 	}
 
-	results := searchTasks(tasks, "authentication")
+	results := search.Search(tasks, "authentication")
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
@@ -193,7 +194,7 @@ func TestSearch_MatchInTitleAndBody(t *testing.T) {
 		{ID: "001", Title: "Authentication system", Status: model.StatusPending, Body: "Implement authentication with JWT"},
 	}
 
-	results := searchTasks(tasks, "authentication")
+	results := search.Search(tasks, "authentication")
 
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
@@ -210,7 +211,7 @@ func TestSearch_NoResults(t *testing.T) {
 		{ID: "001", Title: "Some task", Status: model.StatusPending, Body: "Nothing here"},
 	}
 
-	results := searchTasks(tasks, "zzzznonexistent")
+	results := search.Search(tasks, "zzzznonexistent")
 
 	if len(results) != 0 {
 		t.Fatalf("expected 0 results, got %d", len(results))
@@ -229,7 +230,7 @@ func TestSearch_JSONFormat(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var parsed []searchResult
+	var parsed []search.Result
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("failed to parse JSON output: %v\noutput: %s", err, output)
 	}
@@ -286,7 +287,7 @@ func TestSearch_UnsupportedFormat(t *testing.T) {
 func TestSearch_EmptyTaskList(t *testing.T) {
 	resetSearchFlags()
 
-	results := searchTasks([]*model.Task{}, "anything")
+	results := search.Search([]*model.Task{}, "anything")
 
 	if len(results) != 0 {
 		t.Fatalf("expected 0 results for empty task list, got %d", len(results))
@@ -338,7 +339,7 @@ func TestSearchTasks_Unit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := searchTasks(tasks, tt.query)
+			results := search.Search(tasks, tt.query)
 			if len(results) != tt.expected {
 				t.Fatalf("expected %d results, got %d", tt.expected, len(results))
 			}
@@ -348,89 +349,6 @@ func TestSearchTasks_Unit(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestExtractSnippet(t *testing.T) {
-	tests := []struct {
-		name       string
-		body       string
-		query      string
-		bodyMatch  bool
-		wantPrefix bool // should start with "..."
-		wantSuffix bool // should end with "..."
-		contains   string
-	}{
-		{
-			name:      "title only match returns title",
-			body:      "unrelated body text",
-			query:     "notinbody",
-			bodyMatch: false,
-			contains:  "", // returns task title, tested via task
-		},
-		{
-			name:       "short body fully included",
-			body:       "small body with keyword here",
-			query:      "keyword",
-			bodyMatch:  true,
-			wantPrefix: false,
-			wantSuffix: false,
-			contains:   "keyword",
-		},
-		{
-			name:       "long body gets ellipsis",
-			body:       strings.Repeat("word ", 20) + "target" + strings.Repeat(" word", 20),
-			query:      "target",
-			bodyMatch:  true,
-			wantPrefix: true,
-			wantSuffix: true,
-			contains:   "target",
-		},
-		{
-			name:       "match at start no prefix ellipsis",
-			body:       "target is at the very start of a long text" + strings.Repeat(" word", 20),
-			query:      "target",
-			bodyMatch:  true,
-			wantPrefix: false,
-			wantSuffix: true,
-			contains:   "target",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			task := &model.Task{Title: "Test Title", Body: tt.body}
-			result := extractSnippet(task, strings.ToLower(tt.query), tt.bodyMatch)
-
-			if tt.contains != "" && !strings.Contains(result, tt.contains) {
-				t.Errorf("expected snippet to contain %q, got %q", tt.contains, result)
-			}
-			if tt.wantPrefix && !strings.HasPrefix(result, "...") {
-				t.Errorf("expected snippet to start with '...', got %q", result)
-			}
-			if tt.wantSuffix && !strings.HasSuffix(result, "...") {
-				t.Errorf("expected snippet to end with '...', got %q", result)
-			}
-		})
-	}
-}
-
-func TestMatchLocation(t *testing.T) {
-	tests := []struct {
-		title    bool
-		body     bool
-		expected string
-	}{
-		{true, false, "title"},
-		{false, true, "body"},
-		{true, true, "title,body"},
-	}
-
-	for _, tt := range tests {
-		result := matchLocation(tt.title, tt.body)
-		if result != tt.expected {
-			t.Errorf("matchLocation(%v, %v) = %q, want %q", tt.title, tt.body, result, tt.expected)
-		}
 	}
 }
 
@@ -488,7 +406,7 @@ func TestSearch_IntegrationWithFiles(t *testing.T) {
 		t.Fatalf("expected JSON output, got empty. stderr: %s", stderrBuf.String())
 	}
 
-	var parsed []searchResult
+	var parsed []search.Result
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
 	}

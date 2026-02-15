@@ -12,6 +12,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/metrics"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/next"
+	"github.com/driangle/taskmd/apps/cli/internal/search"
 	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
 	"github.com/driangle/taskmd/apps/cli/internal/tracks"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
@@ -45,6 +46,29 @@ func writeJSON(w http.ResponseWriter, v any) {
 type TaskDetail struct {
 	*model.Task
 	Body string `json:"body"`
+}
+
+func handleSearch(dp *DataProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query().Get("q")
+		if q == "" {
+			http.Error(w, "query parameter 'q' is required", http.StatusBadRequest)
+			return
+		}
+
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		results := search.Search(tasks, q)
+		if results == nil {
+			results = []search.Result{}
+		}
+
+		writeJSON(w, results)
+	}
 }
 
 func handleTasks(dp *DataProvider) http.HandlerFunc {

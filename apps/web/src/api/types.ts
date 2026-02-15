@@ -125,6 +125,15 @@ export interface TracksResult {
   warnings?: string[];
 }
 
+export interface SearchResult {
+  id: string;
+  title: string;
+  status: string;
+  file_path: string;
+  match_location: string;
+  snippet: string;
+}
+
 export interface ApiError {
   error: string;
   details?: string[];

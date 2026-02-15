@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { useConfig } from "../../hooks/use-config.ts";
 import { useTheme } from "../../hooks/use-theme.ts";
+import { SearchDialog } from "../search/SearchDialog.tsx";
 
 const tabs = [
   { path: "/tasks", label: "Tasks" },
@@ -22,12 +23,44 @@ export function Shell({ children }: ShellProps) {
   const { readonly, version } = useConfig();
   const { theme, toggle } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const location = useLocation();
 
   // Close mobile menu on route change
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Cmd+K / Ctrl+K - open search
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+
+      // "/" key - open search (only when not in input/textarea)
+      if (
+        e.key === "/" &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
+          e.preventDefault();
+          setSearchOpen(true);
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
@@ -70,6 +103,29 @@ export function Shell({ children }: ShellProps) {
                     {tab.label}
                   </NavLink>
                 ))}
+                {/* Search button */}
+                <button
+                  onClick={() => setSearchOpen(true)}
+                  className="ml-1 px-2.5 py-1.5 text-sm rounded-md transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5"
+                  aria-label="Search tasks"
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <kbd className="text-[10px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 dark:text-gray-500 px-1 py-0.5 rounded">
+                    ⌘K
+                  </kbd>
+                </button>
                 <a
                   href="https://driangle.github.io/taskmd/"
                   target="_blank"
@@ -163,6 +219,7 @@ export function Shell({ children }: ShellProps) {
         )}
       </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 md:py-6">{children}</main>
+      <SearchDialog open={searchOpen} onClose={closeSearch} />
     </div>
   );
 }
