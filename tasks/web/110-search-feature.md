@@ -1,7 +1,7 @@
 ---
 id: "110"
 title: "Add full-text search to web interface"
-status: in-progress
+status: completed
 priority: medium
 effort: medium
 tags:
@@ -21,17 +21,17 @@ Add a search feature to the web interface that performs full-text search across 
 
 ## Tasks
 
-- [ ] Add a search input component to the web layout (e.g., header or sidebar)
-- [ ] Implement a search API endpoint that accepts a query string
-- [ ] Perform case-insensitive matching across task titles and body content
-- [ ] Return matching tasks with ID, title, status, match location, and a context snippet
-- [ ] Display search results in a results list with highlighted match terms
-- [ ] Show match location indicator (title, body, or both)
-- [ ] Show a context snippet around the match in the body
-- [ ] Handle empty results with a clear "no results" message
-- [ ] Support keyboard shortcut to focus the search input (e.g., Cmd+K or /)
-- [ ] Add tests for the search API endpoint
-- [ ] Add tests for the search UI component
+- [x] Add a search input component to the web layout (e.g., header or sidebar)
+- [x] Implement a search API endpoint that accepts a query string
+- [x] Perform case-insensitive matching across task titles and body content
+- [x] Return matching tasks with ID, title, status, match location, and a context snippet
+- [x] Display search results in a results list with highlighted match terms
+- [x] Show match location indicator (title, body, or both)
+- [x] Show a context snippet around the match in the body
+- [x] Handle empty results with a clear "no results" message
+- [x] Support keyboard shortcut to focus the search input (e.g., Cmd+K or /)
+- [x] Add tests for the search API endpoint
+- [x] Add tests for the search UI component
 
 ## Acceptance Criteria
 
