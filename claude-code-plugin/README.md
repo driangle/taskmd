@@ -46,6 +46,7 @@ Or install directly from this repository:
 | complete-task | `/taskmd:complete-task <ID>` | Mark a task as completed |
 | list-tasks | `/taskmd:list-tasks` | List tasks with optional filters |
 | validate | `/taskmd:validate` | Validate task files for errors |
+| divide-and-conquer | `/taskmd:divide-and-conquer <ID>` | Split a large task into smaller sub-tasks |
 
 ## Usage Examples
 
@@ -67,6 +68,12 @@ Or install directly from this repository:
 
 # Check task files for issues
 /taskmd:validate
+
+# Split a large task into smaller ones
+/taskmd:divide-and-conquer 045
+
+# Force-split even if it seems small enough
+/taskmd:divide-and-conquer 045 --force
 
 # Look up a specific task
 /taskmd:get-task 042
