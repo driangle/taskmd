@@ -19,4 +19,6 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
 4. **Do the task**: Follow the task description and complete the work described
    - Use `EnterPlanMode` for non-trivial implementation tasks
    - Check off subtasks (`- [x]`) in the task file as you complete them
-5. **Mark the task as completed** when done: Run `taskmd set --task-id <ID> --status completed`
+5. **Mark the task as completed** when done: Run `taskmd set --task-id <ID> --status completed --verify`
+   - The `--verify` flag will run any verification checks defined in the task before applying the status change
+   - If verification fails, fix the issues and try again

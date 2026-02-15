@@ -12,5 +12,7 @@ Mark a task as completed using the `taskmd` CLI.
 
 The user's query is in `$ARGUMENTS` (a task ID like `077`).
 
-1. Run `taskmd update --task-id $ARGUMENTS --status completed`
+1. Run `taskmd set --task-id $ARGUMENTS --status completed --verify`
+   - The `--verify` flag runs any verification checks defined in the task before applying the status change
+   - If verification fails, report the failures to the user
 2. Confirm the status change to the user

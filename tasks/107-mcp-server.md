@@ -18,6 +18,8 @@ created: 2026-02-14
 
 Build an MCP (Model Context Protocol) server that exposes taskmd functionality as tools, enabling LLM-based tools beyond Claude Code (e.g., Cursor, Windsurf, Copilot agents, custom agents) to interact with taskmd projects. The server wraps existing CLI commands so that any MCP-compatible client can list, get, create, update, and query tasks.
 
+Should be implemented in Go for maximum reuse of taskmd's internal packages.
+
 ## Tasks
 
 - [ ] Research MCP server SDK options for Go (or decide on implementation language)
@@ -36,10 +38,11 @@ Build an MCP (Model Context Protocol) server that exposes taskmd functionality a
 - [ ] Support `--task-dir` configuration for pointing at the correct task directory
 - [ ] Write tests for MCP tool handlers
 - [ ] Add documentation for configuring the MCP server in common clients (Claude Desktop, Cursor, etc.)
+- [ ] Update the claude-code-plugin to contain the MCP client configuration snippet for connecting to the local MCP server
 
 ## Acceptance Criteria
 
-- `taskmd mcp` starts an MCP server over stdio
+- `taskmd mcp start` starts an MCP server over stdio
 - MCP clients can discover and call taskmd tools (list, get, set, next, etc.)
 - Tool inputs/outputs follow MCP specification with proper JSON schemas
 - Server reuses existing internal packages rather than shelling out

@@ -1,7 +1,7 @@
 # taskmd Specification
 
-**Version:** 1.1
-**Last Updated:** 2026-02-13
+**Version:** 1.2
+**Last Updated:** 2026-02-15
 
 ## Quick Reference
 
@@ -35,6 +35,7 @@ Description and subtasks go here.
 | `touches` | array | No | Abstract scope identifiers (e.g., `["cli/graph", "cli/output"]`) |
 | `parent` | string | No | Single task ID (e.g., `"045"`) |
 | `created` | date | No | `YYYY-MM-DD` |
+| `verify` | array | No | List of typed verification checks (see below) |
 
 ## Frontmatter Schema
 
@@ -137,6 +138,30 @@ parent: "045"
 ```
 
 **`created`** — Date when the task was created, in `YYYY-MM-DD` format.
+
+**`verify`** — List of typed acceptance checks for validating task completion. Each entry is a map with a `type` field that determines the check kind. Run checks with `taskmd verify --task-id <ID>`.
+
+| Type | Fields | Behavior |
+|------|--------|----------|
+| `bash` | `run` (required), `dir` (optional) | Runs `run` in a shell subprocess; pass if exit code 0, fail otherwise |
+| `assert` | `check` (required) | Displays `check` text for an agent to evaluate (not executed) |
+
+- `dir` is relative to the project root (where `.taskmd.yaml` lives); defaults to `.`
+- Unknown types are preserved in the file but produce a warning and are skipped during execution
+
+```yaml
+verify:
+  - type: bash
+    run: "go test ./internal/api/... -run TestPagination"
+    dir: "apps/cli"
+  - type: bash
+    run: "npm test"
+    dir: "apps/web"
+  - type: assert
+    check: "Pagination links appear in the API response headers"
+  - type: assert
+    check: "Page size defaults to 20 when not specified"
+```
 
 Unknown frontmatter fields are preserved during read/write operations.
 

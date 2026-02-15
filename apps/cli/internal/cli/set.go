@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -10,6 +12,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
+	"github.com/driangle/taskmd/apps/cli/internal/verify"
 )
 
 var (
@@ -21,6 +24,7 @@ var (
 	setParent     string
 	setDone       bool
 	setDryRun     bool
+	setVerify     bool
 	setAddTags    []string
 	setRemoveTags []string
 )
@@ -66,6 +70,7 @@ func init() {
 		cmd.Flags().StringVar(&setParent, "parent", "", "parent task ID (use empty string to clear)")
 		cmd.Flags().BoolVar(&setDone, "done", false, "mark task as completed (alias for --status completed)")
 		cmd.Flags().BoolVar(&setDryRun, "dry-run", false, "preview changes without writing to disk")
+		cmd.Flags().BoolVar(&setVerify, "verify", false, "run verification checks before completing a task")
 		cmd.Flags().StringArrayVar(&setAddTags, "add-tag", nil, "add a tag (repeatable)")
 		cmd.Flags().StringArrayVar(&setRemoveTags, "remove-tag", nil, "remove a tag (repeatable)")
 
@@ -94,6 +99,10 @@ func runSet(cmd *cobra.Command, _ []string) error {
 	task := findExactMatch(setTaskID, result.Tasks)
 	if task == nil {
 		return fmt.Errorf("task not found: %s", setTaskID)
+	}
+
+	if err := runSetVerification(task, req); err != nil {
+		return err
 	}
 
 	changes := buildChangeLog(task, req)
@@ -232,4 +241,43 @@ func colorizeFieldValue(field, value string, r *lipgloss.Renderer) string {
 	default:
 		return value
 	}
+}
+
+// runSetVerification runs verify checks if --verify is set and status is being set to completed.
+func runSetVerification(task *model.Task, req taskfile.UpdateRequest) error {
+	if !setVerify {
+		return nil
+	}
+	isCompleting := req.Status != nil && *req.Status == string(model.StatusCompleted)
+	if !isCompleting {
+		return nil
+	}
+	if len(task.Verify) == 0 {
+		return nil
+	}
+
+	if errs := model.ValidateVerifySteps(task.Verify); len(errs) > 0 {
+		return fmt.Errorf("invalid verify steps:\n  %s", strings.Join(errs, "\n  "))
+	}
+
+	flags := GetGlobalFlags()
+	projectRoot := resolveProjectRoot()
+	opts := verify.Options{
+		ProjectRoot: projectRoot,
+		Timeout:     60 * time.Second,
+		Verbose:     flags.Verbose,
+		LogFunc: func(format string, args ...any) {
+			if !flags.Quiet {
+				fmt.Fprintf(os.Stderr, format+"\n", args...)
+			}
+		},
+	}
+
+	vResult := verify.Run(task.Verify, opts)
+	printVerifyTable(vResult)
+
+	if vResult.HasFailures() {
+		return fmt.Errorf("verification failed: %d check(s) failed — status change aborted", vResult.Failed)
+	}
+	return nil
 }

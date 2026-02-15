@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -112,6 +113,7 @@ func resetSetFlags() {
 	setParent = ""
 	setDone = false
 	setDryRun = false
+	setVerify = false
 	setAddTags = nil
 	setRemoveTags = nil
 	taskDir = "."
@@ -974,6 +976,119 @@ created: 2026-02-08
 	updated, _ := os.ReadFile(path)
 	if strings.Contains(string(updated), "parent: 001") {
 		t.Error("Expected parent to be cleared, but still found 'parent: 001'")
+	}
+}
+
+func createVerifySetTestFile(t *testing.T, id, verifyYAML string) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+
+	content := fmt.Sprintf(`---
+id: "%s"
+title: "Task with verify"
+status: pending
+created: 2026-02-14
+%s---
+
+# Task with verify
+`, id, verifyYAML)
+
+	path := filepath.Join(tmpDir, id+"-verify.md")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	return tmpDir
+}
+
+func TestSet_VerifyPassThenComplete(t *testing.T) {
+	tmpDir := createVerifySetTestFile(t, "050", `verify:
+  - type: bash
+    run: "echo pass"
+`)
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "050"
+	setStatus = "completed"
+	setVerify = true
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output, "status: pending -> completed") {
+		t.Errorf("expected status change in output, got: %s", output)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(tmpDir, "050-verify.md"))
+	if !strings.Contains(string(content), "status: completed") {
+		t.Error("Expected file to contain completed status")
+	}
+}
+
+func TestSet_VerifyFailAborts(t *testing.T) {
+	tmpDir := createVerifySetTestFile(t, "051", `verify:
+  - type: bash
+    run: "exit 1"
+`)
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "051"
+	setStatus = "completed"
+	setVerify = true
+
+	_, err := captureSetOutput(t)
+	if err == nil {
+		t.Fatal("expected error when verify fails")
+	}
+	if !strings.Contains(err.Error(), "verification failed") {
+		t.Errorf("expected 'verification failed' error, got: %v", err)
+	}
+
+	// Status should NOT be changed
+	content, _ := os.ReadFile(filepath.Join(tmpDir, "051-verify.md"))
+	if strings.Contains(string(content), "status: completed") {
+		t.Error("Status should not be changed when verification fails")
+	}
+}
+
+func TestSet_VerifyNoFieldProceeds(t *testing.T) {
+	tmpDir := createVerifySetTestFile(t, "052", "")
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "052"
+	setStatus = "completed"
+	setVerify = true
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(output, "status: pending -> completed") {
+		t.Errorf("expected status change, got: %s", output)
+	}
+}
+
+func TestSet_VerifyNonCompletedSkips(t *testing.T) {
+	tmpDir := createVerifySetTestFile(t, "053", `verify:
+  - type: bash
+    run: "exit 1"
+`)
+	resetSetFlags()
+	taskDir = tmpDir
+	setTaskID = "053"
+	setStatus = "in-progress"
+	setVerify = true
+
+	output, err := captureSetOutput(t)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should succeed because --verify only gates completion
+	if !strings.Contains(output, "status: pending -> in-progress") {
+		t.Errorf("expected status change, got: %s", output)
 	}
 }
 
