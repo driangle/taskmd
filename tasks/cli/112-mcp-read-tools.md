@@ -1,7 +1,7 @@
 ---
 id: "112"
 title: "MCP server: get, next, search, context tools"
-status: pending
+status: completed
 priority: high
 effort: medium
 tags:
@@ -24,12 +24,12 @@ Add read-only MCP tools that wrap existing taskmd query operations: get (single 
 
 ## Tasks
 
-- [ ] Implement `get` tool handler — wraps scanner + parser to return a single task by ID
-- [ ] Implement `next` tool handler — wraps the next package for task recommendations
-- [ ] Implement `search` tool handler — wraps the search package for full-text search
-- [ ] Implement `context` tool handler — wraps the taskcontext package for file resolution
-- [ ] Register all tools with the MCP server
-- [ ] Write tests for each tool handler
+- [x] Implement `get` tool handler — wraps scanner + parser to return a single task by ID
+- [x] Implement `next` tool handler — wraps the next package for task recommendations
+- [x] Implement `search` tool handler — wraps the search package for full-text search
+- [x] Implement `context` tool handler — wraps the taskcontext package for file resolution
+- [x] Register all tools with the MCP server
+- [x] Write tests for each tool handler
 
 ## Acceptance Criteria
 
