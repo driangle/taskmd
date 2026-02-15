@@ -20,7 +20,7 @@ type TrackTask struct {
 	Touches  []string `json:"touches,omitempty" yaml:"touches,omitempty"`
 }
 
-// Track represents a group of non-overlapping tasks that can run in sequence.
+// Track represents a group of scope-overlapping tasks that must run sequentially.
 type Track struct {
 	ID     int         `json:"id" yaml:"id"`
 	Tasks  []TrackTask `json:"tasks" yaml:"tasks"`
@@ -127,22 +127,57 @@ func splitByTouches(items []scored) (withTouches, flexible []scored) {
 }
 
 func assignTracks(items []scored) []Track {
-	var tracks []Track
-	for _, it := range items {
-		placed := false
-		for ti := range tracks {
-			if !overlaps(&tracks[ti], it.task.Touches) {
-				addToTrack(&tracks[ti], it)
-				placed = true
-				break
-			}
+	n := len(items)
+	if n == 0 {
+		return nil
+	}
+
+	// Union-Find with path compression
+	parent := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+	}
+	var find func(int) int
+	find = func(x int) int {
+		if parent[x] != x {
+			parent[x] = find(parent[x])
 		}
-		if !placed {
-			t := newTrack(len(tracks) + 1)
-			addToTrack(&t, it)
-			tracks = append(tracks, t)
+		return parent[x]
+	}
+	union := func(a, b int) {
+		ra, rb := find(a), find(b)
+		if ra != rb {
+			parent[ra] = rb
 		}
 	}
+
+	// Union tasks that share any scope
+	scopeFirst := make(map[string]int)
+	for i, it := range items {
+		for _, scope := range it.task.Touches {
+			if first, exists := scopeFirst[scope]; exists {
+				union(first, i)
+			} else {
+				scopeFirst[scope] = i
+			}
+		}
+	}
+
+	// Group items by component, preserving sorted order
+	seen := make(map[int]int) // root -> track index
+	var tracks []Track
+	for i := range items {
+		root := find(i)
+		if ti, exists := seen[root]; exists {
+			addToTrack(&tracks[ti], items[i])
+		} else {
+			seen[root] = len(tracks)
+			track := newTrack(len(tracks) + 1)
+			addToTrack(&track, items[i])
+			tracks = append(tracks, track)
+		}
+	}
+
 	return tracks
 }
 
@@ -160,15 +195,6 @@ func newTrack(id int) Track {
 		ID:       id,
 		scopeSet: make(map[string]bool),
 	}
-}
-
-func overlaps(track *Track, touches []string) bool {
-	for _, scope := range touches {
-		if track.scopeSet[scope] {
-			return true
-		}
-	}
-	return false
 }
 
 func addToTrack(track *Track, it scored) {

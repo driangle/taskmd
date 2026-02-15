@@ -9,6 +9,7 @@ tags:
   - mvp
 touches:
   - cli
+  - cli/mcp
 parent: "107"
 dependencies:
   - "111"

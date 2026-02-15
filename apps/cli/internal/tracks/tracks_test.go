@@ -49,7 +49,7 @@ func TestAssign_AllFlexible(t *testing.T) {
 	}
 }
 
-func TestAssign_NoOverlap_SingleTrack(t *testing.T) {
+func TestAssign_NoOverlap_SeparateTracks(t *testing.T) {
 	tasks := []*model.Task{
 		makeTask("001", model.StatusPending, model.PriorityHigh, nil, []string{"scope-a"}),
 		makeTask("002", model.StatusPending, model.PriorityMedium, nil, []string{"scope-b"}),
@@ -60,15 +60,18 @@ func TestAssign_NoOverlap_SingleTrack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result.Tracks) != 1 {
-		t.Errorf("expected 1 track (no overlaps), got %d", len(result.Tracks))
+	// No scope overlap -> each task gets its own track (all parallelizable)
+	if len(result.Tracks) != 3 {
+		t.Errorf("expected 3 tracks (no overlaps, all parallel), got %d", len(result.Tracks))
 	}
-	if len(result.Tracks) > 0 && len(result.Tracks[0].Tasks) != 3 {
-		t.Errorf("expected 3 tasks in single track, got %d", len(result.Tracks[0].Tasks))
+	for _, track := range result.Tracks {
+		if len(track.Tasks) != 1 {
+			t.Errorf("expected 1 task per track, got %d in track %d", len(track.Tasks), track.ID)
+		}
 	}
 }
 
-func TestAssign_FullOverlap_SeparateTracks(t *testing.T) {
+func TestAssign_FullOverlap_SingleTrack(t *testing.T) {
 	tasks := []*model.Task{
 		makeTask("001", model.StatusPending, model.PriorityHigh, nil, []string{"scope-a"}),
 		makeTask("002", model.StatusPending, model.PriorityMedium, nil, []string{"scope-a"}),
@@ -79,13 +82,12 @@ func TestAssign_FullOverlap_SeparateTracks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result.Tracks) != 3 {
-		t.Errorf("expected 3 tracks (all overlap), got %d", len(result.Tracks))
+	// All share scope-a -> 1 track (must be sequential)
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track (all overlap), got %d", len(result.Tracks))
 	}
-	for _, track := range result.Tracks {
-		if len(track.Tasks) != 1 {
-			t.Errorf("expected 1 task per track, got %d in track %d", len(track.Tasks), track.ID)
-		}
+	if len(result.Tracks[0].Tasks) != 3 {
+		t.Errorf("expected 3 tasks in single track, got %d", len(result.Tracks[0].Tasks))
 	}
 }
 
@@ -101,17 +103,12 @@ func TestAssign_PartialOverlap(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// 001 touches a,b -> track 1
-	// 002 touches b,c -> overlaps with 001 (b) -> track 2
-	// 003 touches c,d -> overlaps with 002 (c) but not 001 -> track 1
-	if len(result.Tracks) != 2 {
-		t.Fatalf("expected 2 tracks, got %d", len(result.Tracks))
+	// 001↔002 share scope-b, 002↔003 share scope-c → transitive → all 1 track
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track (transitive overlap), got %d", len(result.Tracks))
 	}
-	if len(result.Tracks[0].Tasks) != 2 {
-		t.Errorf("expected 2 tasks in track 1, got %d", len(result.Tracks[0].Tasks))
-	}
-	if len(result.Tracks[1].Tasks) != 1 {
-		t.Errorf("expected 1 task in track 2, got %d", len(result.Tracks[1].Tasks))
+	if len(result.Tracks[0].Tasks) != 3 {
+		t.Errorf("expected 3 tasks in track, got %d", len(result.Tracks[0].Tasks))
 	}
 }
 
@@ -189,8 +186,9 @@ func TestAssign_MixedTouchesAndFlexible(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(result.Tracks) != 1 {
-		t.Errorf("expected 1 track (no overlap), got %d", len(result.Tracks))
+	// scope-a and scope-b don't overlap -> 2 tracks
+	if len(result.Tracks) != 2 {
+		t.Errorf("expected 2 tracks (no overlap between a and b), got %d", len(result.Tracks))
 	}
 	if len(result.Flexible) != 2 {
 		t.Errorf("expected 2 flexible tasks, got %d", len(result.Flexible))
@@ -208,21 +206,21 @@ func TestAssign_TrackScopesUnion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(result.Tracks) != 1 {
-		t.Fatalf("expected 1 track, got %d", len(result.Tracks))
+	// No overlap between tasks -> 2 separate tracks
+	if len(result.Tracks) != 2 {
+		t.Fatalf("expected 2 tracks (no overlap), got %d", len(result.Tracks))
 	}
-	scopes := result.Tracks[0].Scopes
-	if len(scopes) != 3 {
-		t.Errorf("expected 3 scopes in track, got %d: %v", len(scopes), scopes)
+	// Track 1 should have scopes a,b from task 001
+	scopes1 := make(map[string]bool)
+	for _, s := range result.Tracks[0].Scopes {
+		scopes1[s] = true
 	}
-	scopeSet := make(map[string]bool)
-	for _, s := range scopes {
-		scopeSet[s] = true
+	if !scopes1["scope-a"] || !scopes1["scope-b"] {
+		t.Errorf("expected track 1 scopes [scope-a, scope-b], got %v", result.Tracks[0].Scopes)
 	}
-	for _, want := range []string{"scope-a", "scope-b", "scope-c"} {
-		if !scopeSet[want] {
-			t.Errorf("expected scope %q in track scopes %v", want, scopes)
-		}
+	// Track 2 should have scope-c from task 002
+	if len(result.Tracks[1].Scopes) != 1 || result.Tracks[1].Scopes[0] != "scope-c" {
+		t.Errorf("expected track 2 scopes [scope-c], got %v", result.Tracks[1].Scopes)
 	}
 }
 
@@ -238,18 +236,20 @@ func TestAssign_DeterministicOrdering(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// All same score, so sorted by ID ascending.
-	// Each overlaps, so 3 separate tracks.
-	if len(result.Tracks) != 3 {
-		t.Fatalf("expected 3 tracks, got %d", len(result.Tracks))
+	// All share scope-a -> 1 track, tasks sorted by ID ascending
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track, got %d", len(result.Tracks))
+	}
+	if len(result.Tracks[0].Tasks) != 3 {
+		t.Fatalf("expected 3 tasks in track, got %d", len(result.Tracks[0].Tasks))
 	}
 	ids := []string{
 		result.Tracks[0].Tasks[0].ID,
-		result.Tracks[1].Tasks[0].ID,
-		result.Tracks[2].Tasks[0].ID,
+		result.Tracks[0].Tasks[1].ID,
+		result.Tracks[0].Tasks[2].ID,
 	}
 	if ids[0] != "001" || ids[1] != "002" || ids[2] != "003" {
-		t.Errorf("expected tracks ordered by ID [001, 002, 003], got %v", ids)
+		t.Errorf("expected tasks ordered by ID [001, 002, 003], got %v", ids)
 	}
 }
 
@@ -264,14 +264,15 @@ func TestAssign_TrackIDs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(result.Tracks) != 2 {
-		t.Fatalf("expected 2 tracks, got %d", len(result.Tracks))
+	// Both share scope-a -> 1 track
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track, got %d", len(result.Tracks))
 	}
 	if result.Tracks[0].ID != 1 {
-		t.Errorf("expected track 1 ID=1, got %d", result.Tracks[0].ID)
+		t.Errorf("expected track ID=1, got %d", result.Tracks[0].ID)
 	}
-	if result.Tracks[1].ID != 2 {
-		t.Errorf("expected track 2 ID=2, got %d", result.Tracks[1].ID)
+	if len(result.Tracks[0].Tasks) != 2 {
+		t.Errorf("expected 2 tasks in track, got %d", len(result.Tracks[0].Tasks))
 	}
 }
 
@@ -286,14 +287,81 @@ func TestAssign_HigherScoreTaskFirst(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(result.Tracks) != 2 {
-		t.Fatalf("expected 2 tracks, got %d", len(result.Tracks))
+	// Both share scope-a -> 1 track, higher score (002) first
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track, got %d", len(result.Tracks))
 	}
-	// Higher priority task (002) should be in track 1
+	if len(result.Tracks[0].Tasks) != 2 {
+		t.Fatalf("expected 2 tasks in track, got %d", len(result.Tracks[0].Tasks))
+	}
 	if result.Tracks[0].Tasks[0].ID != "002" {
-		t.Errorf("expected task 002 (critical) in track 1, got %s", result.Tracks[0].Tasks[0].ID)
+		t.Errorf("expected task 002 (critical) first, got %s", result.Tracks[0].Tasks[0].ID)
 	}
-	if result.Tracks[1].Tasks[0].ID != "001" {
-		t.Errorf("expected task 001 (low) in track 2, got %s", result.Tracks[1].Tasks[0].ID)
+	if result.Tracks[0].Tasks[1].ID != "001" {
+		t.Errorf("expected task 001 (low) second, got %s", result.Tracks[0].Tasks[1].ID)
+	}
+}
+
+func TestAssign_IdenticalTouches_SameTrack(t *testing.T) {
+	// Bug report scenario: two tasks with identical touches must land in the same track
+	tasks := []*model.Task{
+		makeTask("112", model.StatusPending, model.PriorityHigh, nil, []string{"cli", "cli/mcp"}),
+		makeTask("113", model.StatusPending, model.PriorityHigh, nil, []string{"cli", "cli/mcp"}),
+	}
+
+	result, err := Assign(tasks, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track (identical touches), got %d", len(result.Tracks))
+	}
+	if len(result.Tracks[0].Tasks) != 2 {
+		t.Errorf("expected 2 tasks in track, got %d", len(result.Tracks[0].Tasks))
+	}
+}
+
+func TestAssign_TransitiveOverlap(t *testing.T) {
+	// A shares scope-x with B, B shares scope-y with C.
+	// A and C don't directly overlap but are transitively connected -> 1 track.
+	tasks := []*model.Task{
+		makeTask("001", model.StatusPending, model.PriorityHigh, nil, []string{"scope-x"}),
+		makeTask("002", model.StatusPending, model.PriorityMedium, nil, []string{"scope-x", "scope-y"}),
+		makeTask("003", model.StatusPending, model.PriorityLow, nil, []string{"scope-y"}),
+	}
+
+	result, err := Assign(tasks, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Tracks) != 1 {
+		t.Fatalf("expected 1 track (transitive overlap), got %d", len(result.Tracks))
+	}
+	if len(result.Tracks[0].Tasks) != 3 {
+		t.Errorf("expected 3 tasks in track, got %d", len(result.Tracks[0].Tasks))
+	}
+}
+
+func TestAssign_IndependentGroups(t *testing.T) {
+	// Two disjoint clusters: {001, 002} share scope-a, {003, 004} share scope-b
+	tasks := []*model.Task{
+		makeTask("001", model.StatusPending, model.PriorityHigh, nil, []string{"scope-a"}),
+		makeTask("002", model.StatusPending, model.PriorityMedium, nil, []string{"scope-a"}),
+		makeTask("003", model.StatusPending, model.PriorityHigh, nil, []string{"scope-b"}),
+		makeTask("004", model.StatusPending, model.PriorityMedium, nil, []string{"scope-b"}),
+	}
+
+	result, err := Assign(tasks, Options{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Tracks) != 2 {
+		t.Fatalf("expected 2 tracks (two independent groups), got %d", len(result.Tracks))
+	}
+	// Each track should have 2 tasks
+	for _, track := range result.Tracks {
+		if len(track.Tasks) != 2 {
+			t.Errorf("expected 2 tasks in track %d, got %d", track.ID, len(track.Tasks))
+		}
 	}
 }

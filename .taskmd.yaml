@@ -25,6 +25,17 @@ scopes:
     paths:
       - "apps/cli/internal/graph/"
       - "apps/cli/internal/cli/graph.go"
+  cli/mcp:
+    paths:
+      - "apps/cli/internal/mcp/"
+      - "apps/cli/internal/cli/mcp.go"
+  cli/validate:
+    paths:
+      - "apps/cli/internal/validate/"
+      - "apps/cli/internal/cli/validate.go"
+  cli/config:
+    paths:
+      - "apps/cli/"
   sync/core:
     paths:
       - "apps/cli/internal/sync/source.go"
