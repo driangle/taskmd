@@ -16,6 +16,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
 	"github.com/driangle/taskmd/apps/cli/internal/taskcontext"
+	"github.com/driangle/taskmd/apps/cli/internal/worklog"
 )
 
 var (
@@ -117,7 +118,39 @@ func runGet(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return outputGet(task, depInfo, ctxFiles, getFormat)
+	wlInfo := loadWorklogInfo(task, scanDir)
+
+	return outputGet(task, depInfo, ctxFiles, wlInfo, getFormat)
+}
+
+// worklogInfo holds optional worklog metadata for display.
+type worklogInfo struct {
+	EntryCount  int    `json:"entry_count" yaml:"entry_count"`
+	LastUpdated string `json:"last_updated,omitempty" yaml:"last_updated,omitempty"`
+}
+
+func loadWorklogInfo(task *model.Task, scanDir string) *worklogInfo {
+	// Resolve the worklog path relative to the scan directory
+	// since task.FilePath may be relative after makeFilePathsRelative
+	taskAbsPath := filepath.Join(scanDir, task.FilePath)
+	wlPath := worklog.WorklogPath(taskAbsPath, task.ID)
+	if !worklog.Exists(wlPath) {
+		return nil
+	}
+
+	wl, err := worklog.ParseWorklog(wlPath)
+	if err != nil || len(wl.Entries) == 0 {
+		return nil
+	}
+
+	info := &worklogInfo{
+		EntryCount: len(wl.Entries),
+	}
+
+	last := wl.Entries[len(wl.Entries)-1]
+	info.LastUpdated = last.Timestamp.Format("2006-01-02T15:04:05Z07:00")
+
+	return info
 }
 
 // dependencyInfo holds resolved dependency information for display.
@@ -365,20 +398,20 @@ func buildDependencyInfo(task *model.Task, allTasks []*model.Task) dependencyInf
 }
 
 // outputGet routes to the appropriate formatter.
-func outputGet(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, format string) error {
+func outputGet(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, format string) error {
 	switch format {
 	case "text":
-		return outputGetText(task, deps, ctxFiles, os.Stdout)
+		return outputGetText(task, deps, ctxFiles, wl, os.Stdout)
 	case "json":
-		return outputGetJSON(task, deps, ctxFiles, os.Stdout)
+		return outputGetJSON(task, deps, ctxFiles, wl, os.Stdout)
 	case "yaml":
-		return outputGetYAML(task, deps, ctxFiles, os.Stdout)
+		return outputGetYAML(task, deps, ctxFiles, wl, os.Stdout)
 	default:
 		return fmt.Errorf("unsupported format: %s (supported: text, json, yaml)", format)
 	}
 }
 
-func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, w io.Writer) error {
+func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, w io.Writer) error {
 	r := getRenderer()
 
 	fmt.Fprintf(w, "%s %s\n", formatLabel("Task:", r), formatTaskID(task.ID, r))
@@ -394,11 +427,23 @@ func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext
 		fmt.Fprintf(w, "%s %s\n", formatLabel("Created:", r), task.Created.Format("2006-01-02"))
 	}
 	fmt.Fprintf(w, "%s %s\n", formatLabel("File:", r), formatDim(task.FilePath, r))
+	printWorklogInfo(w, wl, r)
 	printDescription(w, task.Body)
 	printDependencies(w, deps, r)
 	printChildren(w, deps.Children, r)
 	printGetContextFiles(w, ctxFiles, r)
 	return nil
+}
+
+func printWorklogInfo(w io.Writer, wl *worklogInfo, r *lipgloss.Renderer) {
+	if wl == nil {
+		return
+	}
+	text := fmt.Sprintf("%d entries", wl.EntryCount)
+	if wl.LastUpdated != "" {
+		text += fmt.Sprintf(", last updated %s", wl.LastUpdated)
+	}
+	fmt.Fprintf(w, "%s %s\n", formatLabel("Worklog:", r), text)
 }
 
 func printOptionalField(w io.Writer, label, value string, r *lipgloss.Renderer) {
@@ -487,6 +532,7 @@ type getOutput struct {
 	Dependencies getDepsJSON             `json:"dependencies" yaml:"dependencies"`
 	Children     []depEntry              `json:"children,omitempty" yaml:"children,omitempty"`
 	ContextFiles []taskcontext.FileEntry `json:"context_files,omitempty" yaml:"context_files,omitempty"`
+	Worklog      *worklogInfo            `json:"worklog,omitempty" yaml:"worklog,omitempty"`
 }
 
 type getDepsJSON struct {
@@ -494,7 +540,7 @@ type getDepsJSON struct {
 	Blocks    []depEntry `json:"blocks" yaml:"blocks"`
 }
 
-func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry) getOutput {
+func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo) getOutput {
 	created := ""
 	if !task.Created.IsZero() {
 		created = task.Created.Format("2006-01-02")
@@ -515,6 +561,7 @@ func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontex
 			Blocks:    deps.Blocks,
 		},
 		Children: deps.Children,
+		Worklog:  wl,
 	}
 	if len(ctxFiles) > 0 {
 		out.ContextFiles = ctxFiles
@@ -522,12 +569,12 @@ func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontex
 	return out
 }
 
-func outputGetJSON(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, w io.Writer) error {
-	return WriteJSON(w, buildGetOutput(task, deps, ctxFiles))
+func outputGetJSON(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, w io.Writer) error {
+	return WriteJSON(w, buildGetOutput(task, deps, ctxFiles, wl))
 }
 
-func outputGetYAML(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, w io.Writer) error {
-	return WriteYAML(w, buildGetOutput(task, deps, ctxFiles))
+func outputGetYAML(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, w io.Writer) error {
+	return WriteYAML(w, buildGetOutput(task, deps, ctxFiles, wl))
 }
 
 // printGetContextFiles appends context file information to the text output.

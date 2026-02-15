@@ -12,6 +12,13 @@ export interface Task {
   created: string;
   body: string;
   file_path: string;
+  worklog_entries?: number;
+  worklog_updated?: string;
+}
+
+export interface WorklogEntry {
+  timestamp: string;
+  content: string;
 }
 
 export interface BoardGroup {

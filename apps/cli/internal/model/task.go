@@ -87,6 +87,10 @@ type Task struct {
 	// Content fields
 	Body     string `json:"-"`
 	FilePath string `json:"file_path"`
+
+	// Worklog metadata (populated on demand, not from frontmatter)
+	WorklogEntries int        `json:"worklog_entries,omitempty" yaml:"-"`
+	WorklogUpdated *time.Time `json:"worklog_updated,omitempty" yaml:"-"`
 }
 
 // IsValid checks if the task has required fields

@@ -16,6 +16,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/taskfile"
 	"github.com/driangle/taskmd/apps/cli/internal/tracks"
 	"github.com/driangle/taskmd/apps/cli/internal/validator"
+	"github.com/driangle/taskmd/apps/cli/internal/worklog"
 )
 
 // ConfigResponse is the JSON response for GET /api/config.
@@ -45,7 +46,9 @@ func writeJSON(w http.ResponseWriter, v any) {
 // TaskDetail includes the body field for individual task detail views
 type TaskDetail struct {
 	*model.Task
-	Body string `json:"body"`
+	Body           string `json:"body"`
+	WorklogEntries int    `json:"worklog_entries,omitempty"`
+	WorklogUpdated string `json:"worklog_updated,omitempty"`
 }
 
 func handleSearch(dp *DataProvider) http.HandlerFunc {
@@ -110,10 +113,19 @@ func handleTaskByID(dp *DataProvider) http.HandlerFunc {
 			return
 		}
 
-		// Return task with body
+		// Return task with body and worklog metadata
 		detail := TaskDetail{
 			Task: foundTask,
 			Body: foundTask.Body,
+		}
+
+		wlPath := worklog.WorklogPath(foundTask.FilePath, taskID)
+		if worklog.Exists(wlPath) {
+			if wl, err := worklog.ParseWorklog(wlPath); err == nil && len(wl.Entries) > 0 {
+				detail.WorklogEntries = len(wl.Entries)
+				last := wl.Entries[len(wl.Entries)-1]
+				detail.WorklogUpdated = last.Timestamp.Format("2006-01-02T15:04:05Z07:00")
+			}
 		}
 
 		writeJSON(w, detail)
@@ -374,4 +386,54 @@ func reloadTask(dp *DataProvider, taskID string) (*model.Task, error) {
 		return nil, fmt.Errorf("task not found after update: %s", taskID)
 	}
 	return found, nil
+}
+
+// WorklogEntryJSON is a single worklog entry for the API.
+type WorklogEntryJSON struct {
+	Timestamp string `json:"timestamp"`
+	Content   string `json:"content"`
+}
+
+func handleWorklog(dp *DataProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		taskID := r.PathValue("id")
+		if taskID == "" {
+			http.Error(w, "task ID is required", http.StatusBadRequest)
+			return
+		}
+
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		found := findTaskByID(tasks, taskID)
+		if found == nil {
+			http.Error(w, "task not found", http.StatusNotFound)
+			return
+		}
+
+		wlPath := worklog.WorklogPath(found.FilePath, taskID)
+		if !worklog.Exists(wlPath) {
+			writeJSON(w, []WorklogEntryJSON{})
+			return
+		}
+
+		wl, err := worklog.ParseWorklog(wlPath)
+		if err != nil {
+			writeJSON(w, []WorklogEntryJSON{})
+			return
+		}
+
+		entries := make([]WorklogEntryJSON, len(wl.Entries))
+		for i, e := range wl.Entries {
+			entries[i] = WorklogEntryJSON{
+				Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+				Content:   e.Content,
+			}
+		}
+
+		writeJSON(w, entries)
+	}
 }
