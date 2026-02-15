@@ -1,0 +1,16 @@
+{
+  "name": "taskmd-marketplace",
+  "owner": {
+    "name": "driangle"
+  },
+  "metadata": {
+    "description": "Official marketplace for taskmd Claude Code plugins"
+  },
+  "plugins": [
+    {
+      "name": "taskmd",
+      "source": "./claude-code-plugin",
+      "description": "Manage tasks stored as markdown files with taskmd. List, create, complete, and validate tasks directly from Claude Code."
+    }
+  ]
+}
