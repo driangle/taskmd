@@ -1,7 +1,7 @@
 ---
 id: "114"
 title: "MCP server: documentation and claude-code-plugin config"
-status: pending
+status: completed
 priority: medium
 effort: small
 tags:
@@ -26,10 +26,10 @@ Add documentation for configuring the taskmd MCP server with common clients and 
 
 ## Tasks
 
-- [ ] Add MCP server documentation to `docs/` covering setup and usage
-- [ ] Include example configuration snippets for Claude Desktop, Cursor, and other MCP clients
-- [ ] Update the claude-code-plugin to include MCP client configuration snippet
-- [ ] Document available tools with their input/output schemas
+- [x] Add MCP server documentation to `docs/` covering setup and usage
+- [x] Include example configuration snippets for Claude Desktop, Cursor, and other MCP clients
+- [x] Update the claude-code-plugin to include MCP client configuration snippet
+- [x] Document available tools with their input/output schemas
 
 ## Acceptance Criteria
 

@@ -134,6 +134,7 @@ taskmd list ./tasks/cli
 | `sync` | Sync tasks from external sources |
 | `web` | Web dashboard commands |
 | `init` | Initialize a project with agent configuration and spec files |
+| `mcp` | Start MCP server for LLM tool integration |
 | `completion` | Generate shell completion scripts |
 
 ---
@@ -1020,6 +1021,20 @@ taskmd sync --conflict local
 ```
 
 See the [Sync Configuration](#sync-configuration) section below for how to set up `.taskmd.yaml` for sync.
+
+### mcp - MCP Server
+
+Start a Model Context Protocol server over stdio for LLM tool integration.
+
+**Basic usage:**
+```bash
+# Start the MCP server
+taskmd mcp
+```
+
+The server exposes task operations as MCP tools (`list`, `get`, `next`, `search`, `context`, `set`, `validate`, `graph`) that any MCP-compatible client can discover and call.
+
+See the [MCP Server Guide](mcp-guide.md) for client configuration and full tool reference.
 
 ## Common Workflows
 
