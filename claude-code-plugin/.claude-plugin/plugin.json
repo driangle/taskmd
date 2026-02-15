@@ -2,7 +2,9 @@
   "name": "taskmd",
   "version": "1.0.0",
   "description": "Manage tasks stored as markdown files with taskmd. List, create, complete, and validate tasks directly from Claude Code.",
-  "author": "driangle",
+  "author": {
+    "name": "driangle"
+  },
   "homepage": "https://github.com/driangle/taskmd",
   "repository": "https://github.com/driangle/taskmd"
 }
