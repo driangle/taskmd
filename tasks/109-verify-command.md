@@ -18,58 +18,93 @@ created: 2026-02-14
 
 ## Objective
 
-Add a `verify` frontmatter field that lets task authors define acceptance checks — either executable shell commands or natural language assertions. Pair this with a `taskmd verify --task-id <ID>` command that runs executable checks and reports pass/fail results, while surfacing natural language checks for the agent to evaluate on its own. This closes the loop between "what to do" and "how to know it's done," giving both human and AI agents a concrete way to validate their work.
+Add a `verify` frontmatter field that lets task authors define typed acceptance checks. Each check is a map with a `type` field indicating what kind of check it is (e.g., `bash` for shell commands, `assert` for natural language assertions). Pair this with a `taskmd verify --task-id <ID>` command that runs executable checks and reports pass/fail results, while surfacing assertion checks for the agent to evaluate on its own. This closes the loop between "what to do" and "how to know it's done," giving both human and AI agents a concrete way to validate their work. The typed structure is extensible to future check types (e.g., `http`, `api`).
 
 ## Tasks
 
 ### Specification
-- [ ] Add `verify` field to the taskmd specification as an optional array of strings
-- [ ] Define two entry types: executable commands (prefixed with `$ `) and natural language assertions (plain text)
+- [ ] Add `verify` field to the taskmd specification as an optional array of typed maps
+- [ ] Define initial check types: `bash` (shell commands) and `assert` (natural language assertions)
+- [ ] Each entry must have a `type` field; other fields depend on the type (e.g., `run` for bash, `check` for assert)
+- [ ] `bash` steps support an optional `dir` field (relative to project root, defaults to `.`) to control the working directory
 - [ ] Document the field in `docs/taskmd_specification.md` with examples of both types
 - [ ] Update the frontmatter schema and field summary table
 
 ### Parser
 - [ ] Extend the task model to include the `verify` field
-- [ ] Parse `verify` as a list of strings from frontmatter
-- [ ] Classify each entry as executable (starts with `$ `) or natural language
+- [ ] Parse `verify` as a list of maps from frontmatter
+- [ ] Validate each entry has a `type` field and the required fields for that type
+- [ ] Define a `VerifyStep` struct with `Type` and type-specific fields (e.g., `Run`, `Check`, `Dir`)
 - [ ] Preserve the field during read/write operations
 
 ### CLI Command
 - [ ] Create `internal/cli/verify.go` with the `verify` command
 - [ ] Accept `--task-id` flag (required) to identify the task
 - [ ] Read the task's `verify` list
-- [ ] For executable entries (`$ `): run in a shell subprocess, capture stdout/stderr/exit code, report pass/fail
-- [ ] For natural language entries: display them clearly as checks the agent must evaluate (not executed)
-- [ ] Report overall results: executable pass/fail counts + pending natural language checks
+- [ ] Run all commands from the project root (where `.taskmd.yaml` or the `tasks/` directory lives), regardless of the user's cwd — this makes commands like `go test ./internal/...` deterministic
+- [ ] Dispatch each step by `type`:
+  - `bash`: run `run` field in a shell subprocess from `dir` (relative to project root, defaults to `.`), capture stdout/stderr/exit code, report pass/fail
+  - `assert`: display `check` field as a check the agent must evaluate (not executed)
+  - Unknown types: warn and skip
+- [ ] Report overall results: executable pass/fail counts + pending assertion checks
 - [ ] Exit with non-zero status if any executable check fails (useful for CI/scripting)
+- [ ] Support `--format` flag (json, table) via `GetGlobalFlags()` for consistent output across commands
+- [ ] JSON output: structured result with step type, status, stdout/stderr per step, and overall pass/fail
 - [ ] Support `--verbose` flag to show full command output even on success
 - [ ] Support `--dry-run` flag to display all checks without executing any
 - [ ] Add comprehensive tests in `internal/cli/verify_test.go`
 - [ ] Register command with `rootCmd`
 
+### Integration with `set` command
+- [ ] Add `--verify` flag to `taskmd set` — when combined with `--status completed`, run the verify logic before applying the status change
+- [ ] If any bash check fails, abort the status change and exit non-zero
+- [ ] If the task has no `verify` field, proceed with the status change as normal (no-op for verify)
+
+### Agent Skill
+- [ ] Create `.claude/skills/verify-task/SKILL.md` skill for agents to verify a task
+- [ ] The skill should accept a task ID, run `taskmd verify --task-id <ID> --format json`, and interpret the results
+- [ ] For `bash` steps: report pass/fail based on the JSON output
+- [ ] For `assert` steps: the agent reads each `check` assertion and evaluates whether the current codebase satisfies it
+- [ ] Report an overall verdict (all checks passed, or list failures)
+- [ ] Update `.claude/skills/do-task/SKILL.md`: use `taskmd set --task-id <ID> --status completed --verify` in the completion step so verification runs automatically
+- [ ] Update `.claude/skills/complete-task/SKILL.md`: use `taskmd set --task-id <ID> --status completed --verify` so completing a task always verifies first
+
 ### Safety
-- [ ] Display the commands that will be run before executing (with a confirmation prompt or `--yes` flag to skip)
+- [ ] Log each command before executing it (no confirmation prompt — the user explicitly asked to verify)
 - [ ] Support a timeout per command to prevent hangs (default: 60s, configurable with `--timeout`)
 
 ## Acceptance Criteria
 
-- Tasks can define a `verify` field with both executable and natural language checks:
+- Tasks can define a `verify` field with typed check steps:
   ```yaml
   verify:
-    - "$ go test ./internal/api/... -run TestPagination"
-    - "$ curl -s localhost:8080/api/tasks?page=2 | jq '.meta.total_pages'"
-    - "Pagination links appear in the API response headers"
-    - "Page size defaults to 20 when not specified"
+    - type: bash
+      run: "go test ./internal/api/... -run TestPagination"
+      dir: "apps/cli"
+    - type: bash
+      run: "npm test"
+      dir: "apps/web"
+    - type: assert
+      check: "Pagination links appear in the API response headers"
+    - type: assert
+      check: "Page size defaults to 20 when not specified"
   ```
-- Entries prefixed with `$ ` are treated as executable shell commands
-- Plain text entries are natural language assertions for the agent to evaluate
-- `taskmd verify --task-id 042` runs executable checks and displays natural language checks
-- Executable checks show pass/fail with exit code; natural language checks are listed as pending for agent review
+- Each entry is a map with a `type` field that determines the check kind
+- `bash` steps execute the `run` field in a shell subprocess, with optional `dir` (relative to project root, defaults to `.`)
+- `assert` steps surface the `check` field for the agent to evaluate (not executed)
+- `taskmd verify --task-id 042` runs bash checks and displays assert checks
+- Bash checks show pass/fail with exit code; assert checks are listed as pending for agent review
+- Unknown types produce a warning and are skipped
 - Overall exit code is non-zero if any executable check fails
+- `--format json` outputs structured results (step type, status, stdout/stderr, overall pass/fail)
 - `--dry-run` lists all checks without running any
 - `--verbose` shows full output for all commands
 - `--timeout` controls per-command timeout (default 60s)
-- Commands are displayed before execution for transparency
+- All commands run from the project root, regardless of where `taskmd verify` is invoked
+- Commands are logged before execution (no confirmation prompt — agents, CI, and developers all want it to just run)
 - Tasks without a `verify` field produce a clear "no checks defined" message
 - Specification is updated with the new field
-- Tests cover pass, fail, timeout, dry-run, missing field, mixed check types, and multi-command scenarios
+- `taskmd set --task-id 042 --status completed --verify` runs verification before applying the status change; aborts if any bash check fails
+- A `verify-task` agent skill exists that runs `taskmd verify --format json` and evaluates assert checks
+- The `do-task` and `complete-task` skills use `--verify` when marking tasks completed
+- Tests cover pass, fail, timeout, dry-run, JSON output, missing field, mixed check types, unknown types, and multi-step scenarios
