@@ -14,9 +14,14 @@ This starts an MCP server over stdio. The server exposes all task operations as 
 
 ### Claude Code
 
-If you have the [taskmd plugin](../claude-code-plugin/) installed, the MCP server is bundled and starts automatically — no extra configuration needed.
+The easiest way is to install the MCP plugin from the taskmd marketplace:
 
-Otherwise, add to your project's `.mcp.json` or run `claude mcp add --transport stdio taskmd -- taskmd mcp`:
+```bash
+claude plugin marketplace add driangle/taskmd
+claude plugin install taskmd-mcp@taskmd-marketplace --scope project
+```
+
+Alternatively, add to your project's `.mcp.json` or run `claude mcp add --transport stdio taskmd -- taskmd mcp`:
 
 ```json
 {

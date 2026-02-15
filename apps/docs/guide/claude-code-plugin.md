@@ -8,16 +8,40 @@ The `taskmd` CLI must be installed and available in your PATH. See [Installation
 
 ## Installation
 
-Install from the Claude Code plugin marketplace:
+There are two plugins available:
 
-```
-/plugins add taskmd
+| Plugin | What it provides | Requires CLI? |
+|--------|-----------------|---------------|
+| **taskmd** | Slash command skills (`/taskmd:do-task`, `/taskmd:next-task`, etc.) that orchestrate task workflows by invoking the `taskmd` CLI | Yes |
+| **taskmd-mcp** | An MCP server that exposes task operations as tools (`list`, `get`, `next`, `search`, `set`, etc.), letting Claude call taskmd directly through the Model Context Protocol | Yes |
+
+**taskmd** is best for interactive, human-driven workflows via slash commands. **taskmd-mcp** gives Claude direct tool access for autonomous task operations. You can install both.
+
+First, add the taskmd marketplace:
+
+```bash
+claude plugin marketplace add driangle/taskmd
 ```
 
-Or install directly from a local clone:
+Then install the plugin(s):
 
+```bash
+# Install slash command skills
+claude plugin install taskmd@taskmd-marketplace --scope project
+
+# Or install for all projects (user-wide)
+claude plugin install taskmd@taskmd-marketplace --scope user
+
+# Or install for the current directory only
+claude plugin install taskmd@taskmd-marketplace --scope local
 ```
-/plugins add /path/to/taskmd/claude-code-plugin
+
+### MCP Server Plugin (Optional)
+
+For direct tool access without shelling out to the CLI, install the MCP plugin:
+
+```bash
+claude plugin install taskmd-mcp@taskmd-marketplace --scope project
 ```
 
 ## Available Skills
