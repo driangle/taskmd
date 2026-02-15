@@ -259,6 +259,25 @@ func TestResolve_UnknownScope(t *testing.T) {
 	}
 }
 
+func TestResolve_BodyAlwaysIncluded(t *testing.T) {
+	root := t.TempDir()
+
+	task := &model.Task{
+		ID:    "014",
+		Title: "Body without include-content",
+		Body:  "## Description\n\nThis body should always appear.",
+	}
+
+	result, err := Resolve(task, Options{ProjectRoot: root})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.TaskBody != "## Description\n\nThis body should always appear." {
+		t.Errorf("expected task body to be included without --include-content, got %q", result.TaskBody)
+	}
+}
+
 func TestResolve_IncludeContentNoBody(t *testing.T) {
 	root := t.TempDir()
 

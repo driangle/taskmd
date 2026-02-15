@@ -822,12 +822,12 @@ func TestHandleTracks_WithFilters(t *testing.T) {
 func TestHandleTracks_WithLimit(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create tasks with overlapping scopes to force multiple tracks
+	// Create tasks with non-overlapping scopes to force multiple tracks
 	tasks := []struct {
 		file, content string
 	}{
 		{"020.md", "---\nid: \"020\"\ntitle: \"Task A\"\nstatus: pending\npriority: high\ntouches:\n  - api/auth\n---\n"},
-		{"021.md", "---\nid: \"021\"\ntitle: \"Task B\"\nstatus: pending\npriority: high\ntouches:\n  - api/auth\n---\n"},
+		{"021.md", "---\nid: \"021\"\ntitle: \"Task B\"\nstatus: pending\npriority: high\ntouches:\n  - api/payments\n---\n"},
 	}
 	for _, tc := range tasks {
 		os.WriteFile(filepath.Join(dir, tc.file), []byte(tc.content), 0644)
@@ -835,7 +835,7 @@ func TestHandleTracks_WithLimit(t *testing.T) {
 
 	dp := NewDataProvider(dir, false)
 
-	// Without limit, should have 2 tracks (both touch api/auth -> overlap)
+	// Without limit, should have 2 tracks (different scopes -> parallel)
 	noLimit := fetchTracksResult(t, dp, "")
 	if len(noLimit.Tracks) != 2 {
 		t.Fatalf("expected 2 tracks without limit, got %d", len(noLimit.Tracks))

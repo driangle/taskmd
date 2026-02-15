@@ -201,7 +201,7 @@ func TestTracks_TableFormat(t *testing.T) {
 	}
 }
 
-func TestTracks_OverlapSeparation(t *testing.T) {
+func TestTracks_OverlapSameTrack(t *testing.T) {
 	tmpDir := createTracksTestTaskFiles(t)
 	resetTracksFlags()
 	tracksFormat = "json"
@@ -216,7 +216,7 @@ func TestTracks_OverlapSeparation(t *testing.T) {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	// Tasks 002 and 003 both touch scope-a, so they must be in different tracks.
+	// Tasks 002 and 003 both touch scope-a, so they must be in the same track (sequential).
 	task002Track := -1
 	task003Track := -1
 	for _, track := range result.Tracks {
@@ -236,8 +236,8 @@ func TestTracks_OverlapSeparation(t *testing.T) {
 	if task003Track == -1 {
 		t.Error("Task 003 not found in any track")
 	}
-	if task002Track == task003Track {
-		t.Errorf("Tasks 002 and 003 share scope-a but are in the same track (%d)", task002Track)
+	if task002Track != task003Track {
+		t.Errorf("Tasks 002 and 003 share scope-a but are in different tracks (%d vs %d)", task002Track, task003Track)
 	}
 }
 

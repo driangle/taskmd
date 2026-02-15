@@ -70,11 +70,9 @@ func Resolve(task *model.Task, opts Options) (*Result, error) {
 		Files:  files,
 	}
 
-	if opts.IncludeContent {
-		body := strings.TrimSpace(task.Body)
-		if body != "" {
-			result.TaskBody = body
-		}
+	body := strings.TrimSpace(task.Body)
+	if body != "" {
+		result.TaskBody = body
 	}
 
 	return result, nil
