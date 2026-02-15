@@ -233,7 +233,12 @@ When working on tasks:
    taskmd-dev set --task-id 042 --status in-progress
    ```
 
-3. **Reference the task specification** document:
+3. **Maintain a worklog** as you work (unless `worklogs: false` in `.taskmd.yaml`):
+   - Create/append to `tasks/<group>/.worklogs/<ID>.md`
+   - Add timestamped entries when starting, making decisions, hitting blockers, or finishing
+   - See the agent template (e.g., `CLAUDE.md`) for format details and examples
+
+4. **Reference the task specification** document:
    - See `docs/taskmd_specification.md` for task format conventions
    - Follow the defined frontmatter schema
 

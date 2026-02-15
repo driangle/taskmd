@@ -1,7 +1,7 @@
 ---
 id: "108"
 title: "Support worklogs for tasks"
-status: pending
+status: in-progress
 priority: medium
 effort: large
 tags:
@@ -27,6 +27,7 @@ Introduce a worklog convention where each task can have a companion worklog file
 - [ ] Define the worklog file convention (e.g., `tasks/.worklogs/<task-id>.md` or `tasks/cli/.worklogs/<task-id>.md` alongside the task)
 - [ ] Document the worklog format: timestamped entries with optional author, status updates, and free-form notes
 - [ ] Update `docs/taskmd_specification.md` with the worklog convention
+- [ ] Add worklog guidance to agent templates (CLAUDE.md, GEMINI.md, CODEX.md) explaining purpose, when to write entries, and examples of good worklogs
 
 ### Scanner & Parser
 - [ ] Extend the scanner to discover worklog files associated with tasks

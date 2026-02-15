@@ -24,7 +24,13 @@ web:
   # This sets the default value for the --open flag in 'taskmd web start'
   auto_open_browser: false
 
-# Note: Only 'dir', 'web.port', and 'web.auto_open_browser' are supported in config files.
-# Other flags like 'format', 'verbose', and 'quiet' are intentionally CLI-only
-# to keep config files focused on project-specific settings rather than
+# Enable or disable task worklogs
+# When true (default), agents are encouraged to create and maintain worklog files
+# alongside tasks to record progress, decisions, and blockers.
+# Set to false to disable worklog behavior in agent workflows.
+worklogs: true
+
+# Note: Only 'dir', 'web.port', 'web.auto_open_browser', and 'worklogs' are supported
+# in config files. Other flags like 'format', 'verbose', and 'quiet' are intentionally
+# CLI-only to keep config files focused on project-specific settings rather than
 # per-invocation preferences.

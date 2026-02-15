@@ -90,14 +90,16 @@ taskmd list --dir ./tasks
 1. Check dependencies are met: `taskmd graph --format ascii`
 2. Or use `taskmd next` to find an available task
 3. Update status to `in-progress` in the task's frontmatter
-4. Check off subtasks (`- [x]`) as you complete them
+4. Add a worklog entry noting your approach and initial findings
+5. Check off subtasks (`- [x]`) as you complete them
 
 ### Completing a Task
 
 1. Verify all acceptance criteria are met
 2. Ensure all subtasks are checked off
-3. Update status to `completed`
-4. Run `taskmd validate` to confirm no issues
+3. Add a final worklog entry summarizing what was done
+4. Update status to `completed`
+5. Run `taskmd validate` to confirm no issues
 
 ### Task Dependencies
 
@@ -134,6 +136,82 @@ tasks/
 ```
 
 The group is inferred from the directory name unless explicitly set in frontmatter.
+
+## Task Worklogs
+
+Worklogs are enabled by default. To disable them, set `worklogs: false` in `.taskmd.yaml`. When worklogs are disabled, skip all worklog steps in the task workflow.
+
+Each task can have a companion **worklog file** that records progress notes, decisions, and blockers. Worklogs live in a `.worklogs/` directory alongside the task files:
+
+```
+tasks/
+  cli/
+    015-add-user-auth.md
+    .worklogs/
+      015.md                 # Worklog for task 015
+  web/
+    020-frontend.md
+    .worklogs/
+      020.md                 # Worklog for task 020
+```
+
+### When to Write Worklog Entries
+
+Write a worklog entry when you:
+- **Start working** on a task (note your approach and initial findings)
+- **Make a key decision** (record what you chose and why)
+- **Hit a blocker** (describe the issue so the next session can pick up)
+- **Complete a significant subtask** (note what was done and what remains)
+- **Finish a session** (summarize progress, open questions, and next steps)
+
+### Worklog Format
+
+Each entry starts with a timestamp header. Entries are appended chronologically:
+
+```markdown
+## 2026-02-15T10:30:00Z
+
+Started implementation of JWT authentication middleware.
+
+**Approach:** Using `golang-jwt/jwt/v5` library. Chose HMAC-SHA256
+signing since we don't need asymmetric keys for this use case.
+
+**Completed:**
+- [x] Added JWT signing utility
+- [x] Created auth middleware
+
+**Next:** Wire up login endpoint and add tests.
+
+## 2026-02-15T14:15:00Z
+
+Login endpoint is working. Ran into an issue with token expiry
+validation -- the default clock skew tolerance was too strict for
+CI environments. Set `leeway` to 10 seconds.
+
+**Completed:**
+- [x] Login endpoint with token generation
+- [x] Fixed clock skew issue in token validation
+
+**Blocked:** Need the user model changes from task 012 to land
+before I can implement the password verification step.
+```
+
+### Good Worklog Practices
+
+- **Be specific** -- "Fixed auth bug" is unhelpful; "Fixed token validation failing when clock skew exceeds 5s (set leeway to 10s)" tells the next reader exactly what happened
+- **Record decisions with reasoning** -- Future readers (including yourself) will want to know *why*, not just *what*
+- **Note blockers clearly** -- Call out what's blocked and which task/issue is the dependency
+- **Keep entries concise** -- A worklog is a trail of breadcrumbs, not a novel
+
+### CLI Commands
+
+```bash
+# View a task's worklog
+taskmd worklog --task-id 015
+
+# Append a new entry
+taskmd worklog --task-id 015 --add "Completed login endpoint. Blocked on task 012 for user model."
+```
 
 ## Validation
 
