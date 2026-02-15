@@ -33,6 +33,7 @@ Description and subtasks go here.
 | `group` | string | No | Logical grouping (derived from directory if omitted) |
 | `owner` | string | No | Free-form assignee name or identifier |
 | `touches` | array | No | Abstract scope identifiers (e.g., `["cli/graph", "cli/output"]`) |
+| `context` | array | No | Explicit file paths relevant to the task (e.g., `["docs/api.md"]`) |
 | `parent` | string | No | Single task ID (e.g., `"045"`) |
 | `created` | date | No | `YYYY-MM-DD` |
 | `verify` | array | No | List of typed verification checks (see below) |
@@ -126,6 +127,16 @@ scopes:
 The optional `description` field provides a human-readable explanation of what a scope covers. When present, it is included in validation error messages for easier debugging.
 
 When scopes are configured, `touches` values not found in the config produce a warning. When no scopes config exists, all values are accepted silently.
+
+**`context`** — List of explicit file paths relevant to the task. Use this for files that fall outside scope mappings, such as test fixtures, documentation, or configuration files. Paths are relative to the project root.
+
+```yaml
+context:
+  - "docs/api-design.md"
+  - "apps/cli/internal/web/handlers_test.go"
+```
+
+The `context` command merges files from both `touches` (via scope resolution) and `context` (explicit paths), deduplicating by path. Each entry is tagged with its source (`scope:<name>` or `explicit`) and checked for existence. Non-existent files are not errors — the task may create them.
 
 **`parent`** — Task ID of the parent task for hierarchical grouping. A task can have at most one parent. Children are computed dynamically (not stored in frontmatter) by finding all tasks whose `parent` matches a given ID.
 

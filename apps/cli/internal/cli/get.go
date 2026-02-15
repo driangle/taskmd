@@ -15,12 +15,14 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/graph"
 	"github.com/driangle/taskmd/apps/cli/internal/model"
 	"github.com/driangle/taskmd/apps/cli/internal/scanner"
+	"github.com/driangle/taskmd/apps/cli/internal/taskcontext"
 )
 
 var (
-	getFormat    string
-	getExact     bool
-	getThreshold float64
+	getFormat      string
+	getExact       bool
+	getThreshold   float64
+	getShowContext bool
 )
 
 // getStdinReader is the reader used for interactive selection prompts.
@@ -48,7 +50,8 @@ Examples:
   taskmd get sho                    # fuzzy match
   taskmd get sho --exact            # no fuzzy, returns "task not found"
   taskmd get cli-037 --format json
-  taskmd get cli-037 --format yaml`,
+  taskmd get cli-037 --format yaml
+  taskmd get cli-037 --context`,
 	Args: cobra.ExactArgs(1),
 	RunE: runGet,
 }
@@ -70,10 +73,12 @@ func init() {
 	getCmd.Flags().StringVar(&getFormat, "format", "text", "output format (text, json, yaml)")
 	getCmd.Flags().BoolVar(&getExact, "exact", false, "disable fuzzy matching, exact only")
 	getCmd.Flags().Float64Var(&getThreshold, "threshold", 0.6, "fuzzy match sensitivity (0.0-1.0)")
+	getCmd.Flags().BoolVar(&getShowContext, "context", false, "include context files in output")
 
 	showCmd.Flags().StringVar(&getFormat, "format", "text", "output format (text, json, yaml)")
 	showCmd.Flags().BoolVar(&getExact, "exact", false, "disable fuzzy matching, exact only")
 	showCmd.Flags().Float64Var(&getThreshold, "threshold", 0.6, "fuzzy match sensitivity (0.0-1.0)")
+	showCmd.Flags().BoolVar(&getShowContext, "context", false, "include context files in output")
 }
 
 func runGet(cmd *cobra.Command, args []string) error {
@@ -98,7 +103,21 @@ func runGet(cmd *cobra.Command, args []string) error {
 
 	depInfo := buildDependencyInfo(task, tasks)
 
-	return outputGet(task, depInfo, getFormat)
+	var ctxFiles []taskcontext.FileEntry
+	if getShowContext {
+		scopes := loadScopePathsConfig()
+		projectRoot := resolveProjectRoot()
+		opts := taskcontext.Options{
+			Scopes:      scopes,
+			ProjectRoot: projectRoot,
+		}
+		ctxResult, err := taskcontext.Resolve(task, opts)
+		if err == nil {
+			ctxFiles = ctxResult.Files
+		}
+	}
+
+	return outputGet(task, depInfo, ctxFiles, getFormat)
 }
 
 // dependencyInfo holds resolved dependency information for display.
@@ -346,20 +365,20 @@ func buildDependencyInfo(task *model.Task, allTasks []*model.Task) dependencyInf
 }
 
 // outputGet routes to the appropriate formatter.
-func outputGet(task *model.Task, deps dependencyInfo, format string) error {
+func outputGet(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, format string) error {
 	switch format {
 	case "text":
-		return outputGetText(task, deps, os.Stdout)
+		return outputGetText(task, deps, ctxFiles, os.Stdout)
 	case "json":
-		return outputGetJSON(task, deps, os.Stdout)
+		return outputGetJSON(task, deps, ctxFiles, os.Stdout)
 	case "yaml":
-		return outputGetYAML(task, deps, os.Stdout)
+		return outputGetYAML(task, deps, ctxFiles, os.Stdout)
 	default:
 		return fmt.Errorf("unsupported format: %s (supported: text, json, yaml)", format)
 	}
 }
 
-func outputGetText(task *model.Task, deps dependencyInfo, w io.Writer) error {
+func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, w io.Writer) error {
 	r := getRenderer()
 
 	fmt.Fprintf(w, "%s %s\n", formatLabel("Task:", r), formatTaskID(task.ID, r))
@@ -378,6 +397,7 @@ func outputGetText(task *model.Task, deps dependencyInfo, w io.Writer) error {
 	printDescription(w, task.Body)
 	printDependencies(w, deps, r)
 	printChildren(w, deps.Children, r)
+	printGetContextFiles(w, ctxFiles, r)
 	return nil
 }
 
@@ -454,18 +474,19 @@ func formatDepList(entries []depEntry, r *lipgloss.Renderer) string {
 
 // getOutput is the struct for JSON/YAML output (includes body unlike model.Task).
 type getOutput struct {
-	ID           string      `json:"id" yaml:"id"`
-	Title        string      `json:"title" yaml:"title"`
-	Status       string      `json:"status" yaml:"status"`
-	Priority     string      `json:"priority,omitempty" yaml:"priority,omitempty"`
-	Effort       string      `json:"effort,omitempty" yaml:"effort,omitempty"`
-	Tags         []string    `json:"tags" yaml:"tags"`
-	Parent       *depEntry   `json:"parent,omitempty" yaml:"parent,omitempty"`
-	Created      string      `json:"created,omitempty" yaml:"created,omitempty"`
-	FilePath     string      `json:"file_path" yaml:"file_path"`
-	Content      string      `json:"content" yaml:"content"`
-	Dependencies getDepsJSON `json:"dependencies" yaml:"dependencies"`
-	Children     []depEntry  `json:"children,omitempty" yaml:"children,omitempty"`
+	ID           string                  `json:"id" yaml:"id"`
+	Title        string                  `json:"title" yaml:"title"`
+	Status       string                  `json:"status" yaml:"status"`
+	Priority     string                  `json:"priority,omitempty" yaml:"priority,omitempty"`
+	Effort       string                  `json:"effort,omitempty" yaml:"effort,omitempty"`
+	Tags         []string                `json:"tags" yaml:"tags"`
+	Parent       *depEntry               `json:"parent,omitempty" yaml:"parent,omitempty"`
+	Created      string                  `json:"created,omitempty" yaml:"created,omitempty"`
+	FilePath     string                  `json:"file_path" yaml:"file_path"`
+	Content      string                  `json:"content" yaml:"content"`
+	Dependencies getDepsJSON             `json:"dependencies" yaml:"dependencies"`
+	Children     []depEntry              `json:"children,omitempty" yaml:"children,omitempty"`
+	ContextFiles []taskcontext.FileEntry `json:"context_files,omitempty" yaml:"context_files,omitempty"`
 }
 
 type getDepsJSON struct {
@@ -473,12 +494,12 @@ type getDepsJSON struct {
 	Blocks    []depEntry `json:"blocks" yaml:"blocks"`
 }
 
-func buildGetOutput(task *model.Task, deps dependencyInfo) getOutput {
+func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry) getOutput {
 	created := ""
 	if !task.Created.IsZero() {
 		created = task.Created.Format("2006-01-02")
 	}
-	return getOutput{
+	out := getOutput{
 		ID:       task.ID,
 		Title:    task.Title,
 		Status:   string(task.Status),
@@ -495,12 +516,31 @@ func buildGetOutput(task *model.Task, deps dependencyInfo) getOutput {
 		},
 		Children: deps.Children,
 	}
+	if len(ctxFiles) > 0 {
+		out.ContextFiles = ctxFiles
+	}
+	return out
 }
 
-func outputGetJSON(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	return WriteJSON(w, buildGetOutput(task, deps))
+func outputGetJSON(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, w io.Writer) error {
+	return WriteJSON(w, buildGetOutput(task, deps, ctxFiles))
 }
 
-func outputGetYAML(task *model.Task, deps dependencyInfo, w io.Writer) error {
-	return WriteYAML(w, buildGetOutput(task, deps))
+func outputGetYAML(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, w io.Writer) error {
+	return WriteYAML(w, buildGetOutput(task, deps, ctxFiles))
+}
+
+// printGetContextFiles appends context file information to the text output.
+func printGetContextFiles(w io.Writer, files []taskcontext.FileEntry, r *lipgloss.Renderer) {
+	if len(files) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "\n%s\n", formatLabel("Context Files:", r))
+	for _, f := range files {
+		path := f.Path
+		if !f.Exists {
+			path += " " + formatWarning("(missing)", r)
+		}
+		fmt.Fprintf(w, "  %s\n", path)
+	}
 }

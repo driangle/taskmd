@@ -1,7 +1,7 @@
 ---
 id: "105"
 title: "Add context command for AI agent task context"
-status: pending
+status: completed
 priority: high
 effort: large
 tags:
