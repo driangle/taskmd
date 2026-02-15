@@ -1,7 +1,7 @@
 ---
 id: "113"
 title: "MCP server: set, validate, graph tools"
-status: pending
+status: completed
 priority: high
 effort: medium
 tags:
@@ -24,11 +24,11 @@ Add MCP tools for task mutation (`set`), validation (`validate`), and dependency
 
 ## Tasks
 
-- [ ] Implement `set` tool handler — wraps taskfile package to update task fields (status, priority, tags, etc.)
-- [ ] Implement `validate` tool handler — wraps validator package to lint task files
-- [ ] Implement `graph` tool handler — wraps graph package for dependency visualization (JSON format)
-- [ ] Register all tools with the MCP server
-- [ ] Write tests for each tool handler
+- [x] Implement `set` tool handler — wraps taskfile package to update task fields (status, priority, tags, etc.)
+- [x] Implement `validate` tool handler — wraps validator package to lint task files
+- [x] Implement `graph` tool handler — wraps graph package for dependency visualization (JSON format)
+- [x] Register all tools with the MCP server
+- [x] Write tests for each tool handler
 
 ## Acceptance Criteria
 
