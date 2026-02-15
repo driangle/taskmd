@@ -19,6 +19,7 @@ func NewServer(version string) *gomcp.Server {
 	registerSetTool(server)
 	registerValidateTool(server)
 	registerGraphTool(server)
+	registerStatusTool(server)
 
 	return server
 }
