@@ -224,6 +224,12 @@ func printContextFile(w *os.File, f taskcontext.FileEntry, r *lipgloss.Renderer)
 	path := f.Path
 	if !f.Exists {
 		path += " " + formatWarning("(missing)", r)
+	} else if f.IsDir {
+		path += " " + formatDim("(dir)", r)
+	} else if f.Binary {
+		path += " " + formatDim("(binary)", r)
+	} else if f.Generated {
+		path += " " + formatDim("(generated)", r)
 	}
 	if f.Content != "" {
 		fmt.Fprintf(w, "  %s (%d lines)\n", path, f.Lines)

@@ -139,6 +139,178 @@ func TestResolve_DirectoryExpansion(t *testing.T) {
 	}
 }
 
+func TestResolve_DirectoryExpansionRecursive(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "pkg/a.go", "package pkg\n")
+	writeFile(t, root, "pkg/sub/b.go", "package sub\n")
+	writeFile(t, root, "pkg/sub/deep/c.go", "package deep\n")
+
+	task := &model.Task{
+		ID:      "016",
+		Title:   "Recursive dir expansion",
+		Context: []string{"pkg/"},
+	}
+
+	result, err := Resolve(task, Options{
+		ProjectRoot: root,
+		Resolve:     true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Files) != 3 {
+		t.Fatalf("expected 3 files after recursive expansion, got %d", len(result.Files))
+	}
+
+	paths := make(map[string]bool)
+	for _, f := range result.Files {
+		paths[f.Path] = true
+		if !f.Exists {
+			t.Errorf("expected file %s to exist", f.Path)
+		}
+	}
+	for _, expected := range []string{"pkg/a.go", "pkg/sub/b.go", "pkg/sub/deep/c.go"} {
+		if !paths[expected] {
+			t.Errorf("expected %s in expanded files, got %v", expected, paths)
+		}
+	}
+}
+
+func TestResolve_GeneratedFilesSkipped(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "src/main.go", "package main\n")
+	writeFile(t, root, "go.sum", "github.com/foo/bar v1.0.0 h1:abc123=\n")
+	writeFile(t, root, "package-lock.json", `{"lockfileVersion": 3}`)
+
+	task := &model.Task{
+		ID:      "018",
+		Title:   "Generated skip test",
+		Context: []string{"src/main.go", "go.sum", "package-lock.json"},
+	}
+
+	result, err := Resolve(task, Options{
+		ProjectRoot:    root,
+		IncludeContent: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Files) != 3 {
+		t.Fatalf("expected 3 files, got %d", len(result.Files))
+	}
+
+	// Text file should have content
+	if result.Files[0].Content == "" {
+		t.Error("expected main.go to have content")
+	}
+	if result.Files[0].Generated {
+		t.Error("expected main.go to not be marked generated")
+	}
+
+	// go.sum should be marked generated, no content
+	if result.Files[1].Content != "" {
+		t.Error("expected go.sum to have no content")
+	}
+	if !result.Files[1].Generated {
+		t.Error("expected go.sum to be marked generated")
+	}
+
+	// package-lock.json should be marked generated, no content
+	if result.Files[2].Content != "" {
+		t.Error("expected package-lock.json to have no content")
+	}
+	if !result.Files[2].Generated {
+		t.Error("expected package-lock.json to be marked generated")
+	}
+}
+
+func TestResolve_ExpandSkipsJunkDirs(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "pkg/a.go", "package pkg\n")
+	writeFile(t, root, "pkg/node_modules/dep/index.js", "module.exports = {}\n")
+	writeFile(t, root, "pkg/.git/config", "[core]\n")
+	writeFile(t, root, "pkg/sub/b.go", "package sub\n")
+
+	task := &model.Task{
+		ID:      "019",
+		Title:   "Junk dir skip test",
+		Context: []string{"pkg/"},
+	}
+
+	result, err := Resolve(task, Options{
+		ProjectRoot: root,
+		Resolve:     true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	paths := make(map[string]bool)
+	for _, f := range result.Files {
+		paths[f.Path] = true
+	}
+
+	if !paths["pkg/a.go"] {
+		t.Error("expected pkg/a.go to be included")
+	}
+	if !paths["pkg/sub/b.go"] {
+		t.Error("expected pkg/sub/b.go to be included")
+	}
+	if paths["pkg/node_modules/dep/index.js"] {
+		t.Error("expected node_modules files to be skipped")
+	}
+	if paths["pkg/.git/config"] {
+		t.Error("expected .git files to be skipped")
+	}
+}
+
+func TestResolve_BinaryFilesSkipped(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "src/main.go", "package main\n")
+	// Write a binary file (contains null bytes)
+	binaryContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x00, 0x1A, 0x0A}
+	fullPath := filepath.Join(root, "src", "image.png")
+	if err := os.WriteFile(fullPath, binaryContent, 0o644); err != nil {
+		t.Fatalf("write binary: %v", err)
+	}
+
+	task := &model.Task{
+		ID:      "017",
+		Title:   "Binary skip test",
+		Context: []string{"src/main.go", "src/image.png"},
+	}
+
+	result, err := Resolve(task, Options{
+		ProjectRoot:    root,
+		IncludeContent: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(result.Files))
+	}
+
+	textFile := result.Files[0]
+	if textFile.Content == "" {
+		t.Error("expected text file to have content inlined")
+	}
+	if textFile.Binary {
+		t.Error("expected text file to not be marked binary")
+	}
+
+	binaryFile := result.Files[1]
+	if binaryFile.Content != "" {
+		t.Error("expected binary file to have no content inlined")
+	}
+	if !binaryFile.Binary {
+		t.Error("expected binary file to be marked binary")
+	}
+}
+
 func TestResolve_IncludeContent(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "src/main.go", "package main\n\nfunc main() {}\n")
@@ -323,6 +495,43 @@ func TestResolve_ContentNotInlinedForDirs(t *testing.T) {
 	}
 	if result.Files[0].Content != "" {
 		t.Error("expected no content for directory entry")
+	}
+}
+
+func TestResolve_IsDirFlag(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "src/main.go", "package main\n")
+	// "src/" is a directory, "src/main.go" is a file
+
+	task := &model.Task{
+		ID:      "015",
+		Title:   "IsDir check",
+		Context: []string{"src/", "src/main.go"},
+	}
+
+	result, err := Resolve(task, Options{ProjectRoot: root})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(result.Files))
+	}
+
+	dirEntry := result.Files[0]
+	if !dirEntry.IsDir {
+		t.Errorf("expected src/ to have IsDir=true, got false")
+	}
+	if !dirEntry.Exists {
+		t.Errorf("expected src/ to exist")
+	}
+
+	fileEntry := result.Files[1]
+	if fileEntry.IsDir {
+		t.Errorf("expected src/main.go to have IsDir=false, got true")
+	}
+	if !fileEntry.Exists {
+		t.Errorf("expected src/main.go to exist")
 	}
 }
 
