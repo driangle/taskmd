@@ -23,16 +23,11 @@ taskmd --version
 
 ## Installation
 
-Install the plugin from the Claude Code plugin marketplace:
+Add the taskmd marketplace and install the plugin:
 
 ```
-/plugins add taskmd
-```
-
-Or install directly from this repository:
-
-```
-/plugins add /path/to/taskmd/claude-code-plugin
+/plugin marketplace add driangle/taskmd
+/plugin install taskmd@taskmd-marketplace
 ```
 
 ## Available Skills
@@ -79,11 +74,15 @@ Or install directly from this repository:
 /taskmd:get-task 042
 ```
 
-## MCP Server Integration
+## MCP Server Integration (Optional)
 
-This plugin bundles a taskmd MCP server that starts automatically when the plugin is installed. The MCP server exposes task operations as tools (`list`, `get`, `next`, `search`, `context`, `set`, `validate`, `graph`), letting Claude Code call taskmd directly through the Model Context Protocol instead of shelling out to the CLI.
+For direct tool access without shelling out to the CLI, install the optional MCP plugin:
 
-No additional configuration is needed for Claude Code — the `.mcp.json` in this plugin handles it.
+```
+/plugin install taskmd-mcp@taskmd-marketplace
+```
+
+The MCP server exposes task operations as tools (`list`, `get`, `next`, `search`, `context`, `set`, `validate`, `graph`), letting Claude Code call taskmd directly through the Model Context Protocol.
 
 For other MCP-compatible clients, see the [MCP Server Guide](https://github.com/driangle/taskmd/blob/main/docs/guides/mcp-guide.md) for configuration snippets (Claude Desktop, Cursor, Windsurf, etc.).
 

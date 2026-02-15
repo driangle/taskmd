@@ -11,6 +11,11 @@
       "name": "taskmd",
       "source": "./claude-code-plugin",
       "description": "Manage tasks stored as markdown files with taskmd. List, create, complete, and validate tasks directly from Claude Code."
+    },
+    {
+      "name": "taskmd-mcp",
+      "source": "./claude-code-plugin-mcp",
+      "description": "MCP server for taskmd. Provides direct tool access for task operations without shelling out to the CLI."
     }
   ]
 }
