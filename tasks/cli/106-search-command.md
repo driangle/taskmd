@@ -1,7 +1,7 @@
 ---
 id: "106"
 title: "Add search command for full-text task search"
-status: pending
+status: completed
 priority: medium
 effort: medium
 tags:
@@ -21,17 +21,17 @@ Add a new `taskmd search <query>` command that performs full-text search across 
 
 ## Tasks
 
-- [ ] Create `internal/cli/search.go` with the `search` command
-- [ ] Accept a positional query argument (required)
-- [ ] Scan all task files using the existing scanner
-- [ ] Search across both frontmatter `title` and markdown body content
-- [ ] Implement case-insensitive matching
-- [ ] Display matching tasks with ID, title, and a snippet showing the match in context
-- [ ] Support `--format` flag (table, json, yaml) consistent with other commands
-- [ ] Support `--task-dir` flag for custom task directories
-- [ ] Highlight or indicate match location in output
-- [ ] Add comprehensive tests in `internal/cli/search_test.go`
-- [ ] Register command with `rootCmd`
+- [x] Create `internal/cli/search.go` with the `search` command
+- [x] Accept a positional query argument (required)
+- [x] Scan all task files using the existing scanner
+- [x] Search across both frontmatter `title` and markdown body content
+- [x] Implement case-insensitive matching
+- [x] Display matching tasks with ID, title, and a snippet showing the match in context
+- [x] Support `--format` flag (table, json, yaml) consistent with other commands
+- [x] Support `--task-dir` flag for custom task directories
+- [x] Highlight or indicate match location in output
+- [x] Add comprehensive tests in `internal/cli/search_test.go`
+- [x] Register command with `rootCmd`
 
 ## Acceptance Criteria
 
