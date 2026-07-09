@@ -1,4 +1,4 @@
-.PHONY: build run clean install install-full install-dev install-dev-full test e2e lint lint-fix tidy check web-build web-embed build-full sync-spec mcpb mcpb-all
+.PHONY: build run clean install install-full install-dev install-dev-full test e2e lint lint-fix tidy check web-build web-embed build-full sync-spec sync-sdk mcpb mcpb-all
 
 # Build the binary
 build:
@@ -107,6 +107,13 @@ mcpb-all:
 	../../scripts/build-mcpb.sh ./taskmd-windows-amd64.exe "$$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 0.0.0-dev)" windows amd64 .
 	../../scripts/build-mcpb.sh ./taskmd-windows-arm64.exe "$$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 0.0.0-dev)" windows arm64 .
 	@echo "MCPB bundles created for all platforms"
+
+# Sync sdk/go pin in go.mod to match the latest commit.
+# Run this before tagging a release to prevent go.work from hiding a stale pin.
+sync-sdk:
+	go get github.com/driangle/taskmd/sdk/go@HEAD
+	go mod tidy
+	@echo "Synced sdk/go pin to latest commit"
 
 # Build for multiple platforms
 build-all:
