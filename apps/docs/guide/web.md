@@ -165,7 +165,8 @@ Full detail page for a single task.
 
 - Rendered markdown body with full task description
 - Metadata panel showing status, priority, effort, type, tags, owner, and dependencies
-- Worklog timeline (if worklogs exist for the task)
+- Worklog timeline showing each entry's author and timestamp
+- **Comment box** to add worklog entries from the browser, with an optional author field (hidden in read-only mode)
 - **Edit form** for updating task fields directly in the browser (hidden in read-only mode)
 
 ## Web Features
@@ -220,7 +221,8 @@ taskmd web start --readonly
 When enabled:
 - The task edit form is hidden
 - Board drag-and-drop is disabled
-- The `PUT /api/tasks/{id}` endpoint returns `403 Forbidden`
+- The worklog comment box is hidden
+- The `PUT /api/tasks/{id}` and `POST /api/tasks/{id}/worklog` endpoints return `403 Forbidden`
 - All read operations work normally
 
 ### Board Filters
@@ -280,6 +282,7 @@ The web server exposes a JSON API you can access directly. All endpoints return 
 | `GET` | `/api/tasks` | List all tasks (excludes body content) |
 | `GET` | `/api/tasks/{id}` | Get a single task with full body and worklog metadata |
 | `GET` | `/api/tasks/{id}/worklog` | Get worklog entries for a task |
+| `POST` | `/api/tasks/{id}/worklog` | Add a worklog entry/comment (disabled in read-only mode) |
 | `PUT` | `/api/tasks/{id}` | Update task fields (disabled in read-only mode) |
 | `GET` | `/api/search?q=<query>` | Full-text search across task titles and bodies |
 
@@ -315,6 +318,11 @@ curl http://localhost:8080/api/tasks/042
 
 # Get worklog for a task
 curl http://localhost:8080/api/tasks/042/worklog
+
+# Add a worklog entry/comment
+curl -X POST http://localhost:8080/api/tasks/042/worklog \
+  -H 'Content-Type: application/json' \
+  -d '{"author": "alice", "content": "Reviewed the approach — LGTM"}'
 
 # Update a task's status
 curl -X PUT http://localhost:8080/api/tasks/042 \
@@ -368,6 +376,27 @@ Valid values:
 - **type**: `feature`, `bug`, `improvement`, `chore`, `docs`
 
 Returns the updated task detail on success, or a `400` with validation errors for invalid values.
+
+### POST /api/tasks/{id}/worklog
+
+Append a worklog entry (comment) to a task. Send a JSON body with the comment
+text and an optional author:
+
+```json
+{
+  "author": "alice",
+  "content": "Reviewed the approach — LGTM"
+}
+```
+
+- `content` is required; a `400` is returned if it is empty.
+- `author` is optional; when present it is recorded on the entry heading
+  (`## <timestamp> — <author>`).
+- Returns the updated list of worklog entries on success.
+- Returns `403 Forbidden` in read-only mode and `404` if the task does not exist.
+
+In the UI, the task detail page has a **comment box** below the worklog
+timeline (hidden in read-only mode) that posts to this endpoint.
 
 ## Advanced Usage
 

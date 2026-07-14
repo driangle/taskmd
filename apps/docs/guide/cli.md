@@ -1019,6 +1019,9 @@ taskmd worklog 015
 # Add a new entry
 taskmd worklog 015 --add "Started implementation"
 
+# Attribute the entry to an author
+taskmd worklog 015 --add "Reviewed the approach" --author "claude (agent)"
+
 # JSON output
 taskmd worklog 015 --format json
 
@@ -1031,7 +1034,21 @@ taskmd worklog 015 --format yaml
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--add` | | Append a new worklog entry with the given text |
+| `--author` | git `user.name` → `user.email` → `$USER` | Author recorded on the entry |
 | `--format` | `text` | Output format (`text`, `json`, `yaml`) |
+
+**Entry format.** Each entry is written as a timestamped heading followed by the
+message. When an author is present it is appended to the heading:
+
+```markdown
+## 2026-07-14T13:29:44Z — claude (agent)
+
+Reviewed the approach
+```
+
+The author is optional and backward compatible — entries written without one
+(`## <timestamp>`) still parse. Agents should pass `--author` to identify
+themselves; for humans it defaults to the local git user.
 
 ### import - Import Tasks from External Sources
 
@@ -1626,7 +1643,9 @@ export TASKMD_DIR=./tasks
 export TASKMD_VERBOSE=true
 ```
 
-Environment variables have lower precedence than config files and CLI flags.
+Environment variables have lower precedence than config files and CLI flags,
+with one exception: [`TASKMD_TASK_DIR`](../reference/configuration#taskmd-task-dir)
+overrides `.taskmd.yaml` so multiple git worktrees can share one task directory.
 
 ## Troubleshooting
 
