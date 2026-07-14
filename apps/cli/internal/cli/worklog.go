@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -13,6 +15,7 @@ import (
 
 var (
 	worklogAdd    string
+	worklogAuthor string
 	worklogFormat string
 )
 
@@ -25,6 +28,7 @@ var worklogCmd = &cobra.Command{
 Examples:
   taskmd worklog 015                        # view worklog entries
   taskmd worklog 015 --add "Started implementation"
+  taskmd worklog 015 --add "Reviewed" --author "claude (agent)"
   taskmd worklog 015 --format json`,
 	Args: cobra.ExactArgs(1),
 	RunE: runWorklog,
@@ -34,7 +38,23 @@ func init() {
 	rootCmd.AddCommand(worklogCmd)
 
 	worklogCmd.Flags().StringVar(&worklogAdd, "add", "", "append a new worklog entry")
+	worklogCmd.Flags().StringVar(&worklogAuthor, "author", "", "author of the entry (defaults to git user.name, then $USER)")
 	worklogCmd.Flags().StringVar(&worklogFormat, "format", "text", "output format (text, json, yaml)")
+}
+
+// resolveWorklogAuthor returns the explicit author if given, otherwise the
+// git user.name / user.email, then $USER, then "" (anonymous).
+func resolveWorklogAuthor(explicit string) string {
+	if a := strings.TrimSpace(explicit); a != "" {
+		return a
+	}
+	for _, args := range [][]string{{"config", "user.name"}, {"config", "user.email"}} {
+		out, err := exec.Command("git", args...).Output()
+		if v := strings.TrimSpace(string(out)); err == nil && v != "" {
+			return v
+		}
+	}
+	return strings.TrimSpace(os.Getenv("USER"))
 }
 
 func runWorklog(cmd *cobra.Command, args []string) error {
@@ -66,10 +86,15 @@ func runWorklog(cmd *cobra.Command, args []string) error {
 
 	// Add mode
 	if worklogAdd != "" {
-		if err := worklog.AppendEntryLocked(scanDir, wlPath, taskID, worklogAdd); err != nil {
+		author := resolveWorklogAuthor(worklogAuthor)
+		if err := worklog.AppendEntryLocked(scanDir, wlPath, taskID, author, worklogAdd); err != nil {
 			return fmt.Errorf("failed to add worklog entry: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "Added worklog entry for task %s\n", taskID)
+		if author != "" {
+			fmt.Fprintf(os.Stderr, "Added worklog entry for task %s (as %s)\n", taskID, author)
+		} else {
+			fmt.Fprintf(os.Stderr, "Added worklog entry for task %s\n", taskID)
+		}
 		return nil
 	}
 
@@ -114,7 +139,12 @@ func outputWorklogText(wl *worklog.Worklog, w io.Writer) error {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		fmt.Fprintf(w, "%s %s\n", formatLabel("##", r), formatDim(entry.Timestamp.Format("2006-01-02T15:04:05Z07:00"), r))
+		ts := formatDim(entry.Timestamp.Format("2006-01-02T15:04:05Z07:00"), r)
+		if entry.Author != "" {
+			fmt.Fprintf(w, "%s %s %s\n", formatLabel("##", r), ts, formatTaskID(entry.Author, r))
+		} else {
+			fmt.Fprintf(w, "%s %s\n", formatLabel("##", r), ts)
+		}
 		if entry.Content != "" {
 			fmt.Fprintf(w, "\n%s\n", entry.Content)
 		}

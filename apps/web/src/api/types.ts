@@ -20,6 +20,7 @@ export interface Task {
 
 export interface WorklogEntry {
   timestamp: string;
+  author?: string;
   content: string;
 }
 

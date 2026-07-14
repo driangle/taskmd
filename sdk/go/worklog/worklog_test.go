@@ -176,7 +176,7 @@ func TestAppendEntry_CreatesFileAndDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	wlFile := filepath.Join(tmpDir, ".worklogs", "015.md")
 
-	err := AppendEntry(wlFile, "First entry")
+	err := AppendEntry(wlFile, "", "First entry")
 	if err != nil {
 		t.Fatalf("AppendEntry failed: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestAppendEntry_AppendsToExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AppendEntry(wlFile, "New entry")
+	err := AppendEntry(wlFile, "", "New entry")
 	if err != nil {
 		t.Fatalf("AppendEntry failed: %v", err)
 	}
@@ -275,5 +275,78 @@ func TestExists(t *testing.T) {
 
 	if !Exists(wlFile) {
 		t.Error("Expected Exists to return true for existing file")
+	}
+}
+
+func TestAppendEntry_WithAuthor(t *testing.T) {
+	wlFile := filepath.Join(t.TempDir(), ".worklogs", "015.md")
+
+	if err := AppendEntry(wlFile, "Guilherme", "Started work"); err != nil {
+		t.Fatalf("AppendEntry: %v", err)
+	}
+
+	data, err := os.ReadFile(wlFile)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(data), "— Guilherme") {
+		t.Errorf("heading missing author separator/name, got:\n%s", data)
+	}
+
+	wl, err := ParseWorklog(wlFile)
+	if err != nil {
+		t.Fatalf("ParseWorklog: %v", err)
+	}
+	if len(wl.Entries) != 1 {
+		t.Fatalf("got %d entries, want 1", len(wl.Entries))
+	}
+	if got := wl.Entries[0].Author; got != "Guilherme" {
+		t.Errorf("Author = %q, want %q", got, "Guilherme")
+	}
+	if got := wl.Entries[0].Content; got != "Started work" {
+		t.Errorf("Content = %q, want %q", got, "Started work")
+	}
+}
+
+func TestAppendEntry_AuthorWithSpaces(t *testing.T) {
+	wlFile := filepath.Join(t.TempDir(), "016.md")
+	if err := AppendEntry(wlFile, "claude (agent)", "auto update"); err != nil {
+		t.Fatalf("AppendEntry: %v", err)
+	}
+	wl, err := ParseWorklog(wlFile)
+	if err != nil {
+		t.Fatalf("ParseWorklog: %v", err)
+	}
+	if got := wl.Entries[0].Author; got != "claude (agent)" {
+		t.Errorf("Author = %q, want %q", got, "claude (agent)")
+	}
+}
+
+// TestParseWorklog_LegacyAndAuthored verifies backward compatibility: a file
+// mixing a legacy (no-author) entry and an authored entry parses both, with the
+// legacy entry reporting an empty author.
+func TestParseWorklog_LegacyAndAuthored(t *testing.T) {
+	wlFile := filepath.Join(t.TempDir(), "017.md")
+	content := "## 2026-02-15T10:00:00Z\n\nLegacy entry.\n\n" +
+		"## 2026-02-16T11:00:00Z — Guilherme\n\nAuthored entry.\n"
+	if err := os.WriteFile(wlFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	wl, err := ParseWorklog(wlFile)
+	if err != nil {
+		t.Fatalf("ParseWorklog: %v", err)
+	}
+	if len(wl.Entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(wl.Entries))
+	}
+	if wl.Entries[0].Author != "" {
+		t.Errorf("legacy entry Author = %q, want empty", wl.Entries[0].Author)
+	}
+	if wl.Entries[0].Content != "Legacy entry." {
+		t.Errorf("legacy Content = %q", wl.Entries[0].Content)
+	}
+	if wl.Entries[1].Author != "Guilherme" {
+		t.Errorf("authored entry Author = %q, want %q", wl.Entries[1].Author, "Guilherme")
 	}
 }

@@ -85,10 +85,14 @@ When worklogs are enabled (`worklogs: true` in `.taskmd.yaml`), record progress 
 
 ```bash
 taskmd worklog <id> --add "Started implementation. Approach: ..."
+taskmd worklog <id> --add "..." --author "claude (agent)"   # attribute the entry
 taskmd worklog <id>            # View worklog
 ```
 
 Write entries when starting, making key decisions, hitting blockers, or finishing.
+Pass `--author` so entries are attributed (agents should identify themselves,
+e.g. `--author "claude (agent)"`); without it the author defaults to the git
+`user.name`.
 
 ## Validation
 
