@@ -69,7 +69,7 @@ func handleSet(_ context.Context, _ *gomcp.CallToolRequest, input SetInput) (*go
 
 	applyStatusTransitionDates(&req, task)
 
-	if err := taskfile.UpdateTaskFile(task.FilePath, req); err != nil {
+	if err := taskfile.UpdateTaskFileLocked(taskDir, task.FilePath, task.ID, req); err != nil {
 		return nil, nil, fmt.Errorf("update failed: %w", err)
 	}
 

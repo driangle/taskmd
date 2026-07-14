@@ -155,7 +155,7 @@ func runSet(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if err := taskfile.UpdateTaskFile(task.FilePath, req); err != nil {
+	if err := taskfile.UpdateTaskFileLocked(scanDir, task.FilePath, task.ID, req); err != nil {
 		return err
 	}
 

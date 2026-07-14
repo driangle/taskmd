@@ -426,7 +426,7 @@ func handleUpdateTask(dp *DataProvider, readonly bool) http.HandlerFunc {
 			return
 		}
 
-		if err := taskfile.UpdateTaskFile(found.FilePath, req); err != nil {
+		if err := taskfile.UpdateTaskFileLocked(dp.ScanDir(), found.FilePath, found.ID, req); err != nil {
 			handleFileUpdateError(w, err)
 			return
 		}

@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/driangle/taskmd/sdk/go/lock"
 )
 
 // Entry is a single timestamped worklog entry.
@@ -118,6 +120,18 @@ func AppendEntry(filePath string, message string) error {
 	}
 
 	return nil
+}
+
+// AppendEntryLocked appends a worklog entry while holding the per-task lock
+// (scoped to scanDir), serializing it against concurrent worklog appends and
+// task-file writes for the same task ID across processes.
+func AppendEntryLocked(scanDir, filePath, taskID, message string) error {
+	l, err := lock.Acquire(lock.TaskLockPath(scanDir, taskID), lock.DefaultTimeout)
+	if err != nil {
+		return fmt.Errorf("lock task %s: %w", taskID, err)
+	}
+	defer l.Release()
+	return AppendEntry(filePath, message)
 }
 
 // Exists checks whether a worklog file exists for the given path.

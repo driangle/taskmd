@@ -211,6 +211,15 @@ func resolveTaskDir() string {
 		return dirFlag.Value.String()
 	}
 
+	// TASKMD_TASK_DIR env var overrides per-worktree config so that parallel
+	// agents in separate git worktrees can be pointed at one shared task
+	// directory (the source of truth). Use an absolute path for this to be
+	// meaningful across worktrees. It sits below explicit CLI flags (a
+	// deliberate per-invocation override wins) but above committed config.
+	if envDir := os.Getenv("TASKMD_TASK_DIR"); envDir != "" {
+		return envDir
+	}
+
 	// Check config file: support both "task-dir" and "dir" YAML keys.
 	// We must bypass viper's pflag binding (which returns the flag default)
 	// by checking the config file values directly via viper.InConfig.

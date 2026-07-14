@@ -66,7 +66,7 @@ func runWorklog(cmd *cobra.Command, args []string) error {
 
 	// Add mode
 	if worklogAdd != "" {
-		if err := worklog.AppendEntry(wlPath, worklogAdd); err != nil {
+		if err := worklog.AppendEntryLocked(scanDir, wlPath, taskID, worklogAdd); err != nil {
 			return fmt.Errorf("failed to add worklog entry: %w", err)
 		}
 		fmt.Fprintf(os.Stderr, "Added worklog entry for task %s\n", taskID)

@@ -48,3 +48,7 @@ apps/docs/.vitepress/dist/
 settings.local.json
 .claude/worktrees
 apps/web/tsconfig.app.tsbuildinfo
+
+# taskmd runtime locks and atomic-write temp files (machine-local, never committed)
+.taskmd/locks/
+.tmp-*
