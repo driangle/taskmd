@@ -153,14 +153,7 @@ func buildWorklogEntries(t *model.Task) []WorklogEntryJSON {
 	if err != nil {
 		return []WorklogEntryJSON{}
 	}
-	entries := make([]WorklogEntryJSON, len(wl.Entries))
-	for i, e := range wl.Entries {
-		entries[i] = WorklogEntryJSON{
-			Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
-			Content:   e.Content,
-		}
-	}
-	return entries
+	return worklogEntriesJSON(wl)
 }
 
 func generateBoardFiles(boardDir string, tasks []*model.Task) error {

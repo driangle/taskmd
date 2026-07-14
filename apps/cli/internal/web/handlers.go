@@ -480,7 +480,27 @@ func reloadTask(dp *DataProvider, taskID string) (*model.Task, error) {
 // WorklogEntryJSON is a single worklog entry for the API.
 type WorklogEntryJSON struct {
 	Timestamp string `json:"timestamp"`
+	Author    string `json:"author,omitempty"`
 	Content   string `json:"content"`
+}
+
+// WorklogAddRequest is the POST body for adding a worklog entry.
+type WorklogAddRequest struct {
+	Author  string `json:"author"`
+	Content string `json:"content"`
+}
+
+// worklogEntriesJSON maps a parsed worklog to its API representation.
+func worklogEntriesJSON(wl *worklog.Worklog) []WorklogEntryJSON {
+	entries := make([]WorklogEntryJSON, len(wl.Entries))
+	for i, e := range wl.Entries {
+		entries[i] = WorklogEntryJSON{
+			Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+			Author:    e.Author,
+			Content:   e.Content,
+		}
+	}
+	return entries
 }
 
 func handleWorklog(dp *DataProvider) http.HandlerFunc {
@@ -516,15 +536,61 @@ func handleWorklog(dp *DataProvider) http.HandlerFunc {
 			return
 		}
 
-		entries := make([]WorklogEntryJSON, len(wl.Entries))
-		for i, e := range wl.Entries {
-			entries[i] = WorklogEntryJSON{
-				Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
-				Content:   e.Content,
-			}
+		writeJSON(w, worklogEntriesJSON(wl))
+	}
+}
+
+// handleAddWorklog appends a worklog entry via POST /api/tasks/{id}/worklog and
+// returns the updated entry list. Writes go through the per-task lock.
+func handleAddWorklog(dp *DataProvider, readonly bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dp := effectiveDP(r, dp)
+		if readonly {
+			writeError(w, http.StatusForbidden, "server is in read-only mode", nil)
+			return
 		}
 
-		writeJSON(w, entries)
+		taskID := r.PathValue("id")
+		if taskID == "" {
+			writeError(w, http.StatusBadRequest, "task ID is required", nil)
+			return
+		}
+
+		var body WorklogAddRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body", []string{err.Error()})
+			return
+		}
+		if strings.TrimSpace(body.Content) == "" {
+			writeError(w, http.StatusBadRequest, "content is required", nil)
+			return
+		}
+
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to load tasks", nil)
+			return
+		}
+		found := findTaskByID(tasks, taskID)
+		if found == nil {
+			writeError(w, http.StatusNotFound, "task not found: "+taskID, nil)
+			return
+		}
+
+		wlPath := worklog.WorklogPath(found.FilePath, taskID)
+		author := strings.TrimSpace(body.Author)
+		if err := worklog.AppendEntryLocked(dp.ScanDir(), wlPath, taskID, author, body.Content); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to add worklog entry", []string{err.Error()})
+			return
+		}
+		dp.Invalidate()
+
+		wl, err := worklog.ParseWorklog(wlPath)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to reload worklog", nil)
+			return
+		}
+		writeJSON(w, worklogEntriesJSON(wl))
 	}
 }
 
