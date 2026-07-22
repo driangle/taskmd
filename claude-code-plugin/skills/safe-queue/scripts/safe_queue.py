@@ -163,16 +163,60 @@ def branch_config(root: Path, branch: str, key: str) -> str:
     return git(root, "config", "--get", f"branch.{branch}.{key}", check=False)
 
 
-def context_paths(root: Path, task_id: str) -> dict[str, Any]:
+def literal_touch_path(value: str) -> bool:
+    if not value or any(character.isspace() for character in value):
+        return False
+    path = Path(value)
+    if path.is_absolute():
+        return False
+    return "/" in value or value.startswith(".") or bool(path.suffix)
+
+
+def context_paths(root: Path, task: dict[str, Any]) -> dict[str, Any]:
+    task_id = task["id"]
     context = json_command(
         ["taskmd", "context", "--task-id", task_id, "--format", "json"], root
     )
-    files = context.get("files", [])
+    files = context.get("files") or []
+    scope_files = [
+        item for item in files if item.get("source", "").startswith("scope:")
+    ]
+    resolved_scopes = {
+        item["source"].removeprefix("scope:")
+        for item in scope_files
+        if item.get("source")
+    }
+    literal_paths: set[str] = set()
+    unresolved: set[str] = set()
+    for touch in task.get("touches") or []:
+        if touch in resolved_scopes:
+            continue
+        if literal_touch_path(touch):
+            literal_paths.add(touch)
+        else:
+            unresolved.add(touch)
     return {
-        "paths": sorted({item["path"] for item in files if item.get("path")}),
-        "missing": sorted(
-            {item["path"] for item in files if item.get("path") and not item.get("exists")}
+        "paths": sorted(
+            literal_paths
+            | {item["path"] for item in scope_files if item.get("path")}
         ),
+        "missing_scope": sorted(
+            {
+                item["path"]
+                for item in scope_files
+                if item.get("path") and not item.get("exists")
+            }
+        ),
+        "missing_context": sorted(
+            {
+                item["path"]
+                for item in files
+                if item.get("source") == "explicit"
+                and item.get("path")
+                and not item.get("exists")
+            }
+        ),
+        "unresolved": sorted(unresolved),
     }
 
 
@@ -274,7 +318,12 @@ def collect_state(root: Path, task_query: str, main_override: str | None) -> dic
     active = list(active_by_id.values())
     relevant_ids = {task_id, *(task.get("dependencies") or [])}
     relevant_ids.update(item["id"] for item in active)
-    scopes = {item_id: context_paths(root, item_id) for item_id in relevant_ids}
+    tasks_by_id = {item["id"]: item for item in tasks}
+    scopes = {
+        item_id: context_paths(root, tasks_by_id[item_id])
+        for item_id in relevant_ids
+        if item_id in tasks_by_id
+    }
     tracks = json_command(["taskmd", "tracks", "--format", "json"], root)
     return {
         "project_root": str(root),
@@ -312,8 +361,8 @@ def scope_quality(task: dict[str, Any], scope: dict[str, Any]) -> list[str]:
         problems.append("touches is missing")
     if not paths:
         problems.append("touches resolves to no paths")
-    if scope.get("missing"):
-        problems.append("touches resolves to missing paths")
+    if scope.get("unresolved"):
+        problems.append("touches contains unresolved non-path scopes")
     broad = {".", "./", "/", "*", "**", "./**"}
     if any(path.strip() in broad or "*" in path for path in paths):
         problems.append("touches contains a broad or wildcard path")
@@ -542,9 +591,6 @@ def assess_decision(state: dict[str, Any], allow_stacked: bool = False) -> dict[
             else:
                 result["evidence"]["actual_overlaps"].append(evidence)
 
-    if ambiguous_active:
-        result["reason"] = "an in-progress task has ambiguous scope evidence"
-        return result
     if result["evidence"]["actual_overlaps"]:
         result["decision"] = "WAIT"
         result["reason"] = "actual mutable files overlap the requested task scope"
@@ -556,6 +602,9 @@ def assess_decision(state: dict[str, Any], allow_stacked: bool = False) -> dict[
     if result["evidence"]["resource_overlaps"]:
         result["decision"] = "WAIT"
         result["reason"] = "operational resources overlap an in-progress task"
+        return result
+    if ambiguous_active:
+        result["reason"] = "an in-progress task has ambiguous scope evidence"
         return result
 
     dependencies = task.get("dependencies") or []

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -43,6 +44,62 @@ def base_state() -> dict:
 
 
 class AssessmentTests(unittest.TestCase):
+    def test_context_paths_handles_null_files_and_literal_touches(self) -> None:
+        with mock.patch.object(
+            safe_queue,
+            "json_command",
+            return_value={"files": None},
+        ):
+            scope = safe_queue.context_paths(
+                Path("/repo"),
+                {"id": "200", "touches": ["src/app", "tests/test_app.py"]},
+            )
+
+        self.assertEqual(["src/app", "tests/test_app.py"], scope["paths"])
+        self.assertEqual([], scope["unresolved"])
+
+    def test_context_paths_uses_scope_files_but_not_explicit_context(self) -> None:
+        with mock.patch.object(
+            safe_queue,
+            "json_command",
+            return_value={
+                "files": [
+                    {
+                        "path": "src/app",
+                        "source": "scope:app",
+                        "exists": True,
+                    },
+                    {
+                        "path": "docs/design.md",
+                        "source": "explicit",
+                        "exists": False,
+                    },
+                ]
+            },
+        ):
+            scope = safe_queue.context_paths(
+                Path("/repo"),
+                {"id": "200", "touches": ["app"]},
+            )
+
+        self.assertEqual(["src/app"], scope["paths"])
+        self.assertEqual([], scope["unresolved"])
+        self.assertEqual(["docs/design.md"], scope["missing_context"])
+
+    def test_context_paths_rejects_unresolved_prose_touch(self) -> None:
+        with mock.patch.object(
+            safe_queue,
+            "json_command",
+            return_value={"files": []},
+        ):
+            scope = safe_queue.context_paths(
+                Path("/repo"),
+                {"id": "200", "touches": ["job-local generated artifacts"]},
+            )
+
+        self.assertEqual([], scope["paths"])
+        self.assertEqual(["job-local generated artifacts"], scope["unresolved"])
+
     def test_independent_task_starts_from_main(self) -> None:
         result = safe_queue.assess(base_state())
         self.assertEqual("START_FROM_MAIN", result["decision"])
@@ -260,6 +317,36 @@ class AssessmentTests(unittest.TestCase):
         self.assertIn(
             "actual changes fall outside declared touches",
             result["evidence"]["active_tasks"][0]["scope_problems"],
+        )
+
+    def test_actual_overlap_waits_even_when_active_scope_is_stale(self) -> None:
+        state = base_state()
+        active = {
+            "id": "100",
+            "status": "in-progress",
+            "touches": ["base"],
+            "dependencies": [],
+        }
+        state["active_tasks"] = [active]
+        state["tasks"].append(active)
+        state["scopes"]["100"] = {"paths": ["src/base"], "missing": []}
+        state["worktrees"] = [
+            {
+                "branch": "task-100",
+                "path": "/repo.task-100",
+                "head": "active-sha",
+                "clean": False,
+                "changed_files": ["src/app/handler.go", "src/undeclared/file.go"],
+                "task_id": "100",
+            }
+        ]
+
+        result = safe_queue.assess(state)
+
+        self.assertEqual("WAIT", result["decision"])
+        self.assertEqual(
+            "actual mutable files overlap the requested task scope",
+            result["reason"],
         )
 
     @staticmethod
