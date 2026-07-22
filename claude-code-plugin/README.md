@@ -67,6 +67,7 @@ Use `--scope user` instead of `--scope project` to install across all projects.
 | split-task | `/taskmd:split-task <ID>` | Split a large task into smaller sub-tasks |
 | divide-and-conquer | `/taskmd:divide-and-conquer <ID>` | Execute a task using parallel subagents for independent workstreams |
 | import-todos | `/taskmd:import-todos` | Discover TODO/FIXME comments and convert them into task files |
+| safe-queue | `/taskmd:safe-queue <ID>` | Plan or approve dependency-aware Worktrunk scheduling using declared and actual file overlap |
 
 ## Usage Examples
 
@@ -109,7 +110,19 @@ Use `--scope user` instead of `--scope project` to install across all projects.
 
 # Import only FIXME comments from a specific directory
 /taskmd:import-todos --marker FIXME --dir ./src
+
+# Assess a task without changing Git or task state
+/taskmd:safe-queue 042
+
+# After reviewing the plan, ask the skill to execute the approved proposal
+/taskmd:safe-queue 042 --execute
 ```
+
+`safe-queue` is plan-only by default. It reports `START_FROM_MAIN`,
+`START_STACKED`, `WAIT`, or `UNSAFE` with the exact base commit, worktree
+proposal, dependency/overlap evidence, merge order, and validation
+implications. Stacked work always needs explicit approval; automatic execution
+is limited to unambiguous `START_FROM_MAIN` assessments.
 
 ## MCP Server Integration (Optional)
 

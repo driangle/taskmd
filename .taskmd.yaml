@@ -37,6 +37,15 @@ phases:
 web:
   auto_open_browser: false
 scopes:
+  plugin/skills:
+    paths:
+      - "claude-code-plugin/skills/"
+  plugin/docs:
+    paths:
+      - "claude-code-plugin/README.md"
+  skill/benchmarks:
+    paths:
+      - "benchmark/"
   cli:
     paths:
       - "apps/cli/"

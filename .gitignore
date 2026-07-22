@@ -39,6 +39,7 @@ apps/cli/taskmd
 # test artifacts
 *.out
 coverage/
+__pycache__/
 
 # vitepress build artifacts
 apps/docs/.vitepress/cache/

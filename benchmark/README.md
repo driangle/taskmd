@@ -42,7 +42,7 @@ After all evals complete, an aggregation step produces:
 
 ## evals.json
 
-Defines the 13 evals, one per skill:
+Defines evals for each plugin skill:
 
 | ID | Skill | Prompt (abbreviated) |
 |----|-------|---------------------|
@@ -59,6 +59,7 @@ Defines the 13 evals, one per skill:
 | 11 | split-task | "task 002 is too big, can you split it into smaller pieces?" |
 | 12 | import-todos | "find all the TODO comments in the code and turn them into tasks" |
 | 13 | divide-and-conquer | "pick up task 002 and work on it using parallel subagents" |
+| 18 | safe-queue | "can task 006 safely start alongside the current work?" |
 
 Each eval includes:
 - **prompt** — the exact user message sent to Claude

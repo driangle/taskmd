@@ -211,6 +211,19 @@
         {"id": "integrates", "text": "Reviews subagent results and integrates changes"},
         {"id": "marks-complete", "text": "Marks the task as completed with --verify"}
       ]
+    },
+    {
+      "id": 18,
+      "skill": "safe-queue",
+      "prompt": "can task 006 safely start alongside the current work? only assess it, do not create anything",
+      "setup_extra": "Initialize the fixture directory as a Git repository with main committed. Add pending task 006 with touches [search], define search -> src/search/ in .taskmd.yaml, add touches [auth] to in-progress task 001, define auth -> src/auth/, and leave both scopes non-overlapping.",
+      "expected_output": "Runs the safe_queue.py assessment script, reports exactly START_FROM_MAIN with main commit, proposed worktree, dependency/overlap evidence, and makes no mutations.",
+      "assertions": [
+        {"id": "runs-assessor", "text": "Runs the safe-queue non-mutating assessment script"},
+        {"id": "single-decision", "text": "Reports exactly one queue decision: START_FROM_MAIN"},
+        {"id": "shows-evidence", "text": "Shows base branch/commit, proposed worktree, dependencies, declared overlaps, and actual changed-file overlaps"},
+        {"id": "plan-only", "text": "Does not create a worktree or change task status/owner"}
+      ]
     }
   ]
 }
