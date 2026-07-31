@@ -54,8 +54,11 @@ Decide the command surface before implementing (open for discussion):
   `tracks` computes and that command already has the scanner + scope resolution
   in hand. A lint-style exit code (0 = clean, non-zero = drift) makes it
   CI/pre-commit usable.
-- Optionally, a per-task explanation on `taskmd next <id> --explain` that
-  reuses the existing scoring engine to say *why (not) now* for a single task.
+- Optionally, a task-centric readiness query. Note `taskmd next` does **not**
+  currently take a task ID — its positional arg is the tasks directory
+  (`ResolveScanDir`), and it returns a ranked list. Answering "is *this* task
+  ready now?" needs new surface: either a dedicated command, or teaching an
+  existing one to accept a task ID and explain *why (not) now* for it.
 
 Whatever surface is chosen, the drift primitive (attribution + path match)
 should live in `sdk/go` (e.g. `sdk/go/tracks` or a small `sdk/go/drift`) so the
