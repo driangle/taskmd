@@ -329,7 +329,6 @@ jobs:
           class Taskmd < Formula
             desc "Markdown-based task management CLI and web dashboard"
             homepage "https://github.com/driangle/taskmd"
-            version "VERSION_PLACEHOLDER"
             license "MIT"
 
             on_macos do
@@ -369,7 +368,6 @@ jobs:
           EOF
 
           # Replace placeholders with actual values
-          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" Formula/taskmd.rb
           sed -i "s/TAG_PLACEHOLDER/${TAG}/g" Formula/taskmd.rb
           sed -i "s/SHA256_DARWIN_ARM64_PLACEHOLDER/${SHA256_DARWIN_ARM64}/g" Formula/taskmd.rb
           sed -i "s/SHA256_DARWIN_AMD64_PLACEHOLDER/${SHA256_DARWIN_AMD64}/g" Formula/taskmd.rb
