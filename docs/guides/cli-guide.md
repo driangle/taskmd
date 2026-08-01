@@ -1731,6 +1731,8 @@ taskmd phases --format yaml
 
 Show a chronological activity feed of recent changes to task files. Uses git log to detect task creation, modification, and renames, presenting them as a time-ordered feed.
 
+Pass a task id to scope the feed to a single task — a timeline of its status transitions, including the initial "created" event. Use `--field` to track a different frontmatter field (e.g. `priority`).
+
 **Basic usage:**
 ```bash
 # Show recent task activity
@@ -1738,6 +1740,9 @@ taskmd feed
 
 # Show changes from the last 7 days
 taskmd feed --since 7d
+
+# Status timeline for a single task
+taskmd feed cli-049
 ```
 
 **Flags:**
@@ -1749,6 +1754,7 @@ taskmd feed --since 7d
 | `--scope string` | | Filter to a tasks subdirectory; supports wildcards (e.g. `cli`, `cli*`) |
 | `--since string` | | Show changes since (e.g. `2d`, `1w`, `2026-02-28`) |
 | `--source string` | `all` | Filter by event source (`all`, `git`, `worklog`) |
+| `--field string` | `status` | In single-task mode, the frontmatter field whose transitions to show |
 
 **Examples:**
 ```bash
@@ -1766,6 +1772,12 @@ taskmd feed --scope cli
 
 # Export as JSON
 taskmd feed --format json
+
+# Status timeline for a single task
+taskmd feed cli-049
+
+# Track priority transitions instead of status
+taskmd feed cli-049 --field priority
 ```
 
 ### sync - Sync External Sources

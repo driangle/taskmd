@@ -57,14 +57,17 @@ var statusLineRegex = regexp.MustCompile(`(?m)^status:\s*(\S+)`)
 
 // Options configures a feed query.
 type Options struct {
-	TasksDir   string
-	Limit      int
-	Since      string
-	Scope      string
-	Source     string
-	Verbose    bool
-	GitLogFn   GitLogFunc
-	GitShowFn  GitShowFunc
+	TasksDir string
+	Limit    int
+	Since    string
+	Scope    string
+	Source   string
+	// TaskFile, when set, scopes the query to a single task file (path
+	// relative to where git runs). Enables per-task history via --follow.
+	TaskFile  string
+	Verbose   bool
+	GitLogFn  GitLogFunc
+	GitShowFn GitShowFunc
 }
 
 // Query executes a feed query and returns merged, sorted entries.
@@ -82,7 +85,12 @@ func Query(opts Options) ([]FeedEntry, error) {
 		if opts.GitLogFn == nil {
 			return nil, fmt.Errorf("GitLogFn is required for git source")
 		}
-		args := BuildGitLogArgs(opts.TasksDir, opts.Limit, opts.Since, opts.Scope)
+		var args []string
+		if opts.TaskFile != "" {
+			args = BuildGitLogArgsForFile(opts.Limit, opts.Since, opts.TaskFile)
+		} else {
+			args = BuildGitLogArgs(opts.TasksDir, opts.Limit, opts.Since, opts.Scope)
+		}
 		output, err := opts.GitLogFn(opts.TasksDir, args)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read git history: %w", err)
@@ -94,10 +102,18 @@ func Query(opts Options) ([]FeedEntry, error) {
 		if opts.GitShowFn != nil {
 			EnrichEntriesWithDiffAnalysis(gitEntries, opts.GitShowFn)
 		}
+		if opts.TaskFile != "" {
+			// --follow can trace history back into unrelated look-alike files;
+			// keep only changes that actually belong to the target task.
+			gitEntries = filterEntriesByTaskID(gitEntries, ExtractTaskIDFromPath(opts.TaskFile))
+		}
 	}
 
 	if opts.Source != "git" {
 		worklogEntries = ScanWorklogEntries(opts.TasksDir, opts.Scope, opts.Since, opts.Verbose)
+		if opts.TaskFile != "" {
+			worklogEntries = filterWorklogsByTask(worklogEntries, ExtractTaskIDFromPath(opts.TaskFile))
+		}
 	}
 
 	entries := MergeEntries(gitEntries, worklogEntries)
@@ -140,6 +156,65 @@ func BuildGitLogArgs(tasksDir string, limit int, since, scope string) []string {
 	}
 
 	return args
+}
+
+// BuildGitLogArgsForFile constructs git log arguments scoped to a single task
+// file. It uses --follow so the file's history is threaded across renames, and
+// the initial "A" commit surfaces the task's creation event.
+func BuildGitLogArgsForFile(limit int, since, taskFile string) []string {
+	args := []string{
+		"log",
+		"--format=%H%n%an%n%ai%n%s",
+		"--name-status",
+		"--diff-filter=ACMR",
+		fmt.Sprintf("-%d", limit),
+		"--follow",
+	}
+
+	if since != "" {
+		args = append(args, "--since="+NormalizeSince(since))
+	}
+
+	args = append(args, "--", taskFile)
+
+	return args
+}
+
+// filterEntriesByTaskID drops git file changes that don't belong to the given
+// task ID (and any entry thereby left empty). Renames preserve a task's ID, so
+// genuine history is kept while --follow false positives are discarded.
+func filterEntriesByTaskID(entries []FeedEntry, taskID string) []FeedEntry {
+	if taskID == "" {
+		return entries
+	}
+	var out []FeedEntry
+	for _, e := range entries {
+		var files []FileChange
+		for _, f := range e.Files {
+			if f.TaskID == taskID {
+				files = append(files, f)
+			}
+		}
+		if len(files) > 0 {
+			e.Files = files
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// filterWorklogsByTask keeps only worklog entries belonging to the given task ID.
+func filterWorklogsByTask(entries []FeedEntry, taskID string) []FeedEntry {
+	if taskID == "" {
+		return entries
+	}
+	var out []FeedEntry
+	for _, e := range entries {
+		if e.TaskID == taskID {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func containsGlobChars(s string) bool {
@@ -254,11 +329,12 @@ func parseFileChangeLine(line string) *FileChange {
 		path = parts[1]
 	case strings.HasPrefix(statusCode, "R"):
 		status = "renamed"
-		if len(parts) >= 3 {
-			path = parts[2]
-		} else {
-			path = parts[1]
-		}
+		path = destPath(parts)
+	case strings.HasPrefix(statusCode, "C"):
+		// A copy (e.g. a task file created from a template under --follow) is,
+		// for the destination file, a creation event.
+		status = "created"
+		path = destPath(parts)
 	default:
 		return nil
 	}
@@ -270,6 +346,15 @@ func parseFileChangeLine(line string) *FileChange {
 		Status: status,
 		TaskID: taskID,
 	}
+}
+
+// destPath returns the destination path of a rename/copy name-status line
+// (format "<status>\t<src>\t<dst>"), falling back to the first path field.
+func destPath(parts []string) string {
+	if len(parts) >= 3 {
+		return parts[2]
+	}
+	return parts[1]
 }
 
 // ExtractTaskIDFromPath extracts a task ID from a file path.

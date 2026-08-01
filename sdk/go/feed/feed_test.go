@@ -2,6 +2,7 @@ package feed
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -263,4 +264,122 @@ func mustParseTime(s string) time.Time {
 		panic(err)
 	}
 	return t
+}
+
+func TestBuildGitLogArgsForFile(t *testing.T) {
+	args := BuildGitLogArgsForFile(10, "7d", "tasks/cli/042-add-auth.md")
+
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--follow") {
+		t.Errorf("expected --follow in args, got: %v", args)
+	}
+	if !strings.Contains(joined, "-10") {
+		t.Errorf("expected -10 limit in args, got: %v", args)
+	}
+	if !strings.Contains(joined, "--since=7.days.ago") {
+		t.Errorf("expected normalized --since in args, got: %v", args)
+	}
+	// The task file must be the final pathspec, after the "--" separator.
+	if args[len(args)-1] != "tasks/cli/042-add-auth.md" {
+		t.Errorf("expected task file as last arg, got: %v", args)
+	}
+	if args[len(args)-2] != "--" {
+		t.Errorf("expected -- before task file, got: %v", args)
+	}
+}
+
+func TestBuildGitLogArgsForFile_NoSince(t *testing.T) {
+	args := BuildGitLogArgsForFile(20, "", "tasks/cli/042-add-auth.md")
+	if strings.Contains(strings.Join(args, " "), "--since") {
+		t.Errorf("did not expect --since when empty, got: %v", args)
+	}
+}
+
+func TestParseFileChangeLine_Copy(t *testing.T) {
+	// A copy (git --follow surfaces task creation from a template as C<score>)
+	// should be treated as a creation of the destination file.
+	fc := parseFileChangeLine("C051\t.taskmd/templates/feature.md\ttasks/cli/042-add-auth.md")
+	if fc == nil {
+		t.Fatal("expected a file change for a copy line")
+	}
+	if fc.Status != "created" {
+		t.Errorf("expected status created, got %q", fc.Status)
+	}
+	if fc.Path != "tasks/cli/042-add-auth.md" {
+		t.Errorf("expected destination path, got %q", fc.Path)
+	}
+	if fc.TaskID != "042" {
+		t.Errorf("expected taskID 042, got %q", fc.TaskID)
+	}
+}
+
+func TestFilterEntriesByTaskID(t *testing.T) {
+	entries := []FeedEntry{
+		{Files: []FileChange{
+			{Path: "tasks/cli/042-add-auth.md", TaskID: "042", Status: "modified"},
+			{Path: "apps/cli/internal/cli/templates/task_feature.md", TaskID: "", Status: "created"},
+		}},
+		{Files: []FileChange{
+			{Path: "tasks/cli/099-other.md", TaskID: "099", Status: "modified"},
+		}},
+	}
+
+	got := filterEntriesByTaskID(entries, "042")
+	if len(got) != 1 {
+		t.Fatalf("expected 1 entry after filtering, got %d", len(got))
+	}
+	if len(got[0].Files) != 1 || got[0].Files[0].TaskID != "042" {
+		t.Errorf("expected only the 042 file change, got %+v", got[0].Files)
+	}
+}
+
+func TestFilterWorklogsByTask(t *testing.T) {
+	entries := []FeedEntry{
+		{Source: "worklog", TaskID: "042", Message: "keep"},
+		{Source: "worklog", TaskID: "099", Message: "drop"},
+	}
+	got := filterWorklogsByTask(entries, "042")
+	if len(got) != 1 || got[0].Message != "keep" {
+		t.Errorf("expected only the 042 worklog entry, got %+v", got)
+	}
+	// Empty task id is a no-op.
+	if got := filterWorklogsByTask(entries, ""); len(got) != 2 {
+		t.Errorf("expected passthrough for empty task id, got %d", len(got))
+	}
+}
+
+func TestQuery_TaskFileScopesToTask(t *testing.T) {
+	// git log --follow output that includes an unrelated look-alike file the
+	// follow traced through; only the target task's changes should survive.
+	gitOut := `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Alice
+2026-02-28 10:30:00 +0000
+chore: complete task 042
+
+M	tasks/cli/042-add-auth.md
+
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+Bob
+2026-02-20 09:00:00 +0000
+chore: add templates
+
+A	apps/cli/internal/cli/templates/task_feature.md
+`
+	gitLog := func(_ string, _ []string) (string, error) { return gitOut, nil }
+
+	entries, err := Query(Options{
+		TasksDir: "tasks",
+		Source:   "git",
+		TaskFile: "tasks/cli/042-add-auth.md",
+		GitLogFn: gitLog,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry scoped to task 042, got %d", len(entries))
+	}
+	if entries[0].Files[0].TaskID != "042" {
+		t.Errorf("expected only task 042 changes, got %+v", entries[0].Files)
+	}
 }

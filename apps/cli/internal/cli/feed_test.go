@@ -50,6 +50,7 @@ func resetFeedFlags() {
 	feedSince = ""
 	feedScope = ""
 	feedSource = "all"
+	feedField = "status"
 }
 
 // noopGitShow returns an error so enrichEntriesWithTaskStatus is a no-op.
@@ -943,4 +944,111 @@ func mustParseTime(s string) time.Time {
 		panic(err)
 	}
 	return t
+}
+
+// singleTaskEntries builds a small per-task feed: a status change, an unrelated
+// field-only change, and the creation event.
+func singleTaskEntries() []feed.FeedEntry {
+	return []feed.FeedEntry{
+		{Source: "git", Author: "Alice", Message: "complete", Files: []feed.FileChange{{
+			Path: "tasks/cli/042-x.md", TaskID: "042", Status: "modified",
+			FieldChanges:   []feed.FieldChange{{Field: "status", OldValue: "pending", NewValue: "completed"}},
+			SubtaskChanges: []feed.SubtaskChange{{Text: "sub", Done: true}},
+		}}},
+		{Source: "git", Author: "Alice", Message: "retitle priority", Files: []feed.FileChange{{
+			Path: "tasks/cli/042-x.md", TaskID: "042", Status: "modified",
+			FieldChanges: []feed.FieldChange{{Field: "priority", OldValue: "low", NewValue: "high"}},
+		}}},
+		{Source: "git", Author: "Alice", Message: "create", Files: []feed.FileChange{{
+			Path: "tasks/cli/042-x.md", TaskID: "042", Status: "created",
+		}}},
+	}
+}
+
+func TestFilterEntriesByField_Status(t *testing.T) {
+	got := filterEntriesByField(singleTaskEntries(), "status")
+
+	// Keeps the status change + the created event; drops the priority-only change.
+	if len(got) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(got))
+	}
+	if got[0].Message != "complete" || got[1].Message != "create" {
+		t.Errorf("unexpected entries: %q, %q", got[0].Message, got[1].Message)
+	}
+	// Status entry keeps only the status field and drops subtask noise.
+	fc := got[0].Files[0]
+	if len(fc.FieldChanges) != 1 || fc.FieldChanges[0].Field != "status" {
+		t.Errorf("expected only status field change, got %+v", fc.FieldChanges)
+	}
+	if fc.SubtaskChanges != nil {
+		t.Errorf("expected subtask changes cleared, got %+v", fc.SubtaskChanges)
+	}
+}
+
+func TestFilterEntriesByField_Priority(t *testing.T) {
+	got := filterEntriesByField(singleTaskEntries(), "priority")
+
+	// Keeps the priority change + the created event; drops the status-only change.
+	if len(got) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(got))
+	}
+	if got[0].Message != "retitle priority" || got[1].Message != "create" {
+		t.Errorf("unexpected entries: %q, %q", got[0].Message, got[1].Message)
+	}
+}
+
+func TestFilterEntriesByField_KeepsWorklogEntries(t *testing.T) {
+	entries := []feed.FeedEntry{
+		{Source: "worklog", TaskID: "042", Message: "note"},
+	}
+	got := filterEntriesByField(entries, "status")
+	if len(got) != 1 || got[0].Source != "worklog" {
+		t.Errorf("expected worklog entry preserved, got %+v", got)
+	}
+}
+
+func TestFilterEntriesByField_NoMatchesForField(t *testing.T) {
+	entries := []feed.FeedEntry{
+		{Source: "git", Message: "effort only", Files: []feed.FileChange{{
+			Path: "tasks/cli/042-x.md", TaskID: "042", Status: "modified",
+			FieldChanges: []feed.FieldChange{{Field: "effort", NewValue: "small"}},
+		}}},
+	}
+	if got := filterEntriesByField(entries, "priority"); len(got) != 0 {
+		t.Errorf("expected no entries, got %d", len(got))
+	}
+}
+
+func TestWriteEmptyFeed_SingleTaskMessage(t *testing.T) {
+	resetFeedFlags()
+	output, err := captureFeedOutput(t, func() error { return writeEmptyFeed("042") })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(output, "No status changes found for task 042") {
+		t.Errorf("unexpected message: %q", output)
+	}
+}
+
+func TestWriteEmptyFeed_JSON(t *testing.T) {
+	resetFeedFlags()
+	feedFormat = "json"
+	output, err := captureFeedOutput(t, func() error { return writeEmptyFeed("042") })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.TrimSpace(output) != "[]" {
+		t.Errorf("expected [] for json, got %q", output)
+	}
+}
+
+func TestValidateFeedSource(t *testing.T) {
+	for _, s := range []string{"all", "git", "worklog"} {
+		if err := validateFeedSource(s); err != nil {
+			t.Errorf("expected %q to be valid: %v", s, err)
+		}
+	}
+	if err := validateFeedSource("bogus"); err == nil {
+		t.Error("expected error for invalid source")
+	}
 }

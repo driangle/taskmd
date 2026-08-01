@@ -1,11 +1,12 @@
 ---
 title: "Add optional task-id positional to feed for per-task history"
 id: "01kp0pxrz"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["cli"]
 created: "2026-04-12"
+completed_at: 2026-08-01
 ---
 
 # Add optional task-id positional to feed for per-task history
@@ -38,15 +39,15 @@ $ taskmd feed cli-049
 
 ## Tasks
 
-- [ ] Change `feedCmd` args from `cobra.NoArgs` to `cobra.MaximumNArgs(1)`
-- [ ] When a task-id positional is given, resolve it to a task file and scope `feed.Query` to that file (add per-task filtering to `feed.Options` if scope alone is insufficient)
-- [ ] Add a `--field` flag (default `status`) to select which frontmatter field's transitions to surface for the single-task view
-- [ ] Ensure the initial "created" event is shown for the single-task view
-- [ ] Keep repo-wide behavior (no positional) unchanged, including `--limit`, `--since`, `--scope`, `--source`
-- [ ] Reuse existing output helpers/formats (text, json); no new git-log parsing
-- [ ] Handle edge cases: unknown/ambiguous task id, task file not tracked by git, no changes for the chosen field
-- [ ] Update `feed` help text and any docs to describe the optional positional and `--field`
-- [ ] Add tests in `internal/cli/feed_test.go` covering the single-task path
+- [x] Change `feedCmd` args from `cobra.NoArgs` to `cobra.MaximumNArgs(1)`
+- [x] When a task-id positional is given, resolve it to a task file and scope `feed.Query` to that file (added `Options.TaskFile`, `--follow` single-file git log, and a task-id guard against `--follow` false positives)
+- [x] Add a `--field` flag (default `status`) to select which frontmatter field's transitions to surface for the single-task view
+- [x] Ensure the initial "created" event is shown for the single-task view (parser now treats git copy events, `C<score>`, as creations)
+- [x] Keep repo-wide behavior (no positional) unchanged, including `--limit`, `--since`, `--scope`, `--source`
+- [x] Reuse existing output helpers/formats (text, json); no new git-log parsing
+- [x] Handle edge cases: unknown/ambiguous task id, task file not tracked by git, no changes for the chosen field
+- [x] Update `feed` help text and any docs to describe the optional positional and `--field`
+- [x] Add tests in `internal/cli/feed_test.go` covering the single-task path (plus SDK unit tests and e2e git-history tests)
 
 ## Acceptance Criteria
 
