@@ -1,11 +1,12 @@
 ---
 title: "Add --explain flag to next command for score breakdown"
 id: "01kyybnes"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["cli", "next", "scoring"]
 created: "2026-08-01"
+completed_at: 2026-08-01
 ---
 
 # Add --explain flag to next command for score breakdown
@@ -26,27 +27,27 @@ is transparent and debuggable.
 
 ## Tasks
 
-- [ ] Change `ScoreTask` and `scorePhase` in `sdk/go/next/next.go` to return
+- [x] Change `ScoreTask` and `scorePhase` in `sdk/go/next/next.go` to return
       itemized components — a `(label, points)` pair per contribution — instead
       of (or in addition to) the flat `reasons []string`. Preserve the existing
       `Reasons` behaviour for backward compatibility.
-- [ ] Add a `ScoreBreakdown []ScoreComponent` field to the `Recommendation`
+- [x] Add a `ScoreBreakdown []ScoreComponent` field to the `Recommendation`
       struct (with `json`/`yaml` tags), populated in `buildRecommendations`.
-- [ ] Include the downstream-priority multiplier in the breakdown so scaled
+- [x] Include the downstream-priority multiplier in the breakdown so scaled
       bonuses (critical-path and downstream) are explainable (e.g. show base,
       multiplier, and resulting points).
-- [ ] Add the `--explain` bool flag to `nextCmd` in `apps/cli/internal/cli/next.go`.
-- [ ] When `--explain` is set with `--format table`, render a per-task breakdown
+- [x] Add the `--explain` bool flag to `nextCmd` in `apps/cli/internal/cli/next.go`.
+- [x] When `--explain` is set with `--format table`, render a per-task breakdown
       block (component lines + total) beneath each recommendation instead of the
       compact table row.
-- [ ] For `--format json`/`--format yaml`, emit the structured `score_breakdown`
+- [x] For `--format json`/`--format yaml`, emit the structured `score_breakdown`
       array alongside the existing `reasons`/`score` fields (independent of the
       `--explain` flag, or gated on it — pick one and document it).
-- [ ] Add comprehensive tests: unit tests for the itemized scoring in
+- [x] Add comprehensive tests: unit tests for the itemized scoring in
       `sdk/go/next/next_test.go`, and CLI tests for the `--explain` output in
       `apps/cli/internal/cli/next_test.go` (table + json breakdown, and that the
       component points sum to the total score).
-- [ ] Update `apps/docs/guide/cli.md` and the `next` command long help/examples
+- [x] Update `apps/docs/guide/cli.md` and the `next` command long help/examples
       to document `--explain`.
 
 ## Acceptance Criteria

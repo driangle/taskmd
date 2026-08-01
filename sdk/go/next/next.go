@@ -24,19 +24,31 @@ const (
 	ScorePhaseDecay       = 5
 )
 
+// ScoreComponent is a single itemized contribution to a task's score.
+// Base and Multiplier are populated for scaled bonuses (critical path,
+// downstream) so the scaling is explainable; for flat components they are
+// zero and omitted. Points is always the actual points contributed.
+type ScoreComponent struct {
+	Label      string  `json:"label" yaml:"label"`
+	Points     int     `json:"points" yaml:"points"`
+	Base       int     `json:"base,omitempty" yaml:"base,omitempty"`
+	Multiplier float64 `json:"multiplier,omitempty" yaml:"multiplier,omitempty"`
+}
+
 // Recommendation represents a scored task recommendation.
 type Recommendation struct {
-	Rank            int      `json:"rank" yaml:"rank"`
-	ID              string   `json:"id" yaml:"id"`
-	Title           string   `json:"title" yaml:"title"`
-	FilePath        string   `json:"file_path" yaml:"file_path"`
-	Status          string   `json:"status" yaml:"status"`
-	Priority        string   `json:"priority" yaml:"priority"`
-	Effort          string   `json:"effort,omitempty" yaml:"effort,omitempty"`
-	Score           int      `json:"score" yaml:"score"`
-	Reasons         []string `json:"reasons" yaml:"reasons"`
-	DownstreamCount int      `json:"downstream_count" yaml:"downstream_count"`
-	OnCriticalPath  bool     `json:"on_critical_path" yaml:"on_critical_path"`
+	Rank            int              `json:"rank" yaml:"rank"`
+	ID              string           `json:"id" yaml:"id"`
+	Title           string           `json:"title" yaml:"title"`
+	FilePath        string           `json:"file_path" yaml:"file_path"`
+	Status          string           `json:"status" yaml:"status"`
+	Priority        string           `json:"priority" yaml:"priority"`
+	Effort          string           `json:"effort,omitempty" yaml:"effort,omitempty"`
+	Score           int              `json:"score" yaml:"score"`
+	Reasons         []string         `json:"reasons" yaml:"reasons"`
+	ScoreBreakdown  []ScoreComponent `json:"score_breakdown" yaml:"score_breakdown"`
+	DownstreamCount int              `json:"downstream_count" yaml:"downstream_count"`
+	OnCriticalPath  bool             `json:"on_critical_path" yaml:"on_critical_path"`
 }
 
 // Options controls recommendation behaviour.
@@ -56,9 +68,10 @@ type Options struct {
 }
 
 type scoredTask struct {
-	task    *model.Task
-	score   int
-	reasons []string
+	task       *model.Task
+	score      int
+	reasons    []string
+	components []ScoreComponent
 }
 
 // Recommend scores and ranks actionable tasks, returning the top recommendations.
@@ -247,11 +260,12 @@ func scoreAndSort(
 
 	scored := make([]scoredTask, len(tasks))
 	for i, task := range tasks {
-		s, r := ScoreTask(task, criticalPath, downstreamInfo)
-		ms, mr := scorePhase(task, opts.phaseOrder)
-		s += ms
-		r = append(r, mr...)
-		scored[i] = scoredTask{task: task, score: s, reasons: r}
+		comps, r := buildScore(task, criticalPath, downstreamInfo)
+		if pc, pr := buildPhaseScore(task, opts.phaseOrder); pc != nil {
+			comps = append(comps, *pc)
+			r = append(r, pr)
+		}
+		scored[i] = scoredTask{task: task, score: sumComponents(comps), reasons: r, components: comps}
 	}
 
 	sort.SliceStable(scored, func(i, j int) bool {
@@ -319,6 +333,7 @@ func buildRecommendations(
 			Effort:          string(st.task.Effort),
 			Score:           st.score,
 			Reasons:         st.reasons,
+			ScoreBreakdown:  st.components,
 			DownstreamCount: downstreamInfo[st.task.ID].Count,
 			OnCriticalPath:  criticalPath[st.task.ID],
 		}
@@ -385,69 +400,142 @@ func ScoreTask(
 	criticalPath map[string]bool,
 	downstreamInfo map[string]DownstreamInfo,
 ) (int, []string) {
-	score := 0
+	components, reasons := buildScore(task, criticalPath, downstreamInfo)
+	return sumComponents(components), reasons
+}
+
+// ScoreTaskBreakdown returns the itemized scoring components for an actionable
+// task (priority, critical path, downstream, effort). Their points sum to the
+// score returned by ScoreTask. Phase scoring is added separately by callers.
+func ScoreTaskBreakdown(
+	task *model.Task,
+	criticalPath map[string]bool,
+	downstreamInfo map[string]DownstreamInfo,
+) []ScoreComponent {
+	components, _ := buildScore(task, criticalPath, downstreamInfo)
+	return components
+}
+
+// buildScore is the single source of truth for a task's base score: it produces
+// both the itemized components and the legacy reason strings from the same
+// conditionals so the two can never drift.
+func buildScore(
+	task *model.Task,
+	criticalPath map[string]bool,
+	downstreamInfo map[string]DownstreamInfo,
+) ([]ScoreComponent, []string) {
+	components := make([]ScoreComponent, 0, 4)
 	reasons := make([]string, 0)
 
-	switch task.Priority {
-	case model.PriorityCritical:
-		score += ScorePriorityCritical
-		reasons = append(reasons, "critical priority")
-	case model.PriorityHigh:
-		score += ScorePriorityHigh
-		reasons = append(reasons, "high priority")
-	case model.PriorityMedium:
-		score += ScorePriorityMedium
-	default:
-		score += ScorePriorityLow
+	priorityComp, priorityReason := priorityComponent(task)
+	components = append(components, priorityComp)
+	if priorityReason != "" {
+		reasons = append(reasons, priorityReason)
 	}
 
 	info := downstreamInfo[task.ID]
 	mult := downstreamPriorityMultiplier(info.MaxPriority)
 
 	if criticalPath[task.ID] {
-		scaled := int(float64(ScoreCriticalPath) * mult)
-		score += scaled
+		components = append(components, ScoreComponent{
+			Label:      "critical path",
+			Base:       ScoreCriticalPath,
+			Multiplier: mult,
+			Points:     int(float64(ScoreCriticalPath) * mult),
+		})
 		reasons = append(reasons, "on critical path")
 	}
 
-	dc := info.Count
-	bonus := int(float64(min(dc*ScorePerDownstream, ScoreDownstreamMax)) * mult)
-	score += bonus
-	if dc > 0 {
+	if dc := info.Count; dc > 0 {
+		base := min(dc*ScorePerDownstream, ScoreDownstreamMax)
 		noun := "tasks"
 		if dc == 1 {
 			noun = "task"
 		}
+		components = append(components, ScoreComponent{
+			Label:      fmt.Sprintf("downstream (unblocks %d %s)", dc, noun),
+			Base:       base,
+			Multiplier: mult,
+			Points:     int(float64(base) * mult),
+		})
 		reasons = append(reasons, fmt.Sprintf("unblocks %d %s", dc, noun))
 	}
 
-	switch task.Effort {
-	case model.EffortSmall:
-		score += ScoreEffortSmall
-		reasons = append(reasons, "quick win")
-	case model.EffortMedium:
-		score += ScoreEffortMedium
+	if effortComp, effortReason, ok := effortComponent(task); ok {
+		components = append(components, effortComp)
+		if effortReason != "" {
+			reasons = append(reasons, effortReason)
+		}
 	}
 
-	return score, reasons
+	return components, reasons
+}
+
+// priorityComponent returns the priority score component and its legacy reason
+// (empty for medium/low, which carry no reason string).
+func priorityComponent(task *model.Task) (ScoreComponent, string) {
+	switch task.Priority {
+	case model.PriorityCritical:
+		return ScoreComponent{Label: "priority: critical", Points: ScorePriorityCritical}, "critical priority"
+	case model.PriorityHigh:
+		return ScoreComponent{Label: "priority: high", Points: ScorePriorityHigh}, "high priority"
+	case model.PriorityMedium:
+		return ScoreComponent{Label: "priority: medium", Points: ScorePriorityMedium}, ""
+	default:
+		return ScoreComponent{Label: "priority: low", Points: ScorePriorityLow}, ""
+	}
+}
+
+// effortComponent returns the effort score component and its legacy reason.
+// The bool is false when the effort contributes no points (large/unset).
+func effortComponent(task *model.Task) (ScoreComponent, string, bool) {
+	switch task.Effort {
+	case model.EffortSmall:
+		return ScoreComponent{Label: "effort: small", Points: ScoreEffortSmall}, "quick win", true
+	case model.EffortMedium:
+		return ScoreComponent{Label: "effort: medium", Points: ScoreEffortMedium}, "", true
+	default:
+		return ScoreComponent{}, "", false
+	}
+}
+
+// sumComponents returns the total points across all components.
+func sumComponents(components []ScoreComponent) int {
+	total := 0
+	for _, c := range components {
+		total += c.Points
+	}
+	return total
 }
 
 // scorePhase computes a phase-based scoring bonus.
 // Tasks from earlier phases in the configured order get higher bonuses.
 func scorePhase(task *model.Task, phaseOrder []string) (int, []string) {
-	if task.Phase == "" || len(phaseOrder) == 0 {
+	comp, reason := buildPhaseScore(task, phaseOrder)
+	if comp == nil {
 		return 0, nil
+	}
+	return comp.Points, []string{reason}
+}
+
+// buildPhaseScore returns the phase score component and its reason string, or
+// (nil, "") when the task has no ranked phase bonus. Earlier phases in the
+// configured order get higher bonuses.
+func buildPhaseScore(task *model.Task, phaseOrder []string) (*ScoreComponent, string) {
+	if task.Phase == "" || len(phaseOrder) == 0 {
+		return nil, ""
 	}
 	for i, name := range phaseOrder {
 		if name == task.Phase {
 			bonus := ScorePhaseBase - (i * ScorePhaseDecay)
 			if bonus <= 0 {
-				return 0, nil
+				return nil, ""
 			}
-			return bonus, []string{fmt.Sprintf("phase %s", task.Phase)}
+			reason := fmt.Sprintf("phase %s", task.Phase)
+			return &ScoreComponent{Label: reason, Points: bonus}, reason
 		}
 	}
-	return 0, nil
+	return nil, ""
 }
 
 // CalculateCriticalPathTasks identifies tasks on the critical path.

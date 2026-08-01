@@ -181,6 +181,7 @@ func resetNextFlags() {
 	nextColumns = nextDefaultColumns
 	nextStatus = ""
 	nextPriority = ""
+	nextExplain = false
 }
 
 func TestNext_BasicRanking(t *testing.T) {
@@ -601,6 +602,110 @@ func TestNext_TableFormat(t *testing.T) {
 	}
 	if !strings.Contains(output, "Effort") {
 		t.Error("Expected 'Effort' column header in table output")
+	}
+}
+
+func TestNext_Explain_TableFormat(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "table"
+	nextExplain = true
+	nextLimit = 3
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	if !strings.Contains(output, "Recommended tasks:") {
+		t.Error("Expected label 'Recommended tasks:'")
+	}
+	// Breakdown blocks list itemized components and a total, and omit the
+	// compact table column headers.
+	for _, want := range []string{"priority:", "total"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("Expected --explain output to contain %q\nOutput:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "Effort") {
+		t.Errorf("Did not expect compact table header 'Effort' in --explain output\nOutput:\n%s", output)
+	}
+}
+
+func TestNext_Explain_ScaledBonusShowsMultiplier(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "table"
+	nextExplain = true
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	// The fixture has critical-path / downstream tasks, so at least one scaled
+	// bonus (rendered as "base × mult)") must appear.
+	if !strings.Contains(output, "×") {
+		t.Errorf("Expected a scaled-bonus multiplier ('×') in --explain output\nOutput:\n%s", output)
+	}
+}
+
+func TestNext_Explain_JSONBreakdownSumsToScore(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+	if len(recs) == 0 {
+		t.Fatal("Expected at least one recommendation")
+	}
+
+	for _, rec := range recs {
+		if len(rec.ScoreBreakdown) == 0 {
+			t.Errorf("rec %s: score_breakdown is empty", rec.ID)
+			continue
+		}
+		sum := 0
+		for _, c := range rec.ScoreBreakdown {
+			sum += c.Points
+		}
+		if sum != rec.Score {
+			t.Errorf("rec %s: score_breakdown sum = %d, want score %d (%+v)", rec.ID, sum, rec.Score, rec.ScoreBreakdown)
+		}
+	}
+}
+
+func TestNext_TableWithoutExplain_HasNoBreakdown(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "table"
+	nextLimit = 3
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	// Default table shows the compact columns, not the itemized breakdown.
+	if !strings.Contains(output, "Effort") {
+		t.Errorf("Expected compact table header 'Effort'\nOutput:\n%s", output)
+	}
+	if strings.Contains(output, "total") || strings.Contains(output, "priority:") {
+		t.Errorf("Did not expect breakdown lines in default table output\nOutput:\n%s", output)
 	}
 }
 

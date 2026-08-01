@@ -209,6 +209,136 @@ func TestScoreTask_HighChainPreservesExistingBehavior(t *testing.T) {
 	}
 }
 
+func TestScoreTaskBreakdown_ComponentsSumToScore(t *testing.T) {
+	criticalPath := map[string]bool{"t1": true}
+	cases := []struct {
+		name           string
+		task           *model.Task
+		downstreamInfo map[string]DownstreamInfo
+	}{
+		{
+			name:           "high on critical path with downstream and effort",
+			task:           &model.Task{ID: "t1", Priority: model.PriorityHigh, Effort: model.EffortSmall},
+			downstreamInfo: map[string]DownstreamInfo{"t1": {Count: 3, MaxPriority: model.PriorityCritical}},
+		},
+		{
+			name:           "low with scaled downstream",
+			task:           &model.Task{ID: "t2", Priority: model.PriorityLow},
+			downstreamInfo: map[string]DownstreamInfo{"t2": {Count: 5, MaxPriority: model.PriorityLow}},
+		},
+		{
+			name:           "medium standalone",
+			task:           &model.Task{ID: "t3", Priority: model.PriorityMedium},
+			downstreamInfo: map[string]DownstreamInfo{},
+		},
+		{
+			name:           "critical with medium effort",
+			task:           &model.Task{ID: "t4", Priority: model.PriorityCritical, Effort: model.EffortMedium},
+			downstreamInfo: map[string]DownstreamInfo{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cp := map[string]bool{}
+			if criticalPath[tc.task.ID] {
+				cp = criticalPath
+			}
+			components := ScoreTaskBreakdown(tc.task, cp, tc.downstreamInfo)
+			score, _ := ScoreTask(tc.task, cp, tc.downstreamInfo)
+
+			sum := 0
+			for _, c := range components {
+				sum += c.Points
+			}
+			if sum != score {
+				t.Errorf("components sum = %d, want score %d (components: %+v)", sum, score, components)
+			}
+		})
+	}
+}
+
+func TestScoreTaskBreakdown_ScaledBonusesExposeBaseAndMultiplier(t *testing.T) {
+	// Low-priority downstream chain scales bonuses by 0.5 (medium max) — verify
+	// the base and multiplier are surfaced and that Points = int(base * mult).
+	criticalPath := map[string]bool{"t1": true}
+	downstreamInfo := map[string]DownstreamInfo{
+		"t1": {Count: 3, MaxPriority: model.PriorityMedium},
+	}
+	task := &model.Task{ID: "t1", Priority: model.PriorityHigh}
+
+	components := ScoreTaskBreakdown(task, criticalPath, downstreamInfo)
+
+	var crit, down *ScoreComponent
+	for i := range components {
+		switch components[i].Label {
+		case "critical path":
+			crit = &components[i]
+		case "downstream (unblocks 3 tasks)":
+			down = &components[i]
+		}
+	}
+
+	if crit == nil {
+		t.Fatal("expected a critical path component")
+	}
+	if crit.Base != ScoreCriticalPath || crit.Multiplier != 0.5 {
+		t.Errorf("critical path base/mult = %d/%.2f, want %d/0.50", crit.Base, crit.Multiplier, ScoreCriticalPath)
+	}
+	if crit.Points != int(float64(crit.Base)*crit.Multiplier) {
+		t.Errorf("critical path points = %d, want %d", crit.Points, int(float64(crit.Base)*crit.Multiplier))
+	}
+
+	if down == nil {
+		t.Fatal("expected a downstream component")
+	}
+	if down.Base != min(3*ScorePerDownstream, ScoreDownstreamMax) || down.Multiplier != 0.5 {
+		t.Errorf("downstream base/mult = %d/%.2f, want %d/0.50", down.Base, down.Multiplier, min(3*ScorePerDownstream, ScoreDownstreamMax))
+	}
+	if down.Points != int(float64(down.Base)*down.Multiplier) {
+		t.Errorf("downstream points = %d, want %d", down.Points, int(float64(down.Base)*down.Multiplier))
+	}
+}
+
+func TestScoreTaskBreakdown_FlatComponentsHaveNoMultiplier(t *testing.T) {
+	task := &model.Task{ID: "t1", Priority: model.PriorityHigh, Effort: model.EffortSmall}
+	components := ScoreTaskBreakdown(task, map[string]bool{}, map[string]DownstreamInfo{})
+
+	if len(components) != 2 {
+		t.Fatalf("expected 2 components (priority, effort), got %d: %+v", len(components), components)
+	}
+	for _, c := range components {
+		if c.Multiplier != 0 || c.Base != 0 {
+			t.Errorf("flat component %q has base/mult %d/%.2f, want 0/0", c.Label, c.Base, c.Multiplier)
+		}
+	}
+	if components[0].Label != "priority: high" || components[0].Points != ScorePriorityHigh {
+		t.Errorf("priority component = %+v", components[0])
+	}
+	if components[1].Label != "effort: small" || components[1].Points != ScoreEffortSmall {
+		t.Errorf("effort component = %+v", components[1])
+	}
+}
+
+func TestBuildPhaseScore(t *testing.T) {
+	order := []string{"v0.2", "v0.3", "v0.4"}
+
+	comp, reason := buildPhaseScore(makeTaskWithPhase("001", model.StatusPending, model.PriorityMedium, "v0.3"), order)
+	if comp == nil {
+		t.Fatal("expected a phase component")
+	}
+	if comp.Points != ScorePhaseBase-ScorePhaseDecay {
+		t.Errorf("phase points = %d, want %d", comp.Points, ScorePhaseBase-ScorePhaseDecay)
+	}
+	if comp.Label != "phase v0.3" || reason != "phase v0.3" {
+		t.Errorf("label/reason = %q/%q, want phase v0.3", comp.Label, reason)
+	}
+
+	if comp, _ := buildPhaseScore(makeTask("001", model.StatusPending, model.PriorityMedium, nil), order); comp != nil {
+		t.Errorf("no-phase task should yield nil component, got %+v", comp)
+	}
+}
+
 func TestRecommend_MediumTaskRanksAboveLowChain(t *testing.T) {
 	// Integration test: an unblocked medium-priority task should rank higher than
 	// a low-priority task whose entire downstream chain is low priority.
@@ -786,7 +916,7 @@ func TestRecommend_PhaseOrderAffectsRanking(t *testing.T) {
 	}
 
 	recs, err := Recommend(tasks, Options{
-		Limit:          10,
+		Limit:      10,
 		PhaseOrder: []string{"v0.2", "v0.3"},
 	})
 	if err != nil {

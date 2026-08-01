@@ -18,6 +18,9 @@ import (
 // Recommendation is re-exported from the shared package.
 type Recommendation = next.Recommendation
 
+// ScoreComponent is re-exported from the shared package.
+type ScoreComponent = next.ScoreComponent
+
 const nextDefaultColumns = "rank,id,title,priority,effort,file,reason"
 
 var (
@@ -35,6 +38,7 @@ var (
 	nextColumns        string
 	nextStatus         string
 	nextPriority       string
+	nextExplain        bool
 )
 
 var nextCmd = &cobra.Command{
@@ -56,11 +60,18 @@ When combined with --strict-phases, phase is the primary sort key and priority
 is secondary: earlier-phase tasks rank first, and within a phase, higher
 priority ranks first.
 
+--explain prints, beneath each recommendation, an itemized breakdown of every
+scoring component (priority, phase, critical path, downstream, effort) with its
+point value and a total equal to the task's score. Scaled bonuses show their
+base and multiplier so the scaling is visible. The structured score_breakdown
+is always present in json/yaml output.
+
 Output formats: table (default), json, yaml
 
 Examples:
   taskmd next
   taskmd next ./tasks
+  taskmd next --explain
   taskmd next --limit 3
   taskmd next --priority high
   taskmd next --priority high --format json
@@ -96,6 +107,7 @@ func init() {
 	nextCmd.Flags().StringVar(&nextColumns, "columns", nextDefaultColumns, "comma-separated columns for table output (e.g. rank,id,title,reason)")
 	nextCmd.Flags().StringVar(&nextStatus, "status", "", "shortcut for --filter status=<value>")
 	nextCmd.Flags().StringVar(&nextPriority, "priority", "", "shortcut for --filter priority=<value>")
+	nextCmd.Flags().BoolVar(&nextExplain, "explain", false, "show an itemized score breakdown beneath each recommendation (table format)")
 }
 
 func runNext(cmd *cobra.Command, args []string) error {
@@ -356,11 +368,6 @@ func outputNextTable(recs []Recommendation) error {
 		return nil
 	}
 
-	columns, err := parseNextColumns(nextColumns)
-	if err != nil {
-		return err
-	}
-
 	label := "Recommended tasks:"
 	if nextScope != "" {
 		label = fmt.Sprintf("Recommended tasks (scope: %s):", nextScope)
@@ -373,6 +380,15 @@ func outputNextTable(recs []Recommendation) error {
 	}
 	fmt.Println(formatLabel(label, r))
 	fmt.Println()
+
+	if nextExplain {
+		return outputNextExplain(recs, r)
+	}
+
+	columns, err := parseNextColumns(nextColumns)
+	if err != nil {
+		return err
+	}
 
 	tw := NewTableWriter()
 	headers := make([]string, len(columns))
@@ -394,6 +410,49 @@ func outputNextTable(recs []Recommendation) error {
 
 	tw.Flush(os.Stdout)
 	return nil
+}
+
+// explainLabelMinWidth is the minimum width for the component label column
+// in --explain output, so points stay aligned across short and long labels.
+const explainLabelMinWidth = 30
+
+// outputNextExplain renders an itemized score breakdown block beneath each
+// recommendation. Each block lists every scoring component with its points
+// (showing base × multiplier for scaled bonuses) and a total equal to the
+// task's score.
+func outputNextExplain(recs []Recommendation, r *lipgloss.Renderer) error {
+	for i, rec := range recs {
+		if i > 0 {
+			fmt.Println()
+		}
+
+		fmt.Printf("%d. %s  %s\n", rec.Rank, formatTaskID(rec.ID, r), rec.Title)
+
+		width := explainLabelWidth(rec.ScoreBreakdown)
+		for _, c := range rec.ScoreBreakdown {
+			line := fmt.Sprintf("     %-*s %+4d", width, c.Label, c.Points)
+			if c.Multiplier != 0 {
+				line += "  " + formatDim(fmt.Sprintf("(%d × %.2f)", c.Base, c.Multiplier), r)
+			}
+			fmt.Println(line)
+		}
+
+		fmt.Printf("     %s\n", strings.Repeat("─", width+5))
+		fmt.Printf("     %-*s %4d\n", width, "total", rec.Score)
+	}
+	return nil
+}
+
+// explainLabelWidth returns the label column width for a breakdown block:
+// the longest component label (and "total"), floored at explainLabelMinWidth.
+func explainLabelWidth(components []ScoreComponent) int {
+	width := explainLabelMinWidth
+	for _, c := range components {
+		if len(c.Label) > width {
+			width = len(c.Label)
+		}
+	}
+	return width
 }
 
 // parseNextColumns splits the columns string and validates each column name.

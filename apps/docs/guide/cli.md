@@ -230,9 +230,34 @@ taskmd next --phase v0.2
 # Next actionable task within the graph reachable from a task
 taskmd next --root 022
 
+# Explain how each recommendation was scored
+taskmd next --explain
+
 # JSON for automation
 taskmd next --format json
 ```
+
+**Explaining scores with `--explain`:**
+
+`--explain` prints, beneath each recommendation, an itemized breakdown of every
+scoring component — priority, phase, critical path, downstream impact, and
+effort — with each component's point value and a total equal to the task's
+score. Scaled bonuses (critical path and downstream) show their base and
+multiplier, so it's clear how the downstream-priority multiplier reduces a bonus
+when the downstream chain is low priority:
+
+```
+1. 003  Build CLI parser
+     priority: critical              +40
+     critical path                    +7  (15 × 0.50)
+     downstream (unblocks 1 task)     +1  (3 × 0.50)
+     ───────────────────────────────────
+     total                            48
+```
+
+The structured `score_breakdown` array is **always** included in `json` and
+`yaml` output (independent of `--explain`), and its component points always sum
+to `score`.
 
 **Scoping to a task's graph with `--root`:**
 
@@ -264,6 +289,7 @@ and it composes with the other filters.
 | `--status` | | Shortcut for `--filter status=<value>` |
 | `--priority` | | Shortcut for `--filter priority=<value>` |
 | `--columns` | `rank,id,title,priority,effort,file,reason` | Comma-separated columns for table output |
+| `--explain` | `false` | Show an itemized score breakdown beneath each recommendation (table format). `score_breakdown` is always present in json/yaml |
 | `--strict-phases` | `false` | Enforce strict phase ordering (earlier phases always rank first) |
 | `--strict-priority` | `false` | Enforce strict priority ordering (higher priority always ranks first; score breaks ties within a tier). With `--strict-phases`, phase is primary and priority secondary |
 | `--quick-wins` | `false` | Show only quick wins (effort: small) |
