@@ -802,6 +802,103 @@ func TestRecommend_PhaseOrderAffectsRanking(t *testing.T) {
 	}
 }
 
+func TestRecommend_StrictPriority_HigherPriorityRanksFirst(t *testing.T) {
+	// A medium task laden with bonuses (small effort + critical-path + downstream)
+	// normally outscores a bonus-less critical task. --strict-priority must still
+	// rank the critical task first.
+	med := &model.Task{ID: "med", Title: "Medium", Status: model.StatusPending, Priority: model.PriorityMedium, Effort: model.EffortSmall}
+	// dep (high) depends on med, making med a critical-path node with a
+	// high-priority downstream (full-strength bonuses). dep itself is blocked.
+	dep := makeTask("dep", model.StatusPending, model.PriorityHigh, []string{"med"})
+	crit := makeTask("crit", model.StatusPending, model.PriorityCritical, nil)
+	tasks := []*model.Task{med, dep, crit}
+
+	// Sanity: without strict-priority, med outscores crit.
+	loose, err := Recommend(tasks, Options{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if loose[0].ID != "med" {
+		t.Fatalf("precondition: expected med to rank first without strict-priority, got %s", loose[0].ID)
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, StrictPriority: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if recs[0].ID != "crit" {
+		t.Errorf("Expected critical task first under --strict-priority, got %s", recs[0].ID)
+	}
+	if recs[1].ID != "med" {
+		t.Errorf("Expected medium task second under --strict-priority, got %s", recs[1].ID)
+	}
+}
+
+func TestRecommend_StrictPriority_ScoreBreaksTieWithinTier(t *testing.T) {
+	// Two medium tasks: one has a small-effort bonus, so within the medium tier
+	// it must rank first via the score tiebreak.
+	plain := &model.Task{ID: "plain", Title: "Plain", Status: model.StatusPending, Priority: model.PriorityMedium}
+	quick := &model.Task{ID: "quick", Title: "Quick", Status: model.StatusPending, Priority: model.PriorityMedium, Effort: model.EffortSmall}
+	tasks := []*model.Task{plain, quick}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, StrictPriority: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if recs[0].ID != "quick" {
+		t.Errorf("Within the medium tier, expected higher-scoring 'quick' first, got %s", recs[0].ID)
+	}
+}
+
+func TestRecommend_StrictPriority_LowAndUnsetTie(t *testing.T) {
+	// low and unset priority both map to weight 1, so they tie under
+	// strict-priority and fall through to the score/ID tiebreak.
+	low := makeTask("b-low", model.StatusPending, model.PriorityLow, nil)
+	unset := makeTask("a-unset", model.StatusPending, model.Priority(""), nil)
+	tasks := []*model.Task{low, unset}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, StrictPriority: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Equal weight and equal score → ID tiebreak: "a-unset" < "b-low".
+	if recs[0].ID != "a-unset" {
+		t.Errorf("Expected ID tiebreak (a-unset first) for tied low/unset priorities, got %s", recs[0].ID)
+	}
+}
+
+func TestRecommend_StrictPhasesAndPriority_PhasePrimary(t *testing.T) {
+	// v0.2 (first phase) with a low-priority task; v0.3 (later phase) with a
+	// critical task. With both flags, phase is primary: the low v0.2 task ranks
+	// ahead of the critical v0.3 task.
+	lowEarly := makeTaskWithPhase("low-early", model.StatusPending, model.PriorityLow, "v0.2")
+	critLate := makeTaskWithPhase("crit-late", model.StatusPending, model.PriorityCritical, "v0.3")
+	// Second v0.2 task, high priority, to confirm priority is secondary within a phase.
+	highEarly := makeTaskWithPhase("high-early", model.StatusPending, model.PriorityHigh, "v0.2")
+	tasks := []*model.Task{lowEarly, critLate, highEarly}
+
+	recs, err := Recommend(tasks, Options{
+		Limit:          10,
+		PhaseOrder:     []string{"v0.2", "v0.3"},
+		StrictPhases:   true,
+		StrictPriority: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(recs) != 3 {
+		t.Fatalf("Expected 3 recommendations, got %d", len(recs))
+	}
+	// Phase primary: both v0.2 tasks before the v0.3 task.
+	if recs[2].ID != "crit-late" {
+		t.Errorf("Expected critical v0.3 task last (phase primary), got %s", recs[2].ID)
+	}
+	// Priority secondary within v0.2: high before low.
+	if recs[0].ID != "high-early" || recs[1].ID != "low-early" {
+		t.Errorf("Within v0.2 expected high-early then low-early, got %s then %s", recs[0].ID, recs[1].ID)
+	}
+}
+
 // makeTaskWithParentDeps builds a task that has both a parent and dependencies.
 func makeTaskWithParentDeps(id string, status model.Status, priority model.Priority, parent string, deps []string) *model.Task {
 	return &model.Task{

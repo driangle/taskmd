@@ -177,6 +177,7 @@ func resetNextFlags() {
 	nextRoot = ""
 	nextPhase = ""
 	nextStrictPhases = false
+	nextStrictPriority = false
 	nextColumns = nextDefaultColumns
 	nextStatus = ""
 	nextPriority = ""
@@ -2269,6 +2270,175 @@ func TestNext_StrictPhases_WithPhaseFilter(t *testing.T) {
 	// Both are v0.2, so normal scoring: 003 (medium) before 001 (low)
 	if recs[0].ID != "003" {
 		t.Errorf("Expected 003 first within filtered v0.2, got %s", recs[0].ID)
+	}
+}
+
+// createStrictPriorityTestFiles creates tasks where a bonus-laden lower-priority
+// task normally outranks a bonus-less higher-priority one, to test
+// --strict-priority behavior.
+//
+// Task layout:
+//
+//	crit: priority=critical               - actionable, no bonuses (score 40)
+//	med:  priority=medium, effort=small   - actionable, on critical path with a
+//	                                         high-priority downstream (score > 40)
+//	dep:  priority=high, depends on med    - blocked (boosts med's score only)
+func createStrictPriorityTestFiles(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+
+	tasks := map[string]string{
+		"crit.md": `---
+id: "crit"
+title: "Critical task"
+status: pending
+priority: critical
+---`,
+		"med.md": `---
+id: "med"
+title: "Medium quick win"
+status: pending
+priority: medium
+effort: small
+---`,
+		"dep.md": `---
+id: "dep"
+title: "High downstream task"
+status: pending
+priority: high
+dependencies: ["med"]
+---`,
+	}
+
+	for filename, content := range tasks {
+		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+	return tmpDir
+}
+
+func TestNext_StrictPriorityOff_ScoreDominates(t *testing.T) {
+	tmpDir := createStrictPriorityTestFiles(t)
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextStrictPriority = false
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+
+	// Without --strict-priority, the bonus-laden medium task outscores critical.
+	if recs[0].ID != "med" {
+		t.Errorf("Without --strict-priority, expected bonus-laden 'med' first, got %s", recs[0].ID)
+	}
+}
+
+func TestNext_StrictPriorityOn_HigherPriorityFirst(t *testing.T) {
+	tmpDir := createStrictPriorityTestFiles(t)
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextStrictPriority = true
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+
+	// Only crit and med are actionable (dep is blocked).
+	if len(recs) != 2 {
+		t.Fatalf("Expected 2 recommendations, got %d", len(recs))
+	}
+	if recs[0].ID != "crit" {
+		t.Errorf("Expected critical task first under --strict-priority, got %s", recs[0].ID)
+	}
+	if recs[1].ID != "med" {
+		t.Errorf("Expected medium task second under --strict-priority, got %s", recs[1].ID)
+	}
+}
+
+func TestNext_StrictPriority_ScoreBreaksTieWithinTier(t *testing.T) {
+	tmpDir := t.TempDir()
+	files := map[string]string{
+		"plain.md": "---\nid: \"plain\"\ntitle: \"Plain medium\"\nstatus: pending\npriority: medium\n---",
+		"quick.md": "---\nid: \"quick\"\ntitle: \"Quick medium\"\nstatus: pending\npriority: medium\neffort: small\n---",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", name, err)
+		}
+	}
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextStrictPriority = true
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+
+	// Same priority tier → score breaks the tie: the small-effort task ranks first.
+	if recs[0].ID != "quick" {
+		t.Errorf("Within the medium tier, expected higher-scoring 'quick' first, got %s", recs[0].ID)
+	}
+}
+
+func TestNext_StrictPhasesAndPriority_PhasePrimary(t *testing.T) {
+	tmpDir := createStrictPhasesTestFiles(t)
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextStrictPhases = true
+	nextStrictPriority = true
+	setPhaseOrder([]string{"v0.2", "v0.3"})
+	defer viper.Set("phases", nil)
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	var recs []next.Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+
+	if len(recs) != 4 {
+		t.Fatalf("Expected 4 recommendations, got %d", len(recs))
+	}
+
+	// Phase primary: v0.2 tasks (001 low, 003 medium) before v0.3 critical (002),
+	// then the no-phase task (004) last.
+	// Priority secondary within v0.2: 003 (medium) before 001 (low).
+	gotIDs := make([]string, len(recs))
+	for i, r := range recs {
+		gotIDs[i] = r.ID
+	}
+	expected := []string{"003", "001", "002", "004"}
+	for i, id := range expected {
+		if recs[i].ID != id {
+			t.Errorf("rank %d: expected %s, got %s (full order: %v)", i, id, recs[i].ID, gotIDs)
+		}
 	}
 }
 

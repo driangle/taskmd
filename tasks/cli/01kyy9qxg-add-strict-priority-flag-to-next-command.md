@@ -1,11 +1,12 @@
 ---
 title: "Add --strict-priority flag to next command"
 id: "01kyy9qxg"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["cli", "next"]
 created: "2026-08-01"
+completed_at: 2026-08-01
 ---
 
 # Add --strict-priority flag to next command
@@ -43,18 +44,18 @@ the score/ID tiebreak — this is acceptable and intended.
 
 ## Tasks
 
-- [ ] Add `StrictPriority bool` to `next.Options` in `sdk/go/next/next.go`
-- [ ] Extend the sort in `scoreAndSort` to apply the priority tier (using
+- [x] Add `StrictPriority bool` to `next.Options` in `sdk/go/next/next.go`
+- [x] Extend the sort in `scoreAndSort` to apply the priority tier (using
       existing `priorityWeight`) after the strict-phases check and before the
       score comparison
-- [ ] Add `nextStrictPriority` flag var and register `--strict-priority` in
+- [x] Add `nextStrictPriority` flag var and register `--strict-priority` in
       `internal/cli/next.go`, wiring it into `next.Options`
-- [ ] Document the flag and its interaction with `--strict-phases` in the flag
+- [x] Document the flag and its interaction with `--strict-phases` in the flag
       help text and the `next` command `Long` description / examples
-- [ ] Add tests: happy path (priority tiers ordered strictly), score-as-tiebreak
+- [x] Add tests: happy path (priority tiers ordered strictly), score-as-tiebreak
       within a tier, low/unset tie behavior, and the `--strict-phases` +
       `--strict-priority` interaction (phase primary, priority secondary)
-- [ ] Update docs if `next` flags are documented in `apps/docs`
+- [x] Update docs if `next` flags are documented in `apps/docs`
 
 ## Acceptance Criteria
 

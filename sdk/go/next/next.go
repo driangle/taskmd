@@ -20,8 +20,8 @@ const (
 	ScoreDownstreamMax    = 15
 	ScoreEffortSmall      = 5
 	ScoreEffortMedium     = 2
-	ScorePhaseBase    = 25
-	ScorePhaseDecay   = 5
+	ScorePhaseBase        = 25
+	ScorePhaseDecay       = 5
 )
 
 // Recommendation represents a scored task recommendation.
@@ -49,9 +49,10 @@ type Options struct {
 	ScopeExact     bool
 	Root           string
 	ArchivedTasks  []*model.Task
-	Phase        string
-	PhaseOrder   []string
-	StrictPhases bool
+	Phase          string
+	PhaseOrder     []string
+	StrictPhases   bool
+	StrictPriority bool
 }
 
 type scoredTask struct {
@@ -85,7 +86,11 @@ func Recommend(tasks []*model.Task, opts Options) ([]Recommendation, error) {
 		return nil, err
 	}
 
-	scored := scoreAndSort(actionable, opts.PhaseOrder, opts.StrictPhases, criticalPath, downstreamInfo)
+	scored := scoreAndSort(actionable, sortOptions{
+		phaseOrder:     opts.PhaseOrder,
+		strictPhases:   opts.StrictPhases,
+		strictPriority: opts.StrictPriority,
+	}, criticalPath, downstreamInfo)
 
 	limit := min(opts.Limit, len(scored))
 	return buildRecommendations(scored[:limit], criticalPath, downstreamInfo), nil
@@ -225,32 +230,48 @@ func rootReachableSet(root string, tasks []*model.Task, childrenMap map[string][
 	return reachable
 }
 
+// sortOptions groups the ordering-related recommendation options.
+type sortOptions struct {
+	phaseOrder     []string
+	strictPhases   bool
+	strictPriority bool
+}
+
 func scoreAndSort(
 	tasks []*model.Task,
-	phaseOrder []string,
-	strictPhases bool,
+	opts sortOptions,
 	criticalPath map[string]bool,
 	downstreamInfo map[string]DownstreamInfo,
 ) []scoredTask {
-	phaseIndex := buildPhaseIndex(phaseOrder)
+	phaseIndex := buildPhaseIndex(opts.phaseOrder)
 
 	scored := make([]scoredTask, len(tasks))
 	for i, task := range tasks {
 		s, r := ScoreTask(task, criticalPath, downstreamInfo)
-		ms, mr := scorePhase(task, phaseOrder)
+		ms, mr := scorePhase(task, opts.phaseOrder)
 		s += ms
 		r = append(r, mr...)
 		scored[i] = scoredTask{task: task, score: s, reasons: r}
 	}
 
 	sort.SliceStable(scored, func(i, j int) bool {
-		if strictPhases && len(phaseOrder) > 0 {
+		// Primary key: phase tier, when strict-phases is enabled.
+		if opts.strictPhases && len(opts.phaseOrder) > 0 {
 			pi := taskPhaseIndex(scored[i].task, phaseIndex)
 			pj := taskPhaseIndex(scored[j].task, phaseIndex)
 			if pi != pj {
 				return pi < pj
 			}
 		}
+		// Secondary key: priority tier, when strict-priority is enabled.
+		if opts.strictPriority {
+			wi := priorityWeight(scored[i].task.Priority)
+			wj := priorityWeight(scored[j].task.Priority)
+			if wi != wj {
+				return wi > wj
+			}
+		}
+		// Tiebreak within a tier: score, then ID.
 		if scored[i].score != scored[j].score {
 			return scored[i].score > scored[j].score
 		}

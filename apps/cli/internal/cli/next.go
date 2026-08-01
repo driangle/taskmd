@@ -21,19 +21,20 @@ type Recommendation = next.Recommendation
 const nextDefaultColumns = "rank,id,title,priority,effort,file,reason"
 
 var (
-	nextFormat       string
-	nextLimit        int
-	nextFilters      []string
-	nextQuickWins    bool
-	nextCritical     bool
-	nextScope        string
-	nextExact        bool
-	nextRoot         string
-	nextPhase        string
-	nextStrictPhases bool
-	nextColumns      string
-	nextStatus       string
-	nextPriority     string
+	nextFormat         string
+	nextLimit          int
+	nextFilters        []string
+	nextQuickWins      bool
+	nextCritical       bool
+	nextScope          string
+	nextExact          bool
+	nextRoot           string
+	nextPhase          string
+	nextStrictPhases   bool
+	nextStrictPriority bool
+	nextColumns        string
+	nextStatus         string
+	nextPriority       string
 )
 
 var nextCmd = &cobra.Command{
@@ -45,6 +46,15 @@ var nextCmd = &cobra.Command{
 Tasks are scored based on priority, critical path position, downstream impact,
 effort, and phase ordering (from .taskmd.yaml). Only actionable tasks
 (pending or in-progress with all dependencies completed) are shown.
+
+--strict-priority guarantees priority is the primary sort key: no
+lower-priority task is ranked above an actionable higher-priority one
+(critical > high > medium > low/unset), with the existing score breaking ties
+within each tier. Unlike --priority <value> (which filters out non-matching
+tasks), --strict-priority keeps all actionable tasks and only reorders them.
+When combined with --strict-phases, phase is the primary sort key and priority
+is secondary: earlier-phase tasks rank first, and within a phase, higher
+priority ranks first.
 
 Output formats: table (default), json, yaml
 
@@ -62,6 +72,8 @@ Examples:
   taskmd next --root 022
   taskmd next --phase v0.2
   taskmd next --strict-phases
+  taskmd next --strict-priority
+  taskmd next --strict-phases --strict-priority
   taskmd next --columns rank,id,title,reason`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runNext,
@@ -80,6 +92,7 @@ func init() {
 	nextCmd.Flags().StringVar(&nextRoot, "root", "", "limit recommendations to tasks reachable from an ID (its upstream deps + subtasks)")
 	nextCmd.Flags().StringVar(&nextPhase, "phase", "", "filter by phase")
 	nextCmd.Flags().BoolVar(&nextStrictPhases, "strict-phases", false, "enforce strict phase ordering (earlier phases always rank first)")
+	nextCmd.Flags().BoolVar(&nextStrictPriority, "strict-priority", false, "enforce strict priority ordering (higher priority always ranks first, score breaks ties within a tier; with --strict-phases, phase is primary and priority secondary)")
 	nextCmd.Flags().StringVar(&nextColumns, "columns", nextDefaultColumns, "comma-separated columns for table output (e.g. rank,id,title,reason)")
 	nextCmd.Flags().StringVar(&nextStatus, "status", "", "shortcut for --filter status=<value>")
 	nextCmd.Flags().StringVar(&nextPriority, "priority", "", "shortcut for --filter priority=<value>")
@@ -114,17 +127,18 @@ func runNext(cmd *cobra.Command, args []string) error {
 	phaseOrder := loadPhaseOrder()
 
 	recs, err := next.Recommend(allTasks, next.Options{
-		Limit:         nextLimit,
-		Filters:       nextFilters,
-		QuickWins:     nextQuickWins,
-		Critical:      nextCritical,
-		Scope:         nextScope,
-		ScopeExact:    nextExact,
-		Root:          nextRoot,
-		ArchivedTasks: archivedTasks,
-		Phase:         nextPhase,
-		PhaseOrder:    phaseOrder,
-		StrictPhases:  nextStrictPhases,
+		Limit:          nextLimit,
+		Filters:        nextFilters,
+		QuickWins:      nextQuickWins,
+		Critical:       nextCritical,
+		Scope:          nextScope,
+		ScopeExact:     nextExact,
+		Root:           nextRoot,
+		ArchivedTasks:  archivedTasks,
+		Phase:          nextPhase,
+		PhaseOrder:     phaseOrder,
+		StrictPhases:   nextStrictPhases,
+		StrictPriority: nextStrictPriority,
 	})
 	if err != nil {
 		return err
@@ -210,14 +224,15 @@ func recommendForProject(entry GlobalProjectEntry) ([]Recommendation, error) {
 		return nil, err
 	}
 	return next.Recommend(tasks, next.Options{
-		Limit:        0, // get all, we'll limit after merging
-		Filters:      nextFilters,
-		QuickWins:    nextQuickWins,
-		Critical:     nextCritical,
-		Scope:        nextScope,
-		ScopeExact:   nextExact,
-		Phase:        nextPhase,
-		StrictPhases: nextStrictPhases,
+		Limit:          0, // get all, we'll limit after merging
+		Filters:        nextFilters,
+		QuickWins:      nextQuickWins,
+		Critical:       nextCritical,
+		Scope:          nextScope,
+		ScopeExact:     nextExact,
+		Phase:          nextPhase,
+		StrictPhases:   nextStrictPhases,
+		StrictPriority: nextStrictPriority,
 	})
 }
 

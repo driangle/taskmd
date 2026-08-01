@@ -265,6 +265,7 @@ and it composes with the other filters.
 | `--priority` | | Shortcut for `--filter priority=<value>` |
 | `--columns` | `rank,id,title,priority,effort,file,reason` | Comma-separated columns for table output |
 | `--strict-phases` | `false` | Enforce strict phase ordering (earlier phases always rank first) |
+| `--strict-priority` | `false` | Enforce strict priority ordering (higher priority always ranks first; score breaks ties within a tier). With `--strict-phases`, phase is primary and priority secondary |
 | `--quick-wins` | `false` | Show only quick wins (effort: small) |
 | `--critical` | `false` | Show only critical path tasks |
 
