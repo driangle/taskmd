@@ -42,6 +42,9 @@ Multiple --filter flags are combined with AND logic.
 
 Priority and effort support comparison operators (>=, >, <=, <).
 
+Use the sentinel values 'none' and 'any' to match by field presence:
+'field=none' matches tasks where the field is unset, 'field=any' where it is set.
+
 Examples:
   taskmd list
   taskmd list ./tasks
@@ -50,6 +53,10 @@ Examples:
   taskmd list --filter status=pending --filter priority=high
   taskmd list --filter "priority>=medium"
   taskmd list --filter "effort<large"
+  taskmd list --filter phase=none
+  taskmd list --filter owner=any
+  taskmd list --phase none
+  taskmd list --phase none --status pending
   taskmd list --sort priority
   taskmd list --columns id,title,deps
   taskmd list --format json
@@ -69,7 +76,7 @@ func init() {
 	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority,file", "comma-separated list of columns to display")
 	listCmd.Flags().IntVar(&listLimit, "limit", 0, "maximum number of tasks to display (0 = unlimited)")
 	listCmd.Flags().StringVar(&listScope, "scope", "", "filter by scope; supports wildcards (e.g. cli, cli*)")
-	listCmd.Flags().StringVar(&listPhase, "phase", "", "filter by phase")
+	listCmd.Flags().StringVar(&listPhase, "phase", "", "filter by phase (use 'none'/'any' to match tasks without/with a phase)")
 	listCmd.Flags().StringVar(&listStatus, "status", "", "shortcut for --filter status=<value>")
 	listCmd.Flags().StringVar(&listPriority, "priority", "", "shortcut for --filter priority=<value>")
 }
@@ -382,17 +389,6 @@ func makeFilePathsRelative(tasks []*model.Task, baseDir string) {
 			task.FilePath = rel
 		}
 	}
-}
-
-// filterTasksByPhase returns tasks whose phase matches the given value.
-func filterTasksByPhase(tasks []*model.Task, phase string) []*model.Task {
-	var filtered []*model.Task
-	for _, task := range tasks {
-		if task.Phase == phase {
-			filtered = append(filtered, task)
-		}
-	}
-	return filtered
 }
 
 // getColumnValue extracts the value for a specific column from a task

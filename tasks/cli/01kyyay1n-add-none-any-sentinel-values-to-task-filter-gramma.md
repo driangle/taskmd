@@ -1,11 +1,12 @@
 ---
 title: "Add none/any sentinel values to task filter grammar"
 id: "01kyyay1n"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["cli", "filter", "list", "graph"]
 created: "2026-08-01"
+completed_at: 2026-08-01
 ---
 
 # Add none/any sentinel values to task filter grammar
@@ -32,14 +33,14 @@ This gives, for free, `--filter phase=none`, `--filter owner=none`, `--filter gr
 
 ## Tasks
 
-- [ ] In `sdk/go/filter/filter.go`, recognize `none` and `any` as reserved values in equality matching, applied uniformly across all fields returned by `getFieldValue`
-- [ ] Preserve `field=` (empty value) as an alias for `field=none`
-- [ ] Fold the existing `parent=true/false` and `blocked=true/false` presence checks into the `none`/`any` model (retain true/false as aliases)
-- [ ] Route the `--phase` shortcut through the filter grammar (via `applyShortcutFilters`) so `--phase none`/`--phase any` work; ensure `--status none` and `--priority none` also work
-- [ ] Update `list` and `graph` command help/`Long` text with `none`/`any` examples
-- [ ] Update filter documentation in the spec/docs to describe the sentinel convention
-- [ ] Add tests in `sdk/go/filter` covering `none`/`any` for multiple field types, the `field=` alias, and the true/false compatibility aliases
-- [ ] Add CLI-level tests in `list_test.go` (and graph if applicable) for `--filter phase=none`, `--phase none`, and combined filters (e.g. `--filter phase=none --status pending`)
+- [x] In `sdk/go/filter/filter.go`, recognize `none` and `any` as reserved values in equality matching, applied uniformly across all fields returned by `getFieldValue`
+- [x] Preserve `field=` (empty value) as an alias for `field=none`
+- [x] Fold the existing `parent=true/false` and `blocked=true/false` presence checks into the `none`/`any` model (retain true/false as aliases)
+- [x] Route the `--phase` shortcut through the filter grammar (via `applyShortcutFilters`) so `--phase none`/`--phase any` work; ensure `--status none` and `--priority none` also work
+- [x] Update `list` and `graph` command help/`Long` text with `none`/`any` examples
+- [x] Update filter documentation in the spec/docs to describe the sentinel convention
+- [x] Add tests in `sdk/go/filter` covering `none`/`any` for multiple field types, the `field=` alias, and the true/false compatibility aliases
+- [x] Add CLI-level tests in `list_test.go` (and graph if applicable) for `--filter phase=none`, `--phase none`, and combined filters (e.g. `--filter phase=none --status pending`)
 
 ## Acceptance Criteria
 

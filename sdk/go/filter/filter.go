@@ -21,6 +21,16 @@ var ordinalFields = map[string][]string{
 	"effort":   {"small", "medium", "large"},
 }
 
+// Presence sentinel values recognized uniformly across equality filters:
+//   - "none" (and an empty right-hand side) match tasks whose field is unset.
+//   - "any" matches tasks whose field is set.
+//
+// These are reserved: a field cannot be matched against a literal "none"/"any".
+const (
+	sentinelNone = "none"
+	sentinelAny  = "any"
+)
+
 // Apply applies multiple filter expressions to tasks (AND logic).
 func Apply(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {
 	filters := make([]Criteria, 0, len(filterExprs))
@@ -119,6 +129,9 @@ func matchesOrdinal(task *model.Task, c Criteria) bool {
 
 func matchesEquality(task *model.Task, field, value string) bool {
 	if v, ok := getFieldValue(task, field); ok {
+		if matched, isSentinel := matchPresence(v != "", value); isSentinel {
+			return matched
+		}
 		if field == "group" && strings.Contains(value, "*") {
 			return MatchScope(value, v)
 		}
@@ -128,8 +141,7 @@ func matchesEquality(task *model.Task, field, value string) bool {
 	case "title":
 		return strings.Contains(strings.ToLower(task.Title), strings.ToLower(value))
 	case "blocked":
-		isBlocked := len(task.Dependencies) > 0
-		return (value == "true" && isBlocked) || (value == "false" && !isBlocked)
+		return matchBoolPresence(len(task.Dependencies) > 0, value)
 	case "tag":
 		return slices.Contains(task.Tags, value)
 	case "touches":
@@ -177,13 +189,45 @@ func getFieldValue(task *model.Task, field string) (string, bool) {
 	}
 }
 
-// matchBoolOrValue matches "true"/"false" as presence check, or exact value.
+// matchPresence evaluates the none/any presence sentinels against whether a
+// field is set. An empty filter value is treated as an alias for "none". The
+// isSentinel return is false when value is not a presence keyword, letting
+// callers fall through to exact matching.
+func matchPresence(present bool, value string) (matched, isSentinel bool) {
+	switch value {
+	case sentinelNone, "":
+		return !present, true
+	case sentinelAny:
+		return present, true
+	default:
+		return false, false
+	}
+}
+
+// matchBoolPresence matches presence sentinels plus the legacy true/false
+// aliases (true→any, false→none) for fields whose only meaning is presence,
+// such as blocked.
+func matchBoolPresence(present bool, value string) bool {
+	switch value {
+	case sentinelAny, "true":
+		return present
+	case sentinelNone, "false", "":
+		return !present
+	default:
+		return false
+	}
+}
+
+// matchBoolOrValue matches presence sentinels and the legacy true/false aliases
+// (true→any, false→none), falling back to an exact match against the field
+// value. Used by parent, which carries both presence and an exact ID value.
 func matchBoolOrValue(fieldValue, filterValue string) bool {
-	if filterValue == "true" {
+	switch filterValue {
+	case sentinelAny, "true":
 		return fieldValue != ""
-	}
-	if filterValue == "false" {
+	case sentinelNone, "false", "":
 		return fieldValue == ""
+	default:
+		return fieldValue == filterValue
 	}
-	return fieldValue == filterValue
 }

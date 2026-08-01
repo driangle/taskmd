@@ -713,27 +713,34 @@ func TestListCommand_PhaseColumn(t *testing.T) {
 	}
 }
 
-func TestFilterTasksByPhase(t *testing.T) {
+func TestApplyShortcutFilters_Phase(t *testing.T) {
 	tasks := []*model.Task{
-		{ID: "001", Title: "Feature A", Phase: "v0.2"},
-		{ID: "002", Title: "Feature B", Phase: "v0.3"},
-		{ID: "003", Title: "Feature C", Phase: "v0.2"},
-		{ID: "004", Title: "Feature D"},
+		{ID: "001", Title: "Feature A", Status: model.StatusPending, Phase: "v0.2"},
+		{ID: "002", Title: "Feature B", Status: model.StatusCompleted, Phase: "v0.3"},
+		{ID: "003", Title: "Feature C", Status: model.StatusPending, Phase: "v0.2"},
+		{ID: "004", Title: "Feature D", Status: model.StatusPending},
 	}
 
 	tests := []struct {
 		name    string
-		phase   string
+		s       FilterShortcuts
 		wantIDs []string
 	}{
-		{"exact match", "v0.2", []string{"001", "003"}},
-		{"single match", "v0.3", []string{"002"}},
-		{"no match", "v1.0", nil},
+		{"exact match", FilterShortcuts{Phase: "v0.2"}, []string{"001", "003"}},
+		{"single match", FilterShortcuts{Phase: "v0.3"}, []string{"002"}},
+		{"no match", FilterShortcuts{Phase: "v1.0"}, nil},
+		{"phase none", FilterShortcuts{Phase: "none"}, []string{"004"}},
+		{"phase any", FilterShortcuts{Phase: "any"}, []string{"001", "002", "003"}},
+		{"phase none + status pending", FilterShortcuts{Phase: "none", Status: "pending"}, []string{"004"}},
+		{"phase any + status pending", FilterShortcuts{Phase: "any", Status: "pending"}, []string{"001", "003"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := filterTasksByPhase(tasks, tt.phase)
+			result, err := applyShortcutFilters(tasks, tt.s)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			if len(result) != len(tt.wantIDs) {
 				t.Fatalf("got %d tasks, want %d", len(result), len(tt.wantIDs))
 			}

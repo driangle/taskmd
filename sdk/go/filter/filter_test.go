@@ -360,3 +360,105 @@ func TestApply_PhaseFilter(t *testing.T) {
 		}
 	})
 }
+
+// sentinelTasks provides a fixed set with a mix of set/unset optional fields.
+func sentinelTasks() []*model.Task {
+	return []*model.Task{
+		{ID: "001", Title: "A", Phase: "v0.2", Owner: "alice", Group: "cli", Priority: model.PriorityHigh},
+		{ID: "002", Title: "B", Phase: "v0.3", Owner: "", Group: "web", Priority: ""},
+		{ID: "003", Title: "C", Phase: "", Owner: "bob", Group: "", Priority: model.PriorityLow},
+	}
+}
+
+func TestApply_SentinelNoneAny(t *testing.T) {
+	tests := []struct {
+		name    string
+		expr    string
+		wantIDs []string
+	}{
+		{"phase none", "phase=none", []string{"003"}},
+		{"phase any", "phase=any", []string{"001", "002"}},
+		{"owner none", "owner=none", []string{"002"}},
+		{"owner any", "owner=any", []string{"001", "003"}},
+		{"group none", "group=none", []string{"003"}},
+		{"group any", "group=any", []string{"001", "002"}},
+		{"priority none", "priority=none", []string{"002"}},
+		{"priority any", "priority=any", []string{"001", "003"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertFilterIDs(t, sentinelTasks(), tt.expr, tt.wantIDs)
+		})
+	}
+}
+
+func TestApply_EmptyValueAliasesNone(t *testing.T) {
+	// field= (empty RHS) must behave identically to field=none.
+	assertFilterIDs(t, sentinelTasks(), "phase=", []string{"003"})
+	assertFilterIDs(t, sentinelTasks(), "owner=", []string{"002"})
+}
+
+func TestApply_SentinelCombined(t *testing.T) {
+	// phase=none AND owner=any narrows to task 003 (no phase, has owner).
+	assertFilterIDs(t, sentinelTasks(), "phase=none", []string{"003"})
+	filtered, err := Apply(sentinelTasks(), []string{"phase=none", "owner=any"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(filtered) != 1 || filtered[0].ID != "003" {
+		t.Fatalf("expected only task 003, got %v", ids(filtered))
+	}
+}
+
+func TestApply_BlockedTrueFalseAliases(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "A", Dependencies: []string{"099"}},
+		{ID: "002", Title: "B"},
+	}
+	// true/false retained as aliases for any/none.
+	assertFilterIDs(t, tasks, "blocked=true", []string{"001"})
+	assertFilterIDs(t, tasks, "blocked=any", []string{"001"})
+	assertFilterIDs(t, tasks, "blocked=false", []string{"002"})
+	assertFilterIDs(t, tasks, "blocked=none", []string{"002"})
+}
+
+func TestApply_ParentTrueFalseAliases(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Title: "Parent"},
+		{ID: "002", Title: "Child", Parent: "001"},
+	}
+	assertFilterIDs(t, tasks, "parent=true", []string{"002"})
+	assertFilterIDs(t, tasks, "parent=any", []string{"002"})
+	assertFilterIDs(t, tasks, "parent=false", []string{"001"})
+	assertFilterIDs(t, tasks, "parent=none", []string{"001"})
+	// Exact-value matching still works alongside the sentinels.
+	assertFilterIDs(t, tasks, "parent=001", []string{"002"})
+}
+
+// assertFilterIDs applies a single filter expression and asserts the resulting
+// task IDs match wantIDs (order-sensitive; input order is preserved by Apply).
+func assertFilterIDs(t *testing.T, tasks []*model.Task, expr string, wantIDs []string) {
+	t.Helper()
+	filtered, err := Apply(tasks, []string{expr})
+	if err != nil {
+		t.Fatalf("Apply(%q) unexpected error: %v", expr, err)
+	}
+	got := ids(filtered)
+	if len(got) != len(wantIDs) {
+		t.Fatalf("Apply(%q) = %v, want %v", expr, got, wantIDs)
+	}
+	for i := range wantIDs {
+		if got[i] != wantIDs[i] {
+			t.Fatalf("Apply(%q) = %v, want %v", expr, got, wantIDs)
+		}
+	}
+}
+
+func ids(tasks []*model.Task) []string {
+	out := make([]string, len(tasks))
+	for i, task := range tasks {
+		out[i] = task.ID
+	}
+	return out
+}

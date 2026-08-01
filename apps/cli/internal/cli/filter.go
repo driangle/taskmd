@@ -34,6 +34,9 @@ func applyShortcutFilters(tasks []*model.Task, s FilterShortcuts) ([]*model.Task
 	if s.Priority != "" {
 		filters = append(filters, "priority="+s.Priority)
 	}
+	if s.Phase != "" {
+		filters = append(filters, "phase="+s.Phase)
+	}
 
 	if len(filters) > 0 {
 		var err error
@@ -46,10 +49,6 @@ func applyShortcutFilters(tasks []*model.Task, s FilterShortcuts) ([]*model.Task
 	if s.Scope != "" {
 		warnUnknownScope(s.Scope)
 		tasks = filterTasksByScope(tasks, s.Scope)
-	}
-
-	if s.Phase != "" {
-		tasks = filterTasksByPhase(tasks, s.Phase)
 	}
 
 	return tasks, nil

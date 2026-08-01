@@ -43,6 +43,9 @@ Supported formats:
 
 Multiple --filter flags are combined with AND logic.
 
+Use the sentinel values 'none' and 'any' to match by field presence:
+'field=none' matches tasks where the field is unset, 'field=any' where it is set.
+
 Examples:
   taskmd graph > deps.mmd
   taskmd graph --format dot | dot -Tpng > graph.png
@@ -53,9 +56,11 @@ Examples:
   taskmd graph --filter priority=high
   taskmd graph --filter priority=high --filter effort=small
   taskmd graph --filter tag=cli --exclude-status completed
+  taskmd graph --filter phase=none
   taskmd graph --status pending
   taskmd graph --priority high
   taskmd graph --phase web-ui
+  taskmd graph --phase none
   taskmd graph --scope cli
   taskmd graph --scope "web*" --format mermaid
 
@@ -79,7 +84,7 @@ func init() {
 	graphCmd.Flags().StringVar(&graphScope, "scope", "", "filter by scope; supports wildcards (e.g. cli, cli*)")
 	graphCmd.Flags().StringVar(&graphStatus, "status", "", "shortcut for --filter status=<value>")
 	graphCmd.Flags().StringVar(&graphPriority, "priority", "", "shortcut for --filter priority=<value>")
-	graphCmd.Flags().StringVar(&graphPhase, "phase", "", "filter by phase")
+	graphCmd.Flags().StringVar(&graphPhase, "phase", "", "filter by phase (use 'none'/'any' to match tasks without/with a phase)")
 }
 
 //nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity

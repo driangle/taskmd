@@ -128,7 +128,7 @@ Each filter expression is a string in the form `field<op>value`, where `<op>` is
 - Leading and trailing whitespace on both field and value are trimmed.
 - An expression missing any recognized operator is an error.
 
-**Comparison operators** (`>`, `>=`, `<`, `<=`) are only supported on ordinal fields (see §2.3.1). Using them on other fields is an error.
+**Comparison operators** (`>`, `>=`, `<`, `<=`) are only supported on ordinal fields (see §2.3.2). Using them on other fields is an error.
 
 ### 2.2 Combination
 
@@ -139,19 +139,37 @@ Multiple filter expressions combine with **AND** logic: a task must match every 
 | Field | Match Type | Details |
 |-------|-----------|---------|
 | `status` | Exact | `task.Status == value` |
-| `priority` | Exact or ordinal | `task.Priority == value`; supports `>`, `>=`, `<`, `<=` (see §2.3.1) |
-| `effort` | Exact or ordinal | `task.Effort == value`; supports `>`, `>=`, `<`, `<=` (see §2.3.1) |
+| `priority` | Exact or ordinal | `task.Priority == value`; supports `>`, `>=`, `<`, `<=` (see §2.3.2) |
+| `effort` | Exact or ordinal | `task.Effort == value`; supports `>`, `>=`, `<`, `<=` (see §2.3.2) |
 | `type` | Exact | `task.Type == value` |
 | `id` | Exact | `task.ID == value` |
 | `group` | Exact | `task.Group == value` |
 | `owner` | Exact | `task.Owner == value` |
+| `phase` | Exact | `task.Phase == value` |
 | `title` | Substring | Case-insensitive `contains` check |
 | `tag` | Collection | Value must appear in `task.Tags` (exact, case-sensitive) |
 | `touches` | Collection | Value must appear in `task.Touches` (exact, case-sensitive) |
-| `blocked` | Boolean | `blocked=true` matches tasks with `len(Dependencies) > 0`; `blocked=false` matches tasks with no dependencies |
-| `parent` | Bool/value | `parent=true` matches tasks with a parent set; `parent=false` matches tasks without; any other value is an exact match against `task.Parent` |
+| `blocked` | Boolean | `blocked=any`/`blocked=true` match tasks with `len(Dependencies) > 0`; `blocked=none`/`blocked=false` match tasks with no dependencies |
+| `parent` | Bool/value | `parent=any`/`parent=true` match tasks with a parent set; `parent=none`/`parent=false` match tasks without; any other value is an exact match against `task.Parent` |
 
-### 2.3.1 Ordinal Comparison
+### 2.3.1 Presence Sentinels (`none` / `any`)
+
+Every equality field supports two reserved sentinel values that match on **presence** rather than an exact value:
+
+- `field=none` — matches tasks where the field is **unset** (empty).
+- `field=any` — matches tasks where the field is **set** (non-empty).
+
+This applies uniformly to all equality fields (`status`, `priority`, `effort`, `type`, `id`, `group`, `owner`, `phase`). For example, `phase=none` returns tasks with no phase and `owner=any` returns tasks that have an owner.
+
+Additional rules:
+
+- **Empty right-hand side is an alias for `none`**: `field=` behaves identically to `field=none`. This is also the escape hatch for free-text fields that might legitimately hold the literal string `none` or `any`.
+- **`blocked` and `parent`** fold their historical `true`/`false` values into this model: `true` is an alias for `any` and `false` is an alias for `none`. Both spellings continue to work.
+- Because `none` and `any` are **reserved**, a field cannot be matched against those literal values (a non-issue for taskmd's enum fields).
+
+These sentinels are available anywhere filters are consumed, including the `list` and `graph` shortcut flags (e.g. `taskmd list --phase none`, which routes through the same grammar as `--filter phase=none`).
+
+### 2.3.2 Ordinal Comparison
 
 The `priority` and `effort` fields have a natural ordering and support the comparison operators `>`, `>=`, `<`, `<=`:
 
