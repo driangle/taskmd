@@ -1,12 +1,13 @@
 ---
 title: "Add sort direction flag to list command"
 id: "01kyydnea"
-status: pending
+status: completed
 priority: medium
 effort: small
 type: feature
 tags: ["cli", "list", "sort"]
 created: "2026-08-01"
+completed_at: 2026-08-01
 ---
 
 # Add sort direction flag to list command
@@ -19,11 +20,11 @@ A boolean flag is preferred over `--order asc|desc` or a `field:desc` suffix bec
 
 ## Tasks
 
-- [ ] Add `listReverse` package-level flag var and register `--reverse` / `-r` on `listCmd` in `apps/cli/internal/cli/list.go`
-- [ ] In `applyListFiltersAndSort`, reverse the task slice after `sortTasks` succeeds and before applying `--limit` (so `--limit` keeps the top N of the reversed order)
-- [ ] Update the command `Long` help text and examples to document `--reverse`
-- [ ] Add tests in `list_test.go` covering `--reverse` with multiple sort fields and combined with `--limit`
-- [ ] Update relevant docs (`docs/taskmd_specification.md` if applicable, CLI reference)
+- [x] Add `listReverse` package-level flag var and register `--reverse` / `-r` on `listCmd` in `apps/cli/internal/cli/list.go`
+- [x] In `applyListFiltersAndSort`, reverse the task slice after `sortTasks` succeeds and before applying `--limit` (so `--limit` keeps the top N of the reversed order)
+- [x] Update the command `Long` help text and examples to document `--reverse`
+- [x] Add tests in `list_test.go` covering `--reverse` with multiple sort fields and combined with `--limit`
+- [x] Update relevant docs (`docs/taskmd_specification.md` if applicable, CLI reference)
 
 ## Acceptance Criteria
 

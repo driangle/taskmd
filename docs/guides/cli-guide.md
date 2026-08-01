@@ -206,6 +206,12 @@ taskmd list --sort status
 
 # Sort by created date
 taskmd list --sort created
+
+# Reverse the sort order (newest first)
+taskmd list --sort created --reverse
+
+# Reverse works with any sort field; -r is shorthand
+taskmd list --sort priority -r
 ```
 
 **Custom columns:**
@@ -233,6 +239,7 @@ taskmd list --sort priority --limit 5
 | `--phase` | | Filter by phase |
 | `--scope` | | Filter by scope; supports wildcards (e.g. `cli`, `cli*`) |
 | `--sort` | | Sort by field (`id`, `title`, `status`, `priority`, `effort`, `created_at`) |
+| `--reverse` / `-r` | `false` | Reverse the sort order (or the default file-scan order when `--sort` is omitted) |
 | `--columns` | `id,title,status,priority,file` | Comma-separated list of columns to display |
 | `--limit` | `0` | Maximum number of tasks to display (0 = unlimited) |
 | `--format` | `table` | Output format (`table`, `json`, `yaml`) |

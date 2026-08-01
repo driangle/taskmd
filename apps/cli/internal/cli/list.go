@@ -18,6 +18,7 @@ var (
 	listFormat   string
 	listFilters  []string
 	listSort     string
+	listReverse  bool
 	listColumns  string
 	listLimit    int
 	listScope    string
@@ -45,6 +46,10 @@ Priority and effort support comparison operators (>=, >, <=, <).
 Use the sentinel values 'none' and 'any' to match by field presence:
 'field=none' matches tasks where the field is unset, 'field=any' where it is set.
 
+Sorting is ascending by default. Use --reverse / -r to flip the order,
+following the Unix convention (sort -r, ls -r). With no --sort, --reverse
+reverses the default file-scan order.
+
 Examples:
   taskmd list
   taskmd list ./tasks
@@ -58,6 +63,8 @@ Examples:
   taskmd list --phase none
   taskmd list --phase none --status pending
   taskmd list --sort priority
+  taskmd list --sort priority --reverse
+  taskmd list --sort created_at -r
   taskmd list --columns id,title,deps
   taskmd list --format json
   taskmd list --scope cli
@@ -73,6 +80,7 @@ func init() {
 	listCmd.Flags().StringVar(&listFormat, "format", "table", "output format (table, json, yaml)")
 	listCmd.Flags().StringArrayVar(&listFilters, "filter", []string{}, "filter tasks (e.g., --filter status=pending --filter \"priority>=medium\"); supports >=, >, <=, < for priority and effort")
 	listCmd.Flags().StringVar(&listSort, "sort", "", "sort by field (id, title, status, priority, effort, created_at)")
+	listCmd.Flags().BoolVarP(&listReverse, "reverse", "r", false, "reverse the sort order (or the default file-scan order when --sort is omitted)")
 	listCmd.Flags().StringVar(&listColumns, "columns", "id,title,status,priority,file", "comma-separated list of columns to display")
 	listCmd.Flags().IntVar(&listLimit, "limit", 0, "maximum number of tasks to display (0 = unlimited)")
 	listCmd.Flags().StringVar(&listScope, "scope", "", "filter by scope; supports wildcards (e.g. cli, cli*)")
@@ -253,6 +261,13 @@ func applyListFiltersAndSort(tasks []*model.Task) ([]*model.Task, error) {
 		}
 	}
 
+	// Reverse ordering when requested (after sorting, before limit so
+	// --limit keeps the top N of the reversed order). With no --sort this
+	// reverses the default file-scan order.
+	if listReverse {
+		reverseTasks(tasks)
+	}
+
 	// Apply limit (after sorting)
 	if listLimit > 0 && listLimit < len(tasks) {
 		tasks = tasks[:listLimit]
@@ -304,6 +319,13 @@ func sortTasks(tasks []*model.Task, sortField string) error {
 	}
 
 	return nil
+}
+
+// reverseTasks reverses the order of the tasks slice in place.
+func reverseTasks(tasks []*model.Task) {
+	for i, j := 0, len(tasks)-1; i < j; i, j = i+1, j-1 {
+		tasks[i], tasks[j] = tasks[j], tasks[i]
+	}
 }
 
 // outputJSON outputs tasks as JSON

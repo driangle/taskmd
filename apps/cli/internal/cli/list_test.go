@@ -49,6 +49,95 @@ func TestSortTasks(t *testing.T) {
 	}
 }
 
+// reverseTestTasks returns a fixed set of tasks for reverse-order tests.
+func reverseTestTasks() []*model.Task {
+	now := time.Now()
+	return []*model.Task{
+		{ID: "003", Title: "C", Status: model.StatusPending, Priority: model.PriorityLow, Effort: model.EffortLarge, Created: model.NewFlexibleTime(now.Add(2 * time.Hour))},
+		{ID: "001", Title: "A", Status: model.StatusCompleted, Priority: model.PriorityHigh, Effort: model.EffortSmall, Created: model.NewFlexibleTime(now)},
+		{ID: "002", Title: "B", Status: model.StatusInProgress, Priority: model.PriorityCritical, Effort: model.EffortMedium, Created: model.NewFlexibleTime(now.Add(1 * time.Hour))},
+	}
+}
+
+// idsOf extracts the ID sequence from a task slice for assertions.
+func idsOf(tasks []*model.Task) []string {
+	ids := make([]string, len(tasks))
+	for i, task := range tasks {
+		ids[i] = task.ID
+	}
+	return ids
+}
+
+func TestApplyListFiltersAndSort_Reverse(t *testing.T) {
+	tests := []struct {
+		name    string
+		sort    string
+		wantIDs []string
+	}{
+		// priority default (critical->low): 002,001,003; reversed: 003,001,002
+		{"reverse priority (low to critical)", "priority", []string{"003", "001", "002"}},
+		// created_at default (oldest first): 001,002,003; reversed (newest first): 003,002,001
+		{"reverse created_at (newest first)", "created_at", []string{"003", "002", "001"}},
+		// id default: 001,002,003; reversed: 003,002,001
+		{"reverse id", "id", []string{"003", "002", "001"}},
+		// effort default (small->large): 001,002,003; reversed: 003,002,001
+		{"reverse effort", "effort", []string{"003", "002", "001"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetListFlags()
+			listSort = tt.sort
+			listReverse = true
+
+			got, err := applyListFiltersAndSort(reverseTestTasks())
+			if err != nil {
+				t.Fatalf("applyListFiltersAndSort() error = %v", err)
+			}
+			gotIDs := idsOf(got)
+			if strings.Join(gotIDs, ",") != strings.Join(tt.wantIDs, ",") {
+				t.Errorf("reverse %s = %v, want %v", tt.sort, gotIDs, tt.wantIDs)
+			}
+		})
+	}
+}
+
+// TestApplyListFiltersAndSort_ReverseNoSort verifies --reverse with no --sort
+// flips the incoming (file-scan) order.
+func TestApplyListFiltersAndSort_ReverseNoSort(t *testing.T) {
+	resetListFlags()
+	listReverse = true
+
+	got, err := applyListFiltersAndSort(reverseTestTasks())
+	if err != nil {
+		t.Fatalf("applyListFiltersAndSort() error = %v", err)
+	}
+	// input order is 003,001,002; reversed is 002,001,003
+	want := []string{"002", "001", "003"}
+	if strings.Join(idsOf(got), ",") != strings.Join(want, ",") {
+		t.Errorf("reverse no-sort = %v, want %v", idsOf(got), want)
+	}
+}
+
+// TestApplyListFiltersAndSort_ReverseWithLimit verifies --limit keeps the top N
+// of the reversed ordering.
+func TestApplyListFiltersAndSort_ReverseWithLimit(t *testing.T) {
+	resetListFlags()
+	listSort = "priority"
+	listReverse = true
+	listLimit = 2
+
+	got, err := applyListFiltersAndSort(reverseTestTasks())
+	if err != nil {
+		t.Fatalf("applyListFiltersAndSort() error = %v", err)
+	}
+	// reversed priority order: 003,001,002; top 2: 003,001
+	want := []string{"003", "001"}
+	if strings.Join(idsOf(got), ",") != strings.Join(want, ",") {
+		t.Errorf("reverse+limit = %v, want %v", idsOf(got), want)
+	}
+}
+
 func TestGetColumnValue(t *testing.T) {
 	created := time.Date(2026, 2, 8, 0, 0, 0, 0, time.UTC)
 	task := &model.Task{
@@ -96,6 +185,7 @@ func TestGetColumnValue(t *testing.T) {
 func resetListFlags() {
 	listFilters = []string{}
 	listSort = ""
+	listReverse = false
 	listColumns = "id,title,status,priority,file"
 	listLimit = 0
 	listScope = ""
