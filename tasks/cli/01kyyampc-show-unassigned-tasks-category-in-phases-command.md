@@ -1,11 +1,12 @@
 ---
 title: "Show unassigned tasks category in phases command"
 id: "01kyyampc"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["cli", "phases"]
 created: "2026-08-01"
+completed_at: 2026-08-01
 ---
 
 # Show unassigned tasks category in phases command
@@ -25,12 +26,12 @@ Add a synthetic `(unassigned)` category to the `phases` output that aggregates e
 
 ## Tasks
 
-- [ ] Add a helper (e.g. `computeUnassignedSummary`) that builds a `PhaseSummary` from all tasks where `task.Phase == ""`, reusing the same counting rules as `computePhaseSummaries`
-- [ ] Append the unassigned summary to the summaries slice in `runPhases`, only when its task count > 0
-- [ ] Ensure JSON/YAML output includes the synthetic entry with a stable `id`
-- [ ] Confirm the table renderer displays it correctly (name, tasks, done, progress, due `-`)
-- [ ] Add tests in `phases_test.go`: unassigned tasks present → row shown; none present → row absent; cancelled unassigned tasks excluded from count; progress percentage correct; JSON/YAML include the entry
-- [ ] Update `phases` command help/Long text and any relevant docs to mention the unassigned category
+- [x] Add a helper (e.g. `computeUnassignedSummary`) that builds a `PhaseSummary` from all tasks where `task.Phase == ""`, reusing the same counting rules as `computePhaseSummaries`
+- [x] Append the unassigned summary to the summaries slice in `runPhases`, only when its task count > 0
+- [x] Ensure JSON/YAML output includes the synthetic entry with a stable `id`
+- [x] Confirm the table renderer displays it correctly (name, tasks, done, progress, due `-`)
+- [x] Add tests in `phases_test.go`: unassigned tasks present → row shown; none present → row absent; cancelled unassigned tasks excluded from count; progress percentage correct; JSON/YAML include the entry
+- [x] Update `phases` command help/Long text and any relevant docs to mention the unassigned category
 
 ## Acceptance Criteria
 

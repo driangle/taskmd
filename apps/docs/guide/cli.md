@@ -1222,6 +1222,8 @@ taskmd tracks --format json > tracks.json
 
 Display configured project phases with summary statistics including task counts, completion rates, and due dates. Phases are defined in `.taskmd.yaml` under the `phases` key.
 
+Tasks that aren't assigned to any phase are aggregated into a synthetic `(unassigned)` category (id: `unassigned`), listed after the configured phases. This row appears only when unassigned tasks exist, letting you see how much work hasn't been scheduled into a phase yet. It's distinct from the warning about tasks referencing an undefined phase id.
+
 ```bash
 # List phases with progress
 taskmd phases

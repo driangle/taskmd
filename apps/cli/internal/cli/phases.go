@@ -26,6 +26,9 @@ var phasesCmd = &cobra.Command{
 
 Phases are configured in .taskmd.yaml under the "phases" key.
 
+Tasks with no phase are grouped into a synthetic "(unassigned)" category
+(id: unassigned), shown last and only when such tasks exist.
+
 Examples:
   taskmd phases
   taskmd phases ./tasks
@@ -85,6 +88,9 @@ func runPhases(cmd *cobra.Command, args []string) error {
 	}
 
 	summaries := computePhaseSummaries(phases, tasks)
+	if unassigned := computeUnassignedSummary(tasks); unassigned.Tasks > 0 {
+		summaries = append(summaries, unassigned)
+	}
 	warnOrphanedPhases(phases, tasks)
 
 	switch phasesFormat {
@@ -116,6 +122,14 @@ func filterValidPhases(phases []validator.PhaseConfig) []validator.PhaseConfig {
 	return valid
 }
 
+// Stable identifiers for the synthetic category aggregating tasks with no phase.
+// Parentheses aren't valid phase-id characters, so the display name can't
+// collide with a real phase, and the id is safe for programmatic consumers.
+const (
+	unassignedPhaseID   = "unassigned"
+	unassignedPhaseName = "(unassigned)"
+)
+
 func computePhaseSummaries(phases []validator.PhaseConfig, tasks []*model.Task) []PhaseSummary {
 	summaries := make([]PhaseSummary, 0, len(phases))
 	for _, phase := range phases {
@@ -133,24 +147,57 @@ func computePhaseSummaries(phases []validator.PhaseConfig, tasks []*model.Task) 
 			if task.Phase != phase.ID {
 				continue
 			}
-			summary.ByStatus[string(task.Status)]++
-			if task.Status == model.StatusCancelled {
-				continue
-			}
-			summary.Tasks++
-			if task.Status == model.StatusCompleted {
-				summary.Done++
-			}
+			countTask(&summary, task)
 		}
-		if summary.Tasks > 0 {
-			pct := float64(summary.Done) / float64(summary.Tasks) * 100
-			summary.Progress = fmt.Sprintf("%.0f%%", pct)
-		} else {
-			summary.Progress = "0%"
-		}
+		finalizeProgress(&summary)
 		summaries = append(summaries, summary)
 	}
 	return summaries
+}
+
+// computeUnassignedSummary aggregates every task with no phase (task.Phase == "")
+// into a synthetic PhaseSummary, using the same counting rules as configured
+// phases. This is distinct from the orphaned-phase warning, which flags tasks
+// pointing at a phase id that doesn't exist.
+func computeUnassignedSummary(tasks []*model.Task) PhaseSummary {
+	summary := PhaseSummary{
+		ID:       unassignedPhaseID,
+		Name:     unassignedPhaseName,
+		ByStatus: make(map[string]int),
+	}
+	for _, task := range tasks {
+		if task.Phase != "" {
+			continue
+		}
+		countTask(&summary, task)
+	}
+	finalizeProgress(&summary)
+	return summary
+}
+
+// countTask folds a single task into the summary's status breakdown and
+// active/done counts. Cancelled tasks are recorded in ByStatus but excluded
+// from the active task and completion counts.
+func countTask(summary *PhaseSummary, task *model.Task) {
+	summary.ByStatus[string(task.Status)]++
+	if task.Status == model.StatusCancelled {
+		return
+	}
+	summary.Tasks++
+	if task.Status == model.StatusCompleted {
+		summary.Done++
+	}
+}
+
+// finalizeProgress sets the human-readable progress percentage from the
+// summary's active task and done counts.
+func finalizeProgress(summary *PhaseSummary) {
+	if summary.Tasks > 0 {
+		pct := float64(summary.Done) / float64(summary.Tasks) * 100
+		summary.Progress = fmt.Sprintf("%.0f%%", pct)
+	} else {
+		summary.Progress = "0%"
+	}
 }
 
 func warnOrphanedPhases(phases []validator.PhaseConfig, tasks []*model.Task) {

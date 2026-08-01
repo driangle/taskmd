@@ -156,8 +156,9 @@ func TestPhases_JSONOutput(t *testing.T) {
 		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
 	}
 
-	if len(summaries) != 2 {
-		t.Fatalf("expected 2 phases, got %d", len(summaries))
+	// mvp, v2, plus the synthetic unassigned row for task 005 (no phase).
+	if len(summaries) != 3 {
+		t.Fatalf("expected 3 summaries (mvp, v2, unassigned), got %d", len(summaries))
 	}
 
 	mvp := summaries[0]
@@ -195,6 +196,14 @@ func TestPhases_JSONOutput(t *testing.T) {
 	}
 	if v2.Progress != "0%" {
 		t.Errorf("v2 progress = %q, want 0%%", v2.Progress)
+	}
+
+	unassigned := summaries[2]
+	if unassigned.ID != unassignedPhaseID {
+		t.Errorf("third summary ID = %q, want %q", unassigned.ID, unassignedPhaseID)
+	}
+	if unassigned.Tasks != 1 {
+		t.Errorf("unassigned tasks = %d, want 1 (task 005)", unassigned.Tasks)
 	}
 }
 
@@ -468,6 +477,196 @@ func TestPhases_MissingIDWarnsAndExcludes(t *testing.T) {
 	// Since all phases lack an id, none should be valid → "No phases configured".
 	if !strings.Contains(stderr, "No phases configured") {
 		t.Errorf("expected 'No phases configured' when all phases lack id, got stderr:\n%s", stderr)
+	}
+}
+
+func findSummary(summaries []PhaseSummary, id string) (PhaseSummary, bool) {
+	for _, s := range summaries {
+		if s.ID == id {
+			return s, true
+		}
+	}
+	return PhaseSummary{}, false
+}
+
+func TestPhases_UnassignedRowShownInTable(t *testing.T) {
+	// createPhasesTestFiles includes task 005 with no phase.
+	tmpDir := createPhasesTestFiles(t)
+	resetPhasesFlags()
+	setupPhasesConfig(t, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+		{"id": "v2", "name": "Version 2"},
+	})
+
+	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runPhases failed: %v", err)
+	}
+
+	if !strings.Contains(stdout, "unassigned") {
+		t.Errorf("table output missing unassigned row:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "(unassigned)") {
+		t.Errorf("table output missing (unassigned) display name:\n%s", stdout)
+	}
+}
+
+func TestPhases_UnassignedRowOmittedWhenAllAssigned(t *testing.T) {
+	tmpDir := t.TempDir()
+	resetPhasesFlags()
+	phasesFormat = "json"
+	setupPhasesConfig(t, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	})
+
+	// Every task is assigned to a phase.
+	for _, task := range []struct{ id, status string }{
+		{"001", "completed"},
+		{"002", "pending"},
+	} {
+		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\nphase: mvp\n---"
+		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runPhases failed: %v", err)
+	}
+
+	var summaries []PhaseSummary
+	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	}
+
+	if _, ok := findSummary(summaries, unassignedPhaseID); ok {
+		t.Errorf("expected no unassigned row when all tasks assigned, got:\n%s", stdout)
+	}
+}
+
+func TestPhases_UnassignedProgressAndCounts(t *testing.T) {
+	tmpDir := t.TempDir()
+	resetPhasesFlags()
+	phasesFormat = "json"
+	setupPhasesConfig(t, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	})
+
+	// Unassigned (no phase): 4 active tasks (1 completed, 3 pending), 1 cancelled.
+	// Expected: Tasks=4, Done=1, Progress=25%, cancelled excluded from count.
+	tasks := []struct {
+		id, status, phase string
+	}{
+		{"001", "completed", "mvp"}, // assigned, keeps mvp non-empty
+		{"010", "completed", ""},
+		{"011", "pending", ""},
+		{"012", "pending", ""},
+		{"013", "pending", ""},
+		{"014", "cancelled", ""},
+	}
+	for _, task := range tasks {
+		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\n"
+		if task.phase != "" {
+			content += "phase: " + task.phase + "\n"
+		}
+		content += "---"
+		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runPhases failed: %v", err)
+	}
+
+	var summaries []PhaseSummary
+	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	}
+
+	unassigned, ok := findSummary(summaries, unassignedPhaseID)
+	if !ok {
+		t.Fatalf("expected unassigned summary, got:\n%s", stdout)
+	}
+	if unassigned.Name != "(unassigned)" {
+		t.Errorf("unassigned name = %q, want (unassigned)", unassigned.Name)
+	}
+	if unassigned.Tasks != 4 {
+		t.Errorf("unassigned tasks = %d, want 4 (cancelled excluded)", unassigned.Tasks)
+	}
+	if unassigned.Done != 1 {
+		t.Errorf("unassigned done = %d, want 1", unassigned.Done)
+	}
+	if unassigned.Progress != "25%" {
+		t.Errorf("unassigned progress = %q, want 25%%", unassigned.Progress)
+	}
+	if unassigned.ByStatus["cancelled"] != 1 {
+		t.Errorf("unassigned by_status[cancelled] = %d, want 1", unassigned.ByStatus["cancelled"])
+	}
+
+	// The unassigned row must come after the configured phases.
+	if summaries[len(summaries)-1].ID != unassignedPhaseID {
+		t.Errorf("unassigned row should be last, got id %q", summaries[len(summaries)-1].ID)
+	}
+}
+
+func TestPhases_UnassignedOmittedWhenOnlyCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	resetPhasesFlags()
+	phasesFormat = "json"
+	setupPhasesConfig(t, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	})
+
+	// One assigned task keeps the phase list non-empty; unassigned tasks are all cancelled.
+	for _, task := range []struct{ id, status, phase string }{
+		{"001", "pending", "mvp"},
+		{"010", "cancelled", ""},
+		{"011", "cancelled", ""},
+	} {
+		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\n"
+		if task.phase != "" {
+			content += "phase: " + task.phase + "\n"
+		}
+		content += "---"
+		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runPhases failed: %v", err)
+	}
+
+	var summaries []PhaseSummary
+	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	}
+
+	if _, ok := findSummary(summaries, unassignedPhaseID); ok {
+		t.Errorf("expected no unassigned row when only cancelled unassigned tasks exist, got:\n%s", stdout)
+	}
+}
+
+func TestPhases_UnassignedInYAMLOutput(t *testing.T) {
+	tmpDir := createPhasesTestFiles(t)
+	resetPhasesFlags()
+	phasesFormat = "yaml"
+	setupPhasesConfig(t, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+		{"id": "v2", "name": "Version 2"},
+	})
+
+	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runPhases failed: %v", err)
+	}
+
+	if !strings.Contains(stdout, "id: unassigned") {
+		t.Errorf("YAML output missing 'id: unassigned':\n%s", stdout)
 	}
 }
 
