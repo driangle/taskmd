@@ -16,8 +16,8 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
    - If not found, run `taskmd list` to show available tasks and ask the user which one they meant
 2. **Read the task file** with the `Read` tool to get the full description, subtasks, and acceptance criteria
 3. **Mark the task as in-progress**: Run `taskmd set <ID> --status in-progress`
-4. **Start a worklog entry** (if worklogs are enabled):
-   - Check `.taskmd.yaml` for `worklogs: true` -- only create worklogs if explicitly enabled
+4. **Start a worklog entry** (only if worklogs are enabled):
+   - Check `.taskmd.yaml` for `worklogs: true`. If it is not explicitly enabled, skip all worklog steps silently — do not mention worklogs, do not tell the user they are disabled, just move on.
    - If enabled, find or create the worklog file at `tasks/<group>/.worklogs/<ID>.md` (or `tasks/.worklogs/<ID>.md` for root tasks)
    - Append a timestamped entry noting your approach and initial findings
 5. **Do the task**: Follow the task description and complete the work described
@@ -25,7 +25,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
    - Check off subtasks (`- [x]`) in the task file as you complete them
    - Append worklog entries when you make key decisions, hit blockers, or complete significant subtasks
    - In the Plan, include a reference to the original task ID, and task file path.
-6. **Write a final worklog entry** summarizing what was done, decisions made, and any open items
+6. **Write a final worklog entry** (only if worklogs are enabled — otherwise skip silently) summarizing what was done, decisions made, and any open items
 7. **Mark the task as done**: Use the `/complete-task` skill (invoke it with the task ID) to complete the task. It handles verification and status changes automatically.
 
 ## Worklog Format
