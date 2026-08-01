@@ -47,6 +47,7 @@ type Options struct {
 	Critical       bool
 	Scope          string
 	ScopeExact     bool
+	Root           string
 	ArchivedTasks  []*model.Task
 	Phase        string
 	PhaseOrder   []string
@@ -154,6 +155,14 @@ func filterActionable(
 	childrenMap map[string][]*model.Task,
 	criticalPath map[string]bool,
 ) ([]*model.Task, error) {
+	var reachable map[string]bool
+	if opts.Root != "" {
+		if _, exists := taskMap[opts.Root]; !exists {
+			return nil, fmt.Errorf("root task %s not found", opts.Root)
+		}
+		reachable = rootReachableSet(opts.Root, tasks, childrenMap)
+	}
+
 	candidates := tasks
 	if len(opts.Filters) > 0 {
 		var err error
@@ -165,6 +174,9 @@ func filterActionable(
 
 	var actionable []*model.Task
 	for _, task := range candidates {
+		if reachable != nil && !reachable[task.ID] {
+			continue
+		}
 		if IsActionable(task, taskMap, childrenMap) {
 			actionable = append(actionable, task)
 		}
@@ -189,6 +201,28 @@ func filterActionable(
 	}
 
 	return applySpecialFilters(actionable, criticalPath, opts.QuickWins, opts.Critical), nil
+}
+
+// rootReachableSet returns the set of task IDs reachable from root: root's
+// transitive upstream dependency prerequisites, root's transitive subtask
+// subtree (via the parent/child hierarchy), and root itself. Dependencies use
+// the graph package's upstream traversal; subtasks recurse over childrenMap.
+func rootReachableSet(root string, tasks []*model.Task, childrenMap map[string][]*model.Task) map[string]bool {
+	reachable := graph.NewGraph(tasks).GetUpstream(root)
+	reachable[root] = true
+
+	var addSubtree func(id string)
+	addSubtree = func(id string) {
+		for _, child := range childrenMap[id] {
+			if !reachable[child.ID] {
+				reachable[child.ID] = true
+				addSubtree(child.ID)
+			}
+		}
+	}
+	addSubtree(root)
+
+	return reachable
 }
 
 func scoreAndSort(

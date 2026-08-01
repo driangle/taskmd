@@ -28,6 +28,7 @@ var (
 	nextCritical     bool
 	nextScope        string
 	nextExact        bool
+	nextRoot         string
 	nextPhase        string
 	nextStrictPhases bool
 	nextColumns      string
@@ -58,6 +59,7 @@ Examples:
   taskmd next --critical --limit 1
   taskmd next --scope web/graph
   taskmd next --scope web/graph --exact
+  taskmd next --root 022
   taskmd next --phase v0.2
   taskmd next --strict-phases
   taskmd next --columns rank,id,title,reason`,
@@ -75,6 +77,7 @@ func init() {
 	nextCmd.Flags().BoolVar(&nextCritical, "critical", false, "show only critical path tasks")
 	nextCmd.Flags().StringVar(&nextScope, "scope", "", "filter by scope; supports wildcards (e.g. cli, cli*)")
 	nextCmd.Flags().BoolVar(&nextExact, "exact", false, "disable dependency expansion for --scope (only direct matches)")
+	nextCmd.Flags().StringVar(&nextRoot, "root", "", "limit recommendations to tasks reachable from an ID (its upstream deps + subtasks)")
 	nextCmd.Flags().StringVar(&nextPhase, "phase", "", "filter by phase")
 	nextCmd.Flags().BoolVar(&nextStrictPhases, "strict-phases", false, "enforce strict phase ordering (earlier phases always rank first)")
 	nextCmd.Flags().StringVar(&nextColumns, "columns", nextDefaultColumns, "comma-separated columns for table output (e.g. rank,id,title,reason)")
@@ -117,6 +120,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 		Critical:      nextCritical,
 		Scope:         nextScope,
 		ScopeExact:    nextExact,
+		Root:          nextRoot,
 		ArchivedTasks: archivedTasks,
 		Phase:         nextPhase,
 		PhaseOrder:    phaseOrder,
@@ -323,7 +327,9 @@ func outputNextTable(recs []Recommendation) error {
 	r := getRenderer()
 
 	if len(recs) == 0 {
-		if nextScope != "" {
+		if nextRoot != "" {
+			fmt.Printf("No actionable tasks found reachable from %q.\n", nextRoot)
+		} else if nextScope != "" {
 			fmt.Printf("No actionable tasks found for scope %q.\n", nextScope)
 		} else if nextQuickWins {
 			fmt.Println("No quick wins available.")

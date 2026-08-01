@@ -374,7 +374,14 @@ Applied after actionability filtering, before scoring:
 
 - **Quick wins** (`--quick-wins`): keep only tasks with `effort = small`.
 - **Critical** (`--critical`): keep only tasks on the critical path.
-- Both filters can be combined (AND logic).
+- **Root** (`--root <ID>`): keep only tasks reachable from `<ID>` — its
+  transitive upstream dependencies (via `dependencies`), its transitive
+  subtask subtree (via `parent`), and `<ID>` itself. An unknown `<ID>`
+  produces a `root task <ID> not found` error. Because a parent task is never
+  actionable while it has unresolved children, `--root` on a parent yields
+  that parent's next actionable subtask.
+- All filters can be combined (AND logic). They narrow the candidate set only;
+  scoring and ranking are unchanged.
 
 ### 4.7 Reason Strings
 

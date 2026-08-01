@@ -227,9 +227,28 @@ taskmd next --critical --limit 1
 # Next task for a specific phase
 taskmd next --phase v0.2
 
+# Next actionable task within the graph reachable from a task
+taskmd next --root 022
+
 # JSON for automation
 taskmd next --format json
 ```
+
+**Scoping to a task's graph with `--root`:**
+
+`--root <ID>` limits recommendations to the tasks _reachable from_ `<ID>`:
+
+- **Upstream dependencies** — `<ID>`'s transitive prerequisites (the work that
+  unblocks it), followed via `dependencies`.
+- **Subtasks** — `<ID>`'s transitive subtree, followed via the `parent`
+  hierarchy.
+- **`<ID>` itself**, when it is actionable.
+
+This answers "given task X, what should I work on next to make progress toward
+it?". Because a parent task is never actionable while it has open children,
+`--root` on a parent naturally returns that parent's next actionable subtask.
+`--root` only narrows the candidate set, so scoring and ranking are unchanged
+and it composes with the other filters.
 
 **Flags:**
 
@@ -241,6 +260,7 @@ taskmd next --format json
 | `--phase` | | Filter recommendations by phase name |
 | `--scope` | | Filter by scope; supports wildcards (e.g. `cli`, `cli*`) |
 | `--exact` | `false` | Disable dependency expansion for `--scope` (only direct matches) |
+| `--root` | | Limit recommendations to tasks reachable from an ID (its upstream deps + subtasks) |
 | `--status` | | Shortcut for `--filter status=<value>` |
 | `--priority` | | Shortcut for `--filter priority=<value>` |
 | `--columns` | `rank,id,title,priority,effort,file,reason` | Comma-separated columns for table output |

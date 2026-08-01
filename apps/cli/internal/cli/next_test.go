@@ -174,6 +174,7 @@ func resetNextFlags() {
 	nextCritical = false
 	nextScope = ""
 	nextExact = false
+	nextRoot = ""
 	nextPhase = ""
 	nextStrictPhases = false
 	nextColumns = nextDefaultColumns
@@ -2460,5 +2461,184 @@ func TestParseNextColumns(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// createNextParentTestFiles creates a small task set with a parent/child
+// hierarchy for exercising --root against a parent task.
+//
+//	P (pending, high)           - parent, blocked by incomplete children
+//	C1 (pending, medium, →P)    - actionable subtask
+//	C2 (pending, high, →P)      - actionable subtask
+//	U (pending, high)           - unrelated, not reachable from P
+func createNextParentTestFiles(t *testing.T) string {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
+	tasks := map[string]string{
+		"P.md": `---
+id: "P"
+title: "Parent task"
+status: pending
+priority: high
+---`,
+		"C1.md": `---
+id: "C1"
+title: "Child one"
+status: pending
+priority: medium
+parent: "P"
+---`,
+		"C2.md": `---
+id: "C2"
+title: "Child two"
+status: pending
+priority: high
+parent: "P"
+---`,
+		"U.md": `---
+id: "U"
+title: "Unrelated task"
+status: pending
+priority: high
+---`,
+	}
+
+	for filename, content := range tasks {
+		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+
+	return tmpDir
+}
+
+// recIDs extracts the recommendation IDs from JSON next output.
+func recIDs(t *testing.T, output string) []string {
+	t.Helper()
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+	ids := make([]string, len(recs))
+	for i, r := range recs {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+func TestNext_RootLeafReturnsUpstreamOnly(t *testing.T) {
+	// 009 depends on 006 depends on 007. Only 007 is actionable in that chain.
+	// --root 009 should return just 007, excluding other actionable tasks.
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextRoot = "009"
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	ids := recIDs(t, output)
+	if len(ids) != 1 || ids[0] != "007" {
+		t.Fatalf("Expected only upstream task 007, got %v", ids)
+	}
+}
+
+func TestNext_RootActionableRootItself(t *testing.T) {
+	// 004 depends on 002 (completed), so 004 itself is actionable.
+	// --root 004 should return 004.
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextRoot = "004"
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	ids := recIDs(t, output)
+	if len(ids) != 1 || ids[0] != "004" {
+		t.Fatalf("Expected root task 004 itself, got %v", ids)
+	}
+}
+
+func TestNext_RootParentReturnsSubtasks(t *testing.T) {
+	tmpDir := createNextParentTestFiles(t)
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextRoot = "P"
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+
+	ids := recIDs(t, output)
+	got := map[string]bool{}
+	for _, id := range ids {
+		got[id] = true
+	}
+	if len(ids) != 2 || !got["C1"] || !got["C2"] {
+		t.Fatalf("Expected actionable subtasks C1 and C2, got %v", ids)
+	}
+}
+
+func TestNext_RootUnknownIDErrors(t *testing.T) {
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextRoot = "999"
+
+	_, err := captureNextOutput(t, []string{tmpDir})
+	if err == nil {
+		t.Fatal("Expected error for unknown root ID, got nil")
+	}
+	if !strings.Contains(err.Error(), "root task 999 not found") {
+		t.Errorf("Expected 'root task 999 not found', got %q", err.Error())
+	}
+}
+
+func TestNext_RootCombinedWithFilter(t *testing.T) {
+	// --root 009 reaches actionable task 007 (tag api). A matching filter
+	// keeps it; a non-matching filter narrows the result to empty.
+	tmpDir := createNextTestTaskFiles(t)
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextRoot = "009"
+	nextFilters = []string{"tag=api"}
+
+	output, err := captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+	if ids := recIDs(t, output); len(ids) != 1 || ids[0] != "007" {
+		t.Fatalf("Expected 007 with matching filter, got %v", ids)
+	}
+
+	resetNextFlags()
+	nextFormat = "json"
+	nextLimit = 10
+	nextRoot = "009"
+	nextFilters = []string{"tag=cli"}
+
+	output, err = captureNextOutput(t, []string{tmpDir})
+	if err != nil {
+		t.Fatalf("runNext failed: %v", err)
+	}
+	if ids := recIDs(t, output); len(ids) != 0 {
+		t.Fatalf("Expected no results with non-matching filter, got %v", ids)
 	}
 }

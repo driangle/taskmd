@@ -801,3 +801,134 @@ func TestRecommend_PhaseOrderAffectsRanking(t *testing.T) {
 		t.Errorf("Expected task 002 (v0.2) to rank first, got %s", recs[0].ID)
 	}
 }
+
+// makeTaskWithParentDeps builds a task that has both a parent and dependencies.
+func makeTaskWithParentDeps(id string, status model.Status, priority model.Priority, parent string, deps []string) *model.Task {
+	return &model.Task{
+		ID:           id,
+		Title:        "Task " + id,
+		Status:       status,
+		Priority:     priority,
+		Parent:       parent,
+		Dependencies: deps,
+	}
+}
+
+func TestRecommend_RootLeafReturnsUpstreamOnly(t *testing.T) {
+	// R depends on A; A is actionable. X is unrelated and actionable.
+	// --root R should return only A (R is blocked by A; X is not reachable).
+	tasks := []*model.Task{
+		makeTask("R", model.StatusPending, model.PriorityHigh, []string{"A"}),
+		makeTask("A", model.StatusPending, model.PriorityMedium, nil),
+		makeTask("X", model.StatusPending, model.PriorityHigh, nil),
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, Root: "R"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(recs) != 1 || recs[0].ID != "A" {
+		t.Fatalf("Expected only upstream task A, got %v", recs)
+	}
+}
+
+func TestRecommend_RootParentReturnsActionableSubtasks(t *testing.T) {
+	// P is a parent with two pending children; X is unrelated.
+	// --root P should return the actionable subtasks (P itself is blocked by
+	// its incomplete children, X is not reachable).
+	tasks := []*model.Task{
+		makeTask("P", model.StatusPending, model.PriorityHigh, nil),
+		makeTaskWithParent("C1", model.StatusPending, model.PriorityMedium, "P"),
+		makeTaskWithParent("C2", model.StatusPending, model.PriorityMedium, "P"),
+		makeTask("X", model.StatusPending, model.PriorityHigh, nil),
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, Root: "P"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ids := map[string]bool{}
+	for _, rec := range recs {
+		ids[rec.ID] = true
+	}
+	if len(recs) != 2 || !ids["C1"] || !ids["C2"] {
+		t.Fatalf("Expected actionable subtasks C1 and C2, got %v", recs)
+	}
+}
+
+func TestRecommend_RootNestedSubtree(t *testing.T) {
+	// P -> C -> G (grandchild). Only the deepest leaf G is actionable.
+	// --root P should reach the whole subtree and return G.
+	tasks := []*model.Task{
+		makeTask("P", model.StatusPending, model.PriorityHigh, nil),
+		makeTaskWithParent("C", model.StatusPending, model.PriorityMedium, "P"),
+		makeTaskWithParentDeps("G", model.StatusPending, model.PriorityLow, "C", nil),
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, Root: "P"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(recs) != 1 || recs[0].ID != "G" {
+		t.Fatalf("Expected deepest subtask G, got %v", recs)
+	}
+}
+
+func TestRecommend_RootUnknownIDErrors(t *testing.T) {
+	tasks := []*model.Task{
+		makeTask("A", model.StatusPending, model.PriorityHigh, nil),
+	}
+
+	_, err := Recommend(tasks, Options{Limit: 10, Root: "NOPE"})
+	if err == nil {
+		t.Fatal("Expected error for unknown root ID, got nil")
+	}
+	if got := err.Error(); got != "root task NOPE not found" {
+		t.Errorf("Expected 'root task NOPE not found', got %q", got)
+	}
+}
+
+func TestRecommend_RootCombinedWithFilter(t *testing.T) {
+	// R depends on A (high) and B (low), both actionable.
+	// --root R with a priority filter should narrow to A only.
+	tasks := []*model.Task{
+		makeTask("R", model.StatusPending, model.PriorityHigh, []string{"A", "B"}),
+		makeTask("A", model.StatusPending, model.PriorityHigh, nil),
+		makeTask("B", model.StatusPending, model.PriorityLow, nil),
+	}
+
+	recs, err := Recommend(tasks, Options{
+		Limit:   10,
+		Root:    "R",
+		Filters: []string{"priority=high"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(recs) != 1 || recs[0].ID != "A" {
+		t.Fatalf("Expected only high-priority upstream task A, got %v", recs)
+	}
+}
+
+func TestRecommend_RootIncludesActionableRootItself(t *testing.T) {
+	// A leaf root with satisfied dependencies is itself actionable and
+	// should be returned.
+	tasks := []*model.Task{
+		makeTask("R", model.StatusPending, model.PriorityHigh, []string{"A"}),
+		makeTask("A", model.StatusCompleted, model.PriorityMedium, nil),
+		makeTask("X", model.StatusPending, model.PriorityHigh, nil),
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, Root: "R"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(recs) != 1 || recs[0].ID != "R" {
+		t.Fatalf("Expected root R itself, got %v", recs)
+	}
+}

@@ -1,11 +1,12 @@
 ---
 title: "Add --root flag to next command for graph-scoped recommendations"
 id: "01kyw0p0x"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["cli", "next", "graph"]
 created: "2026-07-31"
+completed_at: 2026-07-31
 ---
 
 # Add --root flag to next command for graph-scoped recommendations
@@ -47,22 +48,22 @@ dependency direction.
 
 ## Tasks
 
-- [ ] Add `Root string` to `next.Options` in `sdk/go/next/next.go`
-- [ ] In `filterActionable` (next.go:~183), when `Root` is set, build the reachable
+- [x] Add `Root string` to `next.Options` in `sdk/go/next/next.go`
+- [x] In `filterActionable` (next.go:~183), when `Root` is set, build the reachable
   set = `Root`'s upstream deps ∪ `Root`'s transitive subtree ∪ `Root` itself, then
   intersect the actionable set with it. Reuse `GetUpstream` and `childrenMap`;
   the subtree walk is a small recursion over `childrenMap`
-- [ ] Return a clear error when `Root` is set but the ID does not exist (mirror
+- [x] Return a clear error when `Root` is set but the ID does not exist (mirror
   `graph.go:181` "root task %s not found")
-- [ ] Add a `--root` flag to the `next` CLI command in
+- [x] Add a `--root` flag to the `next` CLI command in
   `apps/cli/internal/cli/next.go` and wire it into `next.Options`
-- [ ] Add one `--root` example to the command `Long` help text
-- [ ] Update docs: add `--root` to the `next` flags table and an example in the
+- [x] Add one `--root` example to the command `Long` help text
+- [x] Update docs: add `--root` to the `next` flags table and an example in the
   `### next` section of `apps/docs/guide/cli.md` (~line 196), documenting that the
   reachable set spans upstream deps + subtasks, and the parent-root behavior.
   Check `apps/docs/reference/taskmd_operations.md` for a `next` reference and
   update it if present
-- [ ] Add tests:
+- [x] Add tests:
   - happy path: `--root` on a leaf returns only its upstream actionable tasks
   - **parent root**: `--root` on a parent returns its next actionable subtask
   - unknown root ID errors
