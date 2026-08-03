@@ -61,6 +61,8 @@ verbose: true
 	projectDir, _ = os.Getwd()
 
 	// Re-initialize cobra command to pick up new config
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
@@ -116,6 +118,8 @@ verbose: true
 	}
 
 	// Re-initialize cobra command
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
@@ -178,6 +182,8 @@ verbose: false
 	projectDir, _ = os.Getwd()
 
 	// Re-initialize cobra command
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
@@ -226,6 +232,8 @@ verbose: true
 	}
 
 	// Re-initialize cobra command
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
@@ -278,6 +286,8 @@ web:
 	}
 
 	// Re-initialize cobra command
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	webCmd = &cobra.Command{Use: "web"}
 	webStartCmd = &cobra.Command{Use: "start"}
@@ -331,6 +341,8 @@ func TestConfigFile_Defaults(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	// Re-initialize cobra command
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
@@ -375,6 +387,8 @@ verbose: true
 	}
 
 	// Re-initialize cobra command
+	origRootCmd := rootCmd
+	t.Cleanup(func() { rootCmd = origRootCmd })
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")

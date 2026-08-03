@@ -310,11 +310,9 @@ func TestResolveTask_UniqueID(t *testing.T) {
 }
 
 func TestRunGet_DuplicateIDError(t *testing.T) {
-	tmpDir := createDuplicateTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := &taskRepo{t: t, Dir: createDuplicateTestFiles(t)}
 
-	err := runGet(getCmd, []string{"042"})
+	err := repo.Run("get", "042").Err
 	if err == nil {
 		t.Fatal("expected error for duplicate ID, got nil")
 	}
@@ -333,11 +331,9 @@ func TestRunGet_DuplicateIDError(t *testing.T) {
 }
 
 func TestRunGet_DuplicateID_UniqueTaskWorks(t *testing.T) {
-	tmpDir := createDuplicateTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := &taskRepo{t: t, Dir: createDuplicateTestFiles(t)}
 
-	output := captureGetOutput(t, "001")
+	output := getStdout(t, repo, "001")
 	if !strings.Contains(output, "Unique Task") {
 		t.Error("expected unique task to still work")
 	}

@@ -38,3 +38,15 @@ cannot parallelize). Fix the root cause and reclaim the LOC without losing cover
 - Inline YAML fixtures are consolidated under `testdata/`
 - At least the read-only command tests run with `t.Parallel()`
 - Test coverage percentage does not drop after the refactor
+
+## Sub-tasks
+
+This task was split into four focused, sequential slices (each depends on the previous):
+
+1. **`01kz3nm85`** — Build shared CLI command-test harness _(foundation, no deps)_
+2. **`01kz3nmbc`** — Consolidate inline YAML test fixtures under `testdata/` _(depends on 1)_
+3. **`01kz3nmfy`** — Migrate per-command test helpers to the shared harness _(depends on 1, 2)_
+4. **`01kz3nmka`** — Convert repetitive tests to table-driven `t.Run` and enable `t.Parallel()` _(depends on 3)_
+
+The original content above is retained for reference; the acceptance criteria are collectively
+satisfied by the four sub-tasks.

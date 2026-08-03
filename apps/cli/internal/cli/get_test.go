@@ -1,22 +1,17 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-func createGetTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// getFixtures returns the standard 3-task dependency chain used by most get tests.
+func getFixtures() map[string]string {
+	return map[string]string{
 		"001-setup.md": `---
 id: "001"
 title: "Setup project"
@@ -63,53 +58,22 @@ created: 2026-02-08
 Create reusable component library.
 `,
 	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-func resetGetFlags() {
-	getFormat = "text"
-	getExact = false
-	getThreshold = 0.6
-	getRawMarkdown = false
-	taskDir = "."
-}
-
-func captureGetOutput(t *testing.T, query string) string {
+// getOutput runs `get <args...>` against repo, fails on error, and returns stdout.
+func getStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runGet(getCmd, []string{query})
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("runGet failed: %v", err)
+	res := repo.Run(append([]string{"get"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("get %v failed: %v", args, res.Err)
 	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
+	return res.Stdout
 }
 
 func TestGet_ExactMatchByID(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
-	output := captureGetOutput(t, "001")
+	output := getStdout(t, repo, "001")
 
 	if !strings.Contains(output, "Task: 001") {
 		t.Error("Expected output to contain 'Task: 001'")
@@ -120,11 +84,9 @@ func TestGet_ExactMatchByID(t *testing.T) {
 }
 
 func TestGet_ExactMatchByTitle(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
-	output := captureGetOutput(t, "Setup project")
+	output := getStdout(t, repo, "Setup project")
 
 	if !strings.Contains(output, "Task: 001") {
 		t.Error("Expected output to contain 'Task: 001'")
@@ -132,11 +94,9 @@ func TestGet_ExactMatchByTitle(t *testing.T) {
 }
 
 func TestGet_ExactMatchByTitle_CaseInsensitive(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
-	output := captureGetOutput(t, "setup PROJECT")
+	output := getStdout(t, repo, "setup PROJECT")
 
 	if !strings.Contains(output, "Task: 001") {
 		t.Error("Expected case-insensitive title match to find task 001")
@@ -144,10 +104,9 @@ func TestGet_ExactMatchByTitle_CaseInsensitive(t *testing.T) {
 }
 
 func TestGet_IDPrecedenceOverTitle(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create a task whose title matches another task's ID
-	task1 := `---
+	// A task whose title matches another task's ID: ID match must win.
+	repo := newTaskRepo(t, map[string]string{
+		"task1.md": `---
 id: "abc"
 title: "First task"
 status: pending
@@ -158,8 +117,8 @@ created: 2026-02-08
 ---
 
 # First task
-`
-	task2 := `---
+`,
+		"task2.md": `---
 id: "xyz"
 title: "abc"
 status: pending
@@ -170,14 +129,10 @@ created: 2026-02-08
 ---
 
 # abc task
-`
-	os.WriteFile(filepath.Join(tmpDir, "task1.md"), []byte(task1), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "task2.md"), []byte(task2), 0644)
+`,
+	})
 
-	resetGetFlags()
-	taskDir = tmpDir
-
-	output := captureGetOutput(t, "abc")
+	output := getStdout(t, repo, "abc")
 
 	// Should match by ID (task1), not by title (task2)
 	if !strings.Contains(output, "Title: First task") {
@@ -186,41 +141,34 @@ created: 2026-02-08
 }
 
 func TestGet_TaskNotFound_ExactMode(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getExact = true
+	repo := newTaskRepo(t, getFixtures())
 
-	err := runGet(getCmd, []string{"nonexistent"})
-	if err == nil {
+	res := repo.Run("get", "nonexistent", "--exact")
+	if res.Err == nil {
 		t.Fatal("Expected error for non-matching query in exact mode")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_TaskNotFound_NoMatches(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getThreshold = 0.99 // very high threshold so nothing matches
+	repo := newTaskRepo(t, getFixtures())
 
-	err := runGet(getCmd, []string{"zzzzzzzzzzzzzzz"})
-	if err == nil {
+	// very high threshold so nothing matches
+	res := repo.Run("get", "zzzzzzzzzzzzzzz", "--threshold", "0.99")
+	if res.Err == nil {
 		t.Fatal("Expected error for garbage query")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_TextFormat(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
-	output := captureGetOutput(t, "002")
+	output := getStdout(t, repo, "002")
 
 	expected := []string{
 		"Task: 002",
@@ -245,12 +193,9 @@ func TestGet_TextFormat(t *testing.T) {
 }
 
 func TestGet_JSONFormat(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "json"
+	repo := newTaskRepo(t, getFixtures())
 
-	output := captureGetOutput(t, "002")
+	output := getStdout(t, repo, "002", "--format", "json")
 
 	var result getOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -275,12 +220,9 @@ func TestGet_JSONFormat(t *testing.T) {
 }
 
 func TestGet_YAMLFormat(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "yaml"
+	repo := newTaskRepo(t, getFixtures())
 
-	output := captureGetOutput(t, "001")
+	output := getStdout(t, repo, "001", "--format", "yaml")
 
 	expected := []string{"id: \"001\"", "title: Setup project", "status: completed"}
 	for _, exp := range expected {
@@ -291,31 +233,26 @@ func TestGet_YAMLFormat(t *testing.T) {
 }
 
 func TestGet_UnsupportedFormat(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "csv"
+	repo := newTaskRepo(t, getFixtures())
 
-	err := runGet(getCmd, []string{"001"})
-	if err == nil {
+	res := repo.Run("get", "001", "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("Expected error for unsupported format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_FuzzyMatch_Substring(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
-	// "auth" is a substring of "Implement authentication" — should fuzzy match
-	// Simulate selecting option 1
+	// "auth" is a substring of "Implement authentication" — should fuzzy match.
+	// Simulate selecting option 1.
 	getStdinReader = strings.NewReader("1\n")
 	defer func() { getStdinReader = os.Stdin }()
 
-	output := captureGetOutput(t, "auth")
+	output := getStdout(t, repo, "auth")
 
 	if !strings.Contains(output, "Task: 002") {
 		t.Error("Expected fuzzy substring match to find task 002")
@@ -323,15 +260,13 @@ func TestGet_FuzzyMatch_Substring(t *testing.T) {
 }
 
 func TestGet_FuzzyMatch_Selection(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
 	// "ui" should fuzzy match "Build UI components"
 	getStdinReader = strings.NewReader("1\n")
 	defer func() { getStdinReader = os.Stdin }()
 
-	output := captureGetOutput(t, "ui")
+	output := getStdout(t, repo, "ui")
 
 	if !strings.Contains(output, "Task: 003") {
 		t.Error("Expected fuzzy match selection to return task 003")
@@ -339,65 +274,57 @@ func TestGet_FuzzyMatch_Selection(t *testing.T) {
 }
 
 func TestGet_FuzzyMatch_Cancel(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
 	getStdinReader = strings.NewReader("0\n")
 	defer func() { getStdinReader = os.Stdin }()
 
-	err := runGet(getCmd, []string{"auth"})
-	if err == nil {
+	res := repo.Run("get", "auth")
+	if res.Err == nil {
 		t.Fatal("Expected error when user cancels selection")
 	}
-	if !strings.Contains(err.Error(), "cancelled") {
-		t.Errorf("Expected 'cancelled' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "cancelled") {
+		t.Errorf("Expected 'cancelled' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_Threshold(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getThreshold = 0.95 // very high threshold
+	repo := newTaskRepo(t, getFixtures())
 
-	err := runGet(getCmd, []string{"aut"})
-	if err == nil {
+	// very high threshold
+	res := repo.Run("get", "aut", "--threshold", "0.95")
+	if res.Err == nil {
 		t.Fatal("Expected error when threshold filters out matches")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_EmptyDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	err := runGet(getCmd, []string{"anything"})
-	if err == nil {
+	res := repo.Run("get", "anything")
+	if res.Err == nil {
 		t.Fatal("Expected error for empty directory")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_Dependencies(t *testing.T) {
-	tmpDir := createGetTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getFixtures())
 
 	// Task 003 depends on 002, and 002 blocks 003
-	output := captureGetOutput(t, "003")
+	output := getStdout(t, repo, "003")
 
 	if !strings.Contains(output, "Depends on: 002 (Implement authentication)") {
 		t.Error("Expected depends-on info for task 003")
 	}
 
 	// Check that task 002 shows it blocks 003
-	output = captureGetOutput(t, "002")
+	output = getStdout(t, repo, "002")
 	if !strings.Contains(output, "Blocks: 003 (Build UI components)") {
 		t.Error("Expected blocks info for task 002")
 	}
@@ -473,19 +400,10 @@ func TestLevenshtein(t *testing.T) {
 
 // --- File path matching tests ---
 
-func createGetTestFilesWithSubdirs(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	dirs := []string{"cli", "backend"}
-	for _, d := range dirs {
-		if err := os.MkdirAll(filepath.Join(tmpDir, d), 0755); err != nil {
-			t.Fatalf("Failed to create directory %s: %v", d, err)
-		}
-	}
-
-	files := map[string]string{
+// getSubdirFixtures returns tasks spread across subdirectories, including a
+// filename ("055-api.md") that is ambiguous between two directories.
+func getSubdirFixtures() map[string]string {
+	return map[string]string{
 		"cli/042-task.md": `---
 id: "cli-042"
 title: "CLI task"
@@ -523,23 +441,12 @@ created: 2026-02-08
 # CLI API task
 `,
 	}
-
-	for relPath, content := range files {
-		path := filepath.Join(tmpDir, relPath)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", relPath, err)
-		}
-	}
-
-	return tmpDir
 }
 
 func TestGet_FilePathMatch_FullRelativePath(t *testing.T) {
-	tmpDir := createGetTestFilesWithSubdirs(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getSubdirFixtures())
 
-	output := captureGetOutput(t, "cli/042-task.md")
+	output := getStdout(t, repo, "cli/042-task.md")
 
 	if !strings.Contains(output, "Task: cli-042") {
 		t.Error("Expected full relative path to match task cli-042")
@@ -547,11 +454,9 @@ func TestGet_FilePathMatch_FullRelativePath(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_FilenameWithExtension(t *testing.T) {
-	tmpDir := createGetTestFilesWithSubdirs(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getSubdirFixtures())
 
-	output := captureGetOutput(t, "042-task.md")
+	output := getStdout(t, repo, "042-task.md")
 
 	if !strings.Contains(output, "Task: cli-042") {
 		t.Error("Expected filename with extension to match task cli-042")
@@ -559,11 +464,9 @@ func TestGet_FilePathMatch_FilenameWithExtension(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_FilenameWithoutExtension(t *testing.T) {
-	tmpDir := createGetTestFilesWithSubdirs(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getSubdirFixtures())
 
-	output := captureGetOutput(t, "042-task")
+	output := getStdout(t, repo, "042-task")
 
 	if !strings.Contains(output, "Task: cli-042") {
 		t.Error("Expected filename without extension to match task cli-042")
@@ -571,27 +474,23 @@ func TestGet_FilePathMatch_FilenameWithoutExtension(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_AmbiguousFilename(t *testing.T) {
-	tmpDir := createGetTestFilesWithSubdirs(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getSubdirFixtures())
 
 	// "055-api.md" exists in both cli/ and backend/ — should be ambiguous
-	err := runGet(getCmd, []string{"055-api.md"})
-	if err == nil {
+	res := repo.Run("get", "055-api.md")
+	if res.Err == nil {
 		t.Fatal("Expected error for ambiguous filename")
 	}
-	if !strings.Contains(err.Error(), "ambiguous") {
-		t.Errorf("Expected 'ambiguous' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "ambiguous") {
+		t.Errorf("Expected 'ambiguous' error, got: %v", res.Err)
 	}
 }
 
 func TestGet_FilePathMatch_ExactPathResolvesAmbiguity(t *testing.T) {
-	tmpDir := createGetTestFilesWithSubdirs(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getSubdirFixtures())
 
 	// Full relative path should resolve ambiguity
-	output := captureGetOutput(t, "backend/055-api.md")
+	output := getStdout(t, repo, "backend/055-api.md")
 
 	if !strings.Contains(output, "Task: backend-055") {
 		t.Error("Expected exact path to resolve ambiguity and match backend-055")
@@ -599,12 +498,10 @@ func TestGet_FilePathMatch_ExactPathResolvesAmbiguity(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_IDStillTakesPriority(t *testing.T) {
-	tmpDir := createGetTestFilesWithSubdirs(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, getSubdirFixtures())
 
 	// "cli-042" is a task ID — should match by ID, not filepath
-	output := captureGetOutput(t, "cli-042")
+	output := getStdout(t, repo, "cli-042")
 
 	if !strings.Contains(output, "Task: cli-042") {
 		t.Error("Expected ID match to still work")
@@ -703,12 +600,9 @@ func TestFuzzyMatchTasks(t *testing.T) {
 	}
 }
 
-func createParentTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// parentFixtures returns a parent task with two children (one completed).
+func parentFixtures() map[string]string {
+	return map[string]string{
 		"010-parent.md": `---
 id: "010"
 title: "Parent task"
@@ -748,23 +642,12 @@ created: 2026-02-08
 # Completed child
 `,
 	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
 func TestGet_ParentDisplay(t *testing.T) {
-	tmpDir := createParentTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, parentFixtures())
 
-	output := captureGetOutput(t, "011")
+	output := getStdout(t, repo, "011")
 
 	if !strings.Contains(output, "Parent:") {
 		t.Error("Expected output to contain 'Parent:'")
@@ -775,11 +658,9 @@ func TestGet_ParentDisplay(t *testing.T) {
 }
 
 func TestGet_ChildrenDisplay(t *testing.T) {
-	tmpDir := createParentTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, parentFixtures())
 
-	output := captureGetOutput(t, "010")
+	output := getStdout(t, repo, "010")
 
 	if !strings.Contains(output, "Children:") {
 		t.Error("Expected output to contain 'Children:'")
@@ -799,12 +680,9 @@ func TestGet_ChildrenDisplay(t *testing.T) {
 }
 
 func TestGet_ParentJSON(t *testing.T) {
-	tmpDir := createParentTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "json"
+	repo := newTaskRepo(t, parentFixtures())
 
-	output := captureGetOutput(t, "011")
+	output := getStdout(t, repo, "011", "--format", "json")
 
 	var result getOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -820,12 +698,9 @@ func TestGet_ParentJSON(t *testing.T) {
 }
 
 func TestGet_ChildrenJSON(t *testing.T) {
-	tmpDir := createParentTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "json"
+	repo := newTaskRepo(t, parentFixtures())
 
-	output := captureGetOutput(t, "010")
+	output := getStdout(t, repo, "010", "--format", "json")
 
 	var result getOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -855,23 +730,19 @@ func TestGet_ChildrenJSON(t *testing.T) {
 }
 
 func TestGet_LeafTaskNoChildren(t *testing.T) {
-	tmpDir := createParentTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, parentFixtures())
 
-	output := captureGetOutput(t, "011")
+	output := getStdout(t, repo, "011")
 
 	if strings.Contains(output, "Children:") {
 		t.Error("Leaf task should not have 'Children:' section")
 	}
 }
 
-func createMarkdownTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	task := `---
+// markdownFixtures returns a task whose body exercises markdown rendering.
+func markdownFixtures() map[string]string {
+	return map[string]string{
+		"md-001-test.md": `---
 id: "md-001"
 title: "Markdown test task"
 status: pending
@@ -887,21 +758,14 @@ This has **bold** and ` + "`code`" + ` text.
 
 - [ ] Unchecked
 - [x] Checked
-`
-	path := filepath.Join(tmpDir, "md-001-test.md")
-	if err := os.WriteFile(path, []byte(task), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+`,
 	}
-	return tmpDir
 }
 
 func TestGet_RawMarkdown(t *testing.T) {
-	tmpDir := createMarkdownTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getRawMarkdown = true
+	repo := newTaskRepo(t, markdownFixtures())
 
-	output := captureGetOutput(t, "md-001")
+	output := getStdout(t, repo, "md-001", "--raw-markdown")
 
 	// Raw mode: markdown delimiters should be preserved
 	if !strings.Contains(output, "# Heading") {
@@ -919,14 +783,13 @@ func TestGet_RawMarkdown(t *testing.T) {
 }
 
 func TestGet_FormattedMarkdown(t *testing.T) {
-	tmpDir := createMarkdownTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	noColor = false
+	repo := newTaskRepo(t, markdownFixtures())
+
+	// Force color so the renderer emits ANSI (default noColor=false after reset).
 	forceColor = true
 	defer func() { forceColor = false }()
 
-	output := captureGetOutput(t, "md-001")
+	output := getStdout(t, repo, "md-001")
 
 	// Formatted mode: markdown delimiters should be stripped
 	if strings.Contains(output, "# Heading") {
@@ -947,12 +810,9 @@ func TestGet_FormattedMarkdown(t *testing.T) {
 	}
 }
 
-func createPhaseTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// phaseFixtures returns one task with a phase and one without.
+func phaseFixtures() map[string]string {
+	return map[string]string{
 		"p01-with-phase.md": `---
 id: "p01"
 title: "Task with phase"
@@ -979,23 +839,12 @@ created: 2026-02-08
 # Task without phase
 `,
 	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
 func TestGet_PhaseText(t *testing.T) {
-	tmpDir := createPhaseTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, phaseFixtures())
 
-	output := captureGetOutput(t, "p01")
+	output := getStdout(t, repo, "p01")
 
 	if !strings.Contains(output, "Phase: beta") {
 		t.Error("Expected output to contain 'Phase: beta'")
@@ -1003,11 +852,9 @@ func TestGet_PhaseText(t *testing.T) {
 }
 
 func TestGet_PhaseOmittedWhenEmpty_Text(t *testing.T) {
-	tmpDir := createPhaseTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, phaseFixtures())
 
-	output := captureGetOutput(t, "p02")
+	output := getStdout(t, repo, "p02")
 
 	if strings.Contains(output, "Phase:") {
 		t.Error("Expected phase to be omitted when empty")
@@ -1015,12 +862,9 @@ func TestGet_PhaseOmittedWhenEmpty_Text(t *testing.T) {
 }
 
 func TestGet_PhaseJSON(t *testing.T) {
-	tmpDir := createPhaseTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "json"
+	repo := newTaskRepo(t, phaseFixtures())
 
-	output := captureGetOutput(t, "p01")
+	output := getStdout(t, repo, "p01", "--format", "json")
 
 	var result getOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -1033,12 +877,9 @@ func TestGet_PhaseJSON(t *testing.T) {
 }
 
 func TestGet_PhaseOmittedWhenEmpty_JSON(t *testing.T) {
-	tmpDir := createPhaseTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "json"
+	repo := newTaskRepo(t, phaseFixtures())
 
-	output := captureGetOutput(t, "p02")
+	output := getStdout(t, repo, "p02", "--format", "json")
 
 	if strings.Contains(output, `"phase"`) {
 		t.Error("Expected phase to be omitted from JSON when empty")
@@ -1046,12 +887,9 @@ func TestGet_PhaseOmittedWhenEmpty_JSON(t *testing.T) {
 }
 
 func TestGet_PhaseYAML(t *testing.T) {
-	tmpDir := createPhaseTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "yaml"
+	repo := newTaskRepo(t, phaseFixtures())
 
-	output := captureGetOutput(t, "p01")
+	output := getStdout(t, repo, "p01", "--format", "yaml")
 
 	if !strings.Contains(output, "phase: beta") {
 		t.Errorf("Expected YAML output to contain 'phase: beta', got:\n%s", output)
@@ -1059,12 +897,9 @@ func TestGet_PhaseYAML(t *testing.T) {
 }
 
 func TestGet_PhaseOmittedWhenEmpty_YAML(t *testing.T) {
-	tmpDir := createPhaseTestFiles(t)
-	resetGetFlags()
-	taskDir = tmpDir
-	getFormat = "yaml"
+	repo := newTaskRepo(t, phaseFixtures())
 
-	output := captureGetOutput(t, "p02")
+	output := getStdout(t, repo, "p02", "--format", "yaml")
 
 	if strings.Contains(output, "phase:") {
 		t.Error("Expected phase to be omitted from YAML when empty")
