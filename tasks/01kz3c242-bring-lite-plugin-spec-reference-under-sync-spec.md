@@ -1,7 +1,7 @@
 ---
 id: "01kz3c242"
 title: "Bring lite plugin SPEC_REFERENCE under sync-spec"
-status: pending
+status: completed
 priority: medium
 effort: small
 type: chore
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [docs, plugins, spec-sync]
 created_at: 2026-08-03
+completed_at: 2026-08-03
 ---
 
 # Bring lite plugin SPEC_REFERENCE under sync-spec
@@ -25,13 +26,13 @@ system was built to prevent, reintroduced outside the system.
 
 ## Tasks
 
-- [ ] Decide the model: either (a) generate `SPEC_REFERENCE.md` from the canonical spec, or
-      (b) drift-check it against the canonical spec in a test
-- [ ] If generated: add a `sync-spec` step that derives the condensed reference deterministically
-- [ ] If checked: add a test asserting the condensed reference is a faithful subset (no
+- [x] Decide the model: chose **(b) drift-check** — the reference is a restructured/condensed subset,
+      not deterministically derivable, so a subset test is the right guard
+- [x] ~~If generated: add a `sync-spec` step that derives the condensed reference deterministically~~ (N/A — chose drift-check)
+- [x] If checked: add a test asserting the condensed reference is a faithful subset (no
       contradictory field definitions/enums)
-- [ ] Document in `AGENTS.md` that `SPEC_REFERENCE.md` is derived/checked, not hand-edited
-- [ ] Fix the `AGENTS.md` claim that the spec has "two copies" — it now governs more
+- [x] Document in `AGENTS.md` that `SPEC_REFERENCE.md` is derived/checked, not hand-edited
+- [x] Fix the `AGENTS.md` claim that the spec has "two copies" — it now governs more
 
 ## Acceptance Criteria
 

@@ -29,7 +29,7 @@ Task files use YAML frontmatter delimited by `---` lines at the top of the file.
 | `touches` | array of strings | Scope identifiers | Areas of the codebase affected |
 | `context` | array of strings | File paths | Files relevant to the task |
 | `parent` | string | Single task ID | Parent task for subtask relationships |
-| `created` | string | `YYYY-MM-DD` | Date the task was created |
+| `created_at` | string | `YYYY-MM-DD` | Date the task was created (alias: `created`) |
 | `verify` | array of objects | See below | Verification steps |
 | `pr` | array of strings | URLs | Associated pull request links |
 | `external_id` | string | Any string | ID in an external system |
@@ -105,7 +105,7 @@ Each phase entry has:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | yes | Short stable identifier, referenced by task `phase` field |
+| `id` | no | Short stable identifier referenced by task `phase` field (falls back to `name` if omitted) |
 | `name` | yes | Human-readable display label |
 | `description` | no | What the phase covers |
 | `due` | no | Target date (`YYYY-MM-DD`) |

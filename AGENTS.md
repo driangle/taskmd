@@ -348,9 +348,11 @@ Update documentation when:
 
 ### Specification Sync
 
-The taskmd specification lives in `docs/taskmd_specification.md` (the canonical source). Two copies must stay in sync:
-- `apps/cli/internal/cli/templates/TASKMD_SPEC.md` (embedded in the CLI binary)
-- `apps/docs/reference/specification.md` (docs site)
+The taskmd specification lives in `docs/taskmd_specification.md` (the canonical source). Three other artifacts derive from it and must stay in sync:
+
+- `apps/cli/internal/cli/templates/TASKMD_SPEC.md` (embedded in the CLI binary) — **byte-identical copy**
+- `apps/docs/reference/specification.md` (docs site) — **byte-identical copy**
+- `claude-code-plugin-lite/SPEC_REFERENCE.md` (embedded in the lite plugin) — **condensed subset**, not a verbatim copy
 
 **After editing `docs/taskmd_specification.md`, always run:**
 
@@ -358,7 +360,9 @@ The taskmd specification lives in `docs/taskmd_specification.md` (the canonical 
 cd apps/cli && make sync-spec
 ```
 
-This copies the canonical spec to both locations. A test (`TestSpecTemplate_MatchesCanonicalSpec`) will fail if they drift.
+`make sync-spec` copies the canonical spec to the two byte-identical locations, and `TestSpecTemplate_MatchesCanonicalSpec` fails if either drifts.
+
+`SPEC_REFERENCE.md` is a hand-written condensed subset (it restructures and omits content), so it is not copied by `sync-spec`. Instead, it is **drift-checked, not freely hand-edited**: `TestSpecReference_EnumsMatchCanonical` and `TestSpecReference_RequiredFieldsMatchCanonical` fail if its enum value sets (`status`, `priority`, `effort`, `type`) or required fields (`id`, `title`) contradict the canonical spec. When you change those facts in the canonical spec, update `SPEC_REFERENCE.md` in the same commit.
 
 ### Documentation Locations
 
