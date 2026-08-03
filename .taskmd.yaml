@@ -34,6 +34,9 @@ phases:
   - id: language-libraries
     name: "Language Libraries"
     description: "Expand ecosystem with SDK libraries"
+  - id: critical-feedback
+    name: "Critical Feedback"
+    description: "Address findings from the project critical evaluation: doc reconciliation, scope discipline, plugin sync, and code/test cleanup"
 web:
   auto_open_browser: false
 scopes:
