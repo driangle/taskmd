@@ -13,6 +13,9 @@ phases:
   - id: phase-support
     name: "Phase Support"
     description: "Add phase ID field, phases CLI command, and web phase features"
+  - id: critical-feedback
+    name: "Critical Feedback"
+    description: "Address findings from the project critical evaluation: doc reconciliation, scope discipline, plugin sync, and code/test cleanup"
   - id: skill-benchmarks
     name: "Skill Benchmarks"
     description: "Establish quality baselines for all agent skills"
@@ -34,9 +37,6 @@ phases:
   - id: language-libraries
     name: "Language Libraries"
     description: "Expand ecosystem with SDK libraries"
-  - id: critical-feedback
-    name: "Critical Feedback"
-    description: "Address findings from the project critical evaluation: doc reconciliation, scope discipline, plugin sync, and code/test cleanup"
 web:
   auto_open_browser: false
 scopes:

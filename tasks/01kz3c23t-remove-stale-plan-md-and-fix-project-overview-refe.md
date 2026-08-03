@@ -1,7 +1,7 @@
 ---
 id: "01kz3c23t"
 title: "Remove stale PLAN.md and fix project-overview references"
-status: pending
+status: completed
 priority: high
 effort: small
 type: docs
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [docs, cleanup, credibility]
 created_at: 2026-08-03
+completed_at: 2026-08-03
 ---
 
 # Remove stale PLAN.md and fix project-overview references
@@ -24,11 +25,11 @@ plan and repoint the overview to something accurate.
 
 ## Tasks
 
-- [ ] Delete `PLAN.md` (or replace it with an accurate one-paragraph architecture overview)
-- [ ] Update `AGENTS.md` "Documentation Locations" to stop pointing "Project overview" at `PLAN.md`
-- [ ] Point the overview at an accurate source (README architecture section or `docs/`)
-- [ ] Grep the repo for other references to `PLAN.md` and fix or remove them
-- [ ] Fix the `AGENTS.md` "Go 1.22+" prerequisite to match `go.work` (`go 1.25.0`)
+- [x] Delete `PLAN.md` (or replace it with an accurate one-paragraph architecture overview)
+- [x] Update `AGENTS.md` "Documentation Locations" to stop pointing "Project overview" at `PLAN.md`
+- [x] Point the overview at an accurate source (README architecture section or `docs/`)
+- [x] Grep the repo for other references to `PLAN.md` and fix or remove them
+- [x] Fix the `AGENTS.md` "Go 1.22+" prerequisite to match `go.work` (`go 1.25.0`)
 
 ## Acceptance Criteria
 

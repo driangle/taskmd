@@ -6,7 +6,7 @@ This document provides guidelines and conventions for developing the taskmd proj
 
 Before developing, ensure you have the following tools installed:
 
-- **Go** (1.22+): [https://go.dev/dl/](https://go.dev/dl/)
+- **Go** (1.25+): [https://go.dev/dl/](https://go.dev/dl/)
 - **pnpm**: `npm install -g pnpm` (for web frontend)
 - **golangci-lint**: Required for `make lint` and `make lint-fix`
   - macOS: `brew install golangci-lint`
@@ -365,7 +365,7 @@ This copies the canonical spec to both locations. A test (`TestSpecTemplate_Matc
 - **CLI commands**: Help text in the command definition
 - **Task format**: `docs/taskmd_specification.md` (canonical spec — see Specification Sync above)
 - **Development**: This file (`CLAUDE.md`)
-- **Project overview**: `PLAN.md`
+- **Project overview**: `README.md` (monorepo: Go CLI in `apps/cli`, Vite + React 19 web app in `apps/web`, Go SDK in `sdk/go`, docs in `apps/docs`)
 
 ## Common Patterns
 
