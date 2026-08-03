@@ -37,6 +37,7 @@ export default defineConfig({
           { text: 'CLI Guide', link: '/guide/cli' },
           { text: 'Web Interface', link: '/guide/web' },
           { text: 'Claude Code Plugin', link: '/guide/claude-code-plugin' },
+          { text: 'MCP Server', link: '/guide/mcp' },
         ],
       },
       {

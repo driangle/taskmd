@@ -121,6 +121,10 @@ Yes. It watches for file changes and updates automatically via Server-Sent Event
 
 Default is 8080. Change it with `--port`: `taskmd web start --port 3000`.
 
+### Can I use the web UI in production?
+
+The web UI is designed for local development and personal use. It has **no authentication** and lacks the security features needed for internet-facing deployments. While it's suitable for small teams on trusted networks, treat it as a development tool rather than a production application.
+
 ## Dependencies
 
 ### How do I add task dependencies?
@@ -190,6 +194,10 @@ Aim for tasks completable in hours to a few days. Use subtasks (markdown checkbo
 ### Should I delete completed tasks?
 
 Keep them for historical reference. Use `--exclude-status completed` to hide them from views, or move them to an `archive/` subdirectory.
+
+### Can I use taskmd in a monorepo?
+
+Yes. Each project can have its own `tasks/` directory, or you can keep a shared tasks directory at the root and organize by subdirectory (`tasks/frontend/`, `tasks/backend/`). The `group` field also helps categorize tasks logically across projects.
 
 ## Need More Help?
 

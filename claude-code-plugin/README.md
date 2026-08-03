@@ -121,7 +121,7 @@ claude plugin install taskmd-mcp@taskmd-marketplace --scope project
 
 The MCP server exposes task operations as tools (`list`, `get`, `next`, `search`, `context`, `set`, `validate`, `graph`), letting Claude Code call taskmd directly through the Model Context Protocol.
 
-For other MCP-compatible clients, see the [MCP Server Guide](https://github.com/driangle/taskmd/blob/main/docs/guides/mcp-guide.md) for configuration snippets (Claude Desktop, Cursor, Windsurf, etc.).
+For other MCP-compatible clients, see the [MCP Server Guide](https://driangle.github.io/taskmd/guide/mcp) for configuration snippets (Claude Desktop, Cursor, Windsurf, etc.).
 
 ## Troubleshooting
 

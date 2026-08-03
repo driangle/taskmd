@@ -11,7 +11,7 @@ taskmd provides:
 2. **[A CLI for managing them](https://driangle.github.io/taskmd/guide/cli)** — Create, update, filter, validate, and visualize tasks from the terminal
 3. **[A web dashboard for visualization](https://driangle.github.io/taskmd/guide/web)** — Kanban board, dependency graphs, and project metrics in your browser
 4. **[A set of AI skills](https://driangle.github.io/taskmd/guide/claude-code-plugin)** — Slash commands for AI assistants to create, update, and work through tasks
-5. **[An MCP server exposing task management tools](https://driangle.github.io/taskmd/guide/claude-code-plugin)** — Direct tool access for AI assistants via the Model Context Protocol
+5. **[An MCP server exposing task management tools](https://driangle.github.io/taskmd/guide/mcp)** — Direct tool access for AI assistants via the Model Context Protocol
 
 Everything runs locally. Task data stays in your repo and is never shared externally.
 
@@ -281,7 +281,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/driangle/taskmd/issues)
-- **Documentation**: [docs/guides/](docs/guides/)
+- **Documentation**: [driangle.github.io/taskmd](https://driangle.github.io/taskmd/)
 - **Specification**: [taskmd_specification.md](docs/taskmd_specification.md)
 
 ## Claude Code Plugin

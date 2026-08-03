@@ -5,7 +5,7 @@ status: pending
 priority: medium
 effort: medium
 type: chore
-phase: critical-feedback
+phase: skill-benchmarks
 dependencies: []
 tags: [benchmark, skills, evidence]
 created_at: 2026-08-03

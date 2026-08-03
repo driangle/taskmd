@@ -103,12 +103,45 @@ Check the **Actions** tab for error logs. Common issues:
 - Go build failures: check `apps/cli/go.mod` and imports
 - Permission errors: verify the workflow has `contents: write` permission
 
+### Missing Artifacts
+
+If binaries are missing from the release:
+
+1. Check the **Compress binaries** step completed successfully
+2. Verify the file paths in the **Create Release** step match the generated files
+
 ### Re-running a Release
 
 1. Delete the existing release and tag from GitHub
 2. Delete the local tag: `git tag -d v1.0.0`
 3. Create and push the tag again
 
-## Manual Release
+## Manual Release (Not Recommended)
 
-If automated release fails, see the [RELEASING.md](https://github.com/driangle/taskmd/blob/main/docs/RELEASING.md) source document for manual build instructions.
+If you need to build releases manually:
+
+```bash
+# Build web frontend
+cd apps/web
+pnpm install
+pnpm build
+
+# Copy to CLI
+cd ../cli
+mkdir -p internal/web/static
+cp -r ../web/dist internal/web/static/dist
+
+# Build for all platforms
+VERSION="1.0.0"
+GIT_COMMIT=$(git rev-parse HEAD)
+BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+LDFLAGS="-X 'github.com/driangle/taskmd/apps/cli/internal/cli.Version=${VERSION}' \
+         -X 'github.com/driangle/taskmd/apps/cli/internal/cli.GitCommit=${GIT_COMMIT}' \
+         -X 'github.com/driangle/taskmd/apps/cli/internal/cli.BuildDate=${BUILD_DATE}'"
+
+GOOS=linux GOARCH=amd64 go build -tags embed_web -ldflags="$LDFLAGS" -o taskmd-linux-amd64 ./cmd/taskmd
+# ... repeat for other platforms
+```
+
+Using the automated workflow is strongly recommended for consistency and reproducibility.

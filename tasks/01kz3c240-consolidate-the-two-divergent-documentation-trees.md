@@ -1,7 +1,7 @@
 ---
 id: "01kz3c240"
 title: "Consolidate the two divergent documentation trees"
-status: pending
+status: completed
 priority: medium
 effort: medium
 type: docs
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [docs, cleanup]
 created_at: 2026-08-03
+completed_at: 2026-08-03
 ---
 
 # Consolidate the two divergent documentation trees
@@ -26,12 +27,12 @@ docs (`docs/brainstorm/`, `docs/specs/`, `docs/USER_STORIES.md`) add further clu
 
 ## Tasks
 
-- [ ] Pick one source of truth for user docs (the VitePress `apps/docs/` site)
-- [ ] Diff `docs/guides/*` against `apps/docs/*`, port any unique/current content into the site
-- [ ] Delete or clearly archive the superseded `docs/guides/` tree
-- [ ] Update README "Documentation" links to point only at the canonical site
-- [ ] Rename remaining "md-task-tracker" references to "taskmd" (start with `USER_STORIES.md`)
-- [ ] Decide whether `docs/brainstorm/` and `docs/specs/` belong in-repo or in a wiki/branch
+- [x] Pick one source of truth for user docs (the VitePress `apps/docs/` site)
+- [x] Diff `docs/guides/*` against `apps/docs/*`, port any unique/current content into the site
+- [x] Delete or clearly archive the superseded `docs/guides/` tree
+- [x] Update README "Documentation" links to point only at the canonical site
+- [x] Rename remaining "md-task-tracker" references to "taskmd" (start with `USER_STORIES.md`)
+- [x] Decide whether `docs/brainstorm/` and `docs/specs/` belong in-repo or in a wiki/branch
 
 ## Acceptance Criteria
 

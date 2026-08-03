@@ -1,6 +1,8 @@
-# MCP Server Guide
+# MCP Server
 
 Use the taskmd MCP server to give LLM-based tools direct access to your tasks. Any client that supports the [Model Context Protocol](https://modelcontextprotocol.io) (Claude Code, Claude Desktop, Cursor, Windsurf, etc.) can list, query, update, and analyze tasks without running CLI commands.
+
+For a comparison of the MCP server plugin versus the slash-command skills plugin in Claude Code, see the [Claude Code Plugin](/guide/claude-code-plugin) guide.
 
 ## Installation via MCPB Bundle
 
@@ -18,14 +20,7 @@ This starts an MCP server over stdio. The server exposes all task operations as 
 
 ### Claude Code
 
-The easiest way is to install the MCP plugin from the taskmd marketplace:
-
-```bash
-claude plugin marketplace add driangle/taskmd
-claude plugin install taskmd-mcp@taskmd-marketplace --scope project
-```
-
-Alternatively, add to your project's `.mcp.json` or run `claude mcp add --transport stdio taskmd -- taskmd mcp`:
+The easiest way is to install the MCP plugin from the taskmd marketplace — see the [Claude Code Plugin](/guide/claude-code-plugin) guide for details. Alternatively, add to your project's `.mcp.json` or run `claude mcp add --transport stdio taskmd -- taskmd mcp`:
 
 ```json
 {
@@ -289,6 +284,7 @@ Verify your MCP configuration file is in the right location and restart the clie
 
 ## Learn More
 
-- [CLI User Guide](cli-guide.md) - Full CLI command reference
-- [Task Specification](../taskmd_specification.md) - Task file format
-- [Quick Start](quickstart.md) - Getting started with taskmd
+- [CLI Guide](/guide/cli) - Full CLI command reference
+- [Claude Code Plugin](/guide/claude-code-plugin) - Slash-command skills for Claude Code
+- [Task Specification](/reference/specification) - Task file format
+- [Quick Start](/getting-started/) - Getting started with taskmd

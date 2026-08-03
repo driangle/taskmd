@@ -245,6 +245,15 @@ The Graph page includes a search box in the top-left corner for finding tasks in
 - Match count is displayed next to the search box
 - Clearing the search restores the previous viewport
 
+### Mobile Access
+
+The web interface is responsive and touch-friendly, so it works in mobile browsers:
+
+- **Stats** — mobile-optimized, the best view on a small screen
+- **Board** — horizontal scroll; good for quick status checks (works well in portrait)
+- **Tasks** — works well, but the table is wide (use landscape mode)
+- **Graph** — may be hard to read on small screens; expect to zoom
+
 ## Common Workflows
 
 ### Daily Task Management
@@ -449,3 +458,7 @@ taskmd web start --port 3000
 2. Verify file is saved (some editors use temporary files)
 3. Try refreshing the page manually
 4. Restart the server
+
+### Graph View Is Slow
+
+The web interface handles hundreds of tasks well, but the Graph view can become slow with more than ~200 tasks. Use filtering to reduce the number of displayed tasks, or organize tasks into subdirectories.

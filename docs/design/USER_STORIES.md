@@ -1,6 +1,6 @@
 # User Stories
 
-This document defines user stories for the md-task-tracker project. Stories are organized by persona and feature area.
+This document defines user stories for the taskmd project. Stories are organized by persona and feature area.
 
 ## Personas
 

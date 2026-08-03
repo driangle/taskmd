@@ -19,7 +19,7 @@ taskmd is directory-scoped. `initConfig()` walks up from `cwd` to find the neare
 - Sub-project groupings within a single repo (use existing `group`, `tags`, or `phase` for that)
 - Cross-project dependencies
 - Project-scoped phases or scopes (each project already has its own `.taskmd.yaml` for that)
-- Monorepo workspace support (see `docs/brainstorm/monorepo-workspaces.md`)
+- Monorepo workspace support (see `monorepo-workspaces.md`)
 
 ## Design
 
