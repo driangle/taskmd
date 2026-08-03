@@ -1,13 +1,15 @@
 # taskmd - Markdown Task Tracker CLI
 
-A terminal-based interface for managing markdown task files with automatic file watching and live updates.
+A non-interactive command-line tool (built with [Cobra](https://github.com/spf13/cobra)) for managing tasks stored as markdown files with YAML frontmatter. Tasks live alongside your code in version control; the CLI reads and writes those `.md` files directly.
 
 ## Features
 
 - Scans directories for markdown task files
-- Interactive TUI built with Bubble Tea
-- Live updates when files change
-- Beautiful markdown rendering
+- Subcommands to list, filter, get, add, set, validate, and visualize tasks
+- Multiple output formats (table, JSON, YAML, ASCII graphs)
+- Dependency graphs, kanban board, and project stats
+- Built-in MCP server (`taskmd mcp`) for AI assistants
+- Web dashboard export (`taskmd web`)
 
 ## Installation
 
@@ -17,24 +19,25 @@ A terminal-based interface for managing markdown task files with automatic file 
 make build
 ```
 
-### Run directly
+### Install to your PATH
 
 ```bash
-make run
+make install
 ```
 
 ## Usage
 
-```bash
-./taskmd
-```
-
-Or from anywhere after installing:
+Run a subcommand against a directory of task files:
 
 ```bash
-make install
-taskmd
+./taskmd list              # List all tasks
+./taskmd next              # Recommend what to work on next
+./taskmd add "Task title"  # Create a new task
+./taskmd graph --format ascii   # Visualize dependencies
+./taskmd validate          # Check task files for errors
 ```
+
+Run `taskmd --help` to see all available commands, or `taskmd <command> --help` for command-specific flags.
 
 ## Project Structure
 
@@ -51,11 +54,13 @@ apps/cli/
 
 ## Dependencies
 
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - TUI framework
+- [Cobra](https://github.com/spf13/cobra) - Command-line framework
+- [Viper](https://github.com/spf13/viper) - Configuration handling
+- [huh](https://github.com/charmbracelet/huh) - Interactive prompts (e.g. `init`)
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss) - Terminal styling
-- [Glamour](https://github.com/charmbracelet/glamour) - Markdown rendering
 - [fsnotify](https://github.com/fsnotify/fsnotify) - File system watching
-- [goldmark](https://github.com/yuin/goldmark) - Markdown parsing
+- [go-sdk](https://github.com/modelcontextprotocol/go-sdk) - MCP server
+- [yaml.v3](https://gopkg.in/yaml.v3) - YAML frontmatter parsing
 
 ## Development
 

@@ -1,7 +1,7 @@
 ---
 id: "01kz3c23y"
 title: "Reconcile stale CLI README with the actual command CLI"
-status: pending
+status: completed
 priority: high
 effort: small
 type: docs
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [docs, cli, cleanup]
 created_at: 2026-08-03
+completed_at: 2026-08-03
 ---
 
 # Reconcile stale CLI README with the actual command CLI
@@ -23,11 +24,11 @@ contributors on the first file they read.
 
 ## Tasks
 
-- [ ] Rewrite the CLI `README.md` intro to describe the actual cobra-based command CLI
-- [ ] Remove references to Bubble Tea, Glamour, goldmark, and any "interactive TUI" framing
-- [ ] Verify every dependency mentioned in the README actually appears in `go.mod`
-- [ ] Ensure command examples in the README match real command names and flags
-- [ ] Cross-check against `apps/docs` so the README and docs site agree
+- [x] Rewrite the CLI `README.md` intro to describe the actual cobra-based command CLI
+- [x] Remove references to Bubble Tea, Glamour, goldmark, and any "interactive TUI" framing
+- [x] Verify every dependency mentioned in the README actually appears in `go.mod`
+- [x] Ensure command examples in the README match real command names and flags
+- [x] Cross-check against `apps/docs` so the README and docs site agree
 
 ## Acceptance Criteria
 
