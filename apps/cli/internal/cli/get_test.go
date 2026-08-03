@@ -9,58 +9,15 @@ import (
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-// getFixtures returns the standard 3-task dependency chain used by most get tests.
-func getFixtures() map[string]string {
-	return map[string]string{
-		"001-setup.md": `---
-id: "001"
-title: "Setup project"
-status: completed
-priority: high
-effort: small
-dependencies: []
-tags: ["infra", "setup"]
-created: 2026-02-08
----
+// Canonical, recurring task shapes live under testdata/ and are loaded with
+// newTaskRepoFromFixture (see testdata/README.md):
+//   - "dependency-chain"  — 001-setup -> 002-auth -> 003-ui
+//   - "parent-children"   — 010 parent with children 011/012
+//   - "phases"            — p01 (phase: beta) and p02 (no phase)
+//   - "subdir-projects"   — cli/ and backend/ tasks with an ambiguous filename
+// Only genuinely one-off fixtures (e.g. markdownFixtures below) stay inline.
 
-# Setup project
-
-Initial project setup with build tooling.
-`,
-		"002-auth.md": `---
-id: "002"
-title: "Implement authentication"
-status: in-progress
-priority: critical
-effort: large
-dependencies: ["001"]
-tags: ["backend", "security"]
-created: 2026-02-08
----
-
-# Implement authentication
-
-Add JWT-based auth with refresh tokens.
-`,
-		"003-ui.md": `---
-id: "003"
-title: "Build UI components"
-status: pending
-priority: medium
-effort: medium
-dependencies: ["002"]
-tags: ["frontend"]
-created: 2026-02-08
----
-
-# Build UI components
-
-Create reusable component library.
-`,
-	}
-}
-
-// getOutput runs `get <args...>` against repo, fails on error, and returns stdout.
+// getStdout runs `get <args...>` against repo, fails on error, and returns stdout.
 func getStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
 	res := repo.Run(append([]string{"get"}, args...)...)
@@ -71,7 +28,7 @@ func getStdout(t *testing.T, repo *taskRepo, args ...string) string {
 }
 
 func TestGet_ExactMatchByID(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	output := getStdout(t, repo, "001")
 
@@ -84,7 +41,7 @@ func TestGet_ExactMatchByID(t *testing.T) {
 }
 
 func TestGet_ExactMatchByTitle(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	output := getStdout(t, repo, "Setup project")
 
@@ -94,7 +51,7 @@ func TestGet_ExactMatchByTitle(t *testing.T) {
 }
 
 func TestGet_ExactMatchByTitle_CaseInsensitive(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	output := getStdout(t, repo, "setup PROJECT")
 
@@ -141,7 +98,7 @@ created: 2026-02-08
 }
 
 func TestGet_TaskNotFound_ExactMode(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	res := repo.Run("get", "nonexistent", "--exact")
 	if res.Err == nil {
@@ -153,7 +110,7 @@ func TestGet_TaskNotFound_ExactMode(t *testing.T) {
 }
 
 func TestGet_TaskNotFound_NoMatches(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	// very high threshold so nothing matches
 	res := repo.Run("get", "zzzzzzzzzzzzzzz", "--threshold", "0.99")
@@ -166,7 +123,7 @@ func TestGet_TaskNotFound_NoMatches(t *testing.T) {
 }
 
 func TestGet_TextFormat(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	output := getStdout(t, repo, "002")
 
@@ -193,7 +150,7 @@ func TestGet_TextFormat(t *testing.T) {
 }
 
 func TestGet_JSONFormat(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	output := getStdout(t, repo, "002", "--format", "json")
 
@@ -220,7 +177,7 @@ func TestGet_JSONFormat(t *testing.T) {
 }
 
 func TestGet_YAMLFormat(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	output := getStdout(t, repo, "001", "--format", "yaml")
 
@@ -233,7 +190,7 @@ func TestGet_YAMLFormat(t *testing.T) {
 }
 
 func TestGet_UnsupportedFormat(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	res := repo.Run("get", "001", "--format", "csv")
 	if res.Err == nil {
@@ -245,7 +202,7 @@ func TestGet_UnsupportedFormat(t *testing.T) {
 }
 
 func TestGet_FuzzyMatch_Substring(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	// "auth" is a substring of "Implement authentication" — should fuzzy match.
 	// Simulate selecting option 1.
@@ -260,7 +217,7 @@ func TestGet_FuzzyMatch_Substring(t *testing.T) {
 }
 
 func TestGet_FuzzyMatch_Selection(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	// "ui" should fuzzy match "Build UI components"
 	getStdinReader = strings.NewReader("1\n")
@@ -274,7 +231,7 @@ func TestGet_FuzzyMatch_Selection(t *testing.T) {
 }
 
 func TestGet_FuzzyMatch_Cancel(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	getStdinReader = strings.NewReader("0\n")
 	defer func() { getStdinReader = os.Stdin }()
@@ -289,7 +246,7 @@ func TestGet_FuzzyMatch_Cancel(t *testing.T) {
 }
 
 func TestGet_Threshold(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	// very high threshold
 	res := repo.Run("get", "aut", "--threshold", "0.95")
@@ -314,7 +271,7 @@ func TestGet_EmptyDirectory(t *testing.T) {
 }
 
 func TestGet_Dependencies(t *testing.T) {
-	repo := newTaskRepo(t, getFixtures())
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
 	// Task 003 depends on 002, and 002 blocks 003
 	output := getStdout(t, repo, "003")
@@ -400,51 +357,8 @@ func TestLevenshtein(t *testing.T) {
 
 // --- File path matching tests ---
 
-// getSubdirFixtures returns tasks spread across subdirectories, including a
-// filename ("055-api.md") that is ambiguous between two directories.
-func getSubdirFixtures() map[string]string {
-	return map[string]string{
-		"cli/042-task.md": `---
-id: "cli-042"
-title: "CLI task"
-status: pending
-priority: medium
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# CLI task
-`,
-		"backend/055-api.md": `---
-id: "backend-055"
-title: "API task"
-status: pending
-priority: high
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# API task
-`,
-		"cli/055-api.md": `---
-id: "cli-055"
-title: "CLI API task"
-status: pending
-priority: low
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# CLI API task
-`,
-	}
-}
-
 func TestGet_FilePathMatch_FullRelativePath(t *testing.T) {
-	repo := newTaskRepo(t, getSubdirFixtures())
+	repo := newTaskRepoFromFixture(t, "subdir-projects")
 
 	output := getStdout(t, repo, "cli/042-task.md")
 
@@ -454,7 +368,7 @@ func TestGet_FilePathMatch_FullRelativePath(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_FilenameWithExtension(t *testing.T) {
-	repo := newTaskRepo(t, getSubdirFixtures())
+	repo := newTaskRepoFromFixture(t, "subdir-projects")
 
 	output := getStdout(t, repo, "042-task.md")
 
@@ -464,7 +378,7 @@ func TestGet_FilePathMatch_FilenameWithExtension(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_FilenameWithoutExtension(t *testing.T) {
-	repo := newTaskRepo(t, getSubdirFixtures())
+	repo := newTaskRepoFromFixture(t, "subdir-projects")
 
 	output := getStdout(t, repo, "042-task")
 
@@ -474,7 +388,7 @@ func TestGet_FilePathMatch_FilenameWithoutExtension(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_AmbiguousFilename(t *testing.T) {
-	repo := newTaskRepo(t, getSubdirFixtures())
+	repo := newTaskRepoFromFixture(t, "subdir-projects")
 
 	// "055-api.md" exists in both cli/ and backend/ — should be ambiguous
 	res := repo.Run("get", "055-api.md")
@@ -487,7 +401,7 @@ func TestGet_FilePathMatch_AmbiguousFilename(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_ExactPathResolvesAmbiguity(t *testing.T) {
-	repo := newTaskRepo(t, getSubdirFixtures())
+	repo := newTaskRepoFromFixture(t, "subdir-projects")
 
 	// Full relative path should resolve ambiguity
 	output := getStdout(t, repo, "backend/055-api.md")
@@ -498,7 +412,7 @@ func TestGet_FilePathMatch_ExactPathResolvesAmbiguity(t *testing.T) {
 }
 
 func TestGet_FilePathMatch_IDStillTakesPriority(t *testing.T) {
-	repo := newTaskRepo(t, getSubdirFixtures())
+	repo := newTaskRepoFromFixture(t, "subdir-projects")
 
 	// "cli-042" is a task ID — should match by ID, not filepath
 	output := getStdout(t, repo, "cli-042")
@@ -600,52 +514,8 @@ func TestFuzzyMatchTasks(t *testing.T) {
 	}
 }
 
-// parentFixtures returns a parent task with two children (one completed).
-func parentFixtures() map[string]string {
-	return map[string]string{
-		"010-parent.md": `---
-id: "010"
-title: "Parent task"
-status: pending
-priority: high
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# Parent task
-`,
-		"011-child.md": `---
-id: "011"
-title: "Child task"
-status: pending
-priority: medium
-parent: "010"
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# Child task
-`,
-		"012-child-done.md": `---
-id: "012"
-title: "Completed child"
-status: completed
-priority: low
-parent: "010"
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# Completed child
-`,
-	}
-}
-
 func TestGet_ParentDisplay(t *testing.T) {
-	repo := newTaskRepo(t, parentFixtures())
+	repo := newTaskRepoFromFixture(t, "parent-children")
 
 	output := getStdout(t, repo, "011")
 
@@ -658,7 +528,7 @@ func TestGet_ParentDisplay(t *testing.T) {
 }
 
 func TestGet_ChildrenDisplay(t *testing.T) {
-	repo := newTaskRepo(t, parentFixtures())
+	repo := newTaskRepoFromFixture(t, "parent-children")
 
 	output := getStdout(t, repo, "010")
 
@@ -680,7 +550,7 @@ func TestGet_ChildrenDisplay(t *testing.T) {
 }
 
 func TestGet_ParentJSON(t *testing.T) {
-	repo := newTaskRepo(t, parentFixtures())
+	repo := newTaskRepoFromFixture(t, "parent-children")
 
 	output := getStdout(t, repo, "011", "--format", "json")
 
@@ -698,7 +568,7 @@ func TestGet_ParentJSON(t *testing.T) {
 }
 
 func TestGet_ChildrenJSON(t *testing.T) {
-	repo := newTaskRepo(t, parentFixtures())
+	repo := newTaskRepoFromFixture(t, "parent-children")
 
 	output := getStdout(t, repo, "010", "--format", "json")
 
@@ -730,7 +600,7 @@ func TestGet_ChildrenJSON(t *testing.T) {
 }
 
 func TestGet_LeafTaskNoChildren(t *testing.T) {
-	repo := newTaskRepo(t, parentFixtures())
+	repo := newTaskRepoFromFixture(t, "parent-children")
 
 	output := getStdout(t, repo, "011")
 
@@ -739,7 +609,10 @@ func TestGet_LeafTaskNoChildren(t *testing.T) {
 	}
 }
 
-// markdownFixtures returns a task whose body exercises markdown rendering.
+// markdownFixtures returns a task whose body exercises markdown rendering. Kept
+// inline (not promoted to testdata/) on purpose: the body's exact markdown
+// constructs are the subject of these tests, so co-locating them with the
+// assertions keeps the test self-explanatory.
 func markdownFixtures() map[string]string {
 	return map[string]string{
 		"md-001-test.md": `---
@@ -810,39 +683,8 @@ func TestGet_FormattedMarkdown(t *testing.T) {
 	}
 }
 
-// phaseFixtures returns one task with a phase and one without.
-func phaseFixtures() map[string]string {
-	return map[string]string{
-		"p01-with-phase.md": `---
-id: "p01"
-title: "Task with phase"
-status: pending
-priority: medium
-phase: "beta"
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# Task with phase
-`,
-		"p02-no-phase.md": `---
-id: "p02"
-title: "Task without phase"
-status: pending
-priority: medium
-dependencies: []
-tags: []
-created: 2026-02-08
----
-
-# Task without phase
-`,
-	}
-}
-
 func TestGet_PhaseText(t *testing.T) {
-	repo := newTaskRepo(t, phaseFixtures())
+	repo := newTaskRepoFromFixture(t, "phases")
 
 	output := getStdout(t, repo, "p01")
 
@@ -852,7 +694,7 @@ func TestGet_PhaseText(t *testing.T) {
 }
 
 func TestGet_PhaseOmittedWhenEmpty_Text(t *testing.T) {
-	repo := newTaskRepo(t, phaseFixtures())
+	repo := newTaskRepoFromFixture(t, "phases")
 
 	output := getStdout(t, repo, "p02")
 
@@ -862,7 +704,7 @@ func TestGet_PhaseOmittedWhenEmpty_Text(t *testing.T) {
 }
 
 func TestGet_PhaseJSON(t *testing.T) {
-	repo := newTaskRepo(t, phaseFixtures())
+	repo := newTaskRepoFromFixture(t, "phases")
 
 	output := getStdout(t, repo, "p01", "--format", "json")
 
@@ -877,7 +719,7 @@ func TestGet_PhaseJSON(t *testing.T) {
 }
 
 func TestGet_PhaseOmittedWhenEmpty_JSON(t *testing.T) {
-	repo := newTaskRepo(t, phaseFixtures())
+	repo := newTaskRepoFromFixture(t, "phases")
 
 	output := getStdout(t, repo, "p02", "--format", "json")
 
@@ -887,7 +729,7 @@ func TestGet_PhaseOmittedWhenEmpty_JSON(t *testing.T) {
 }
 
 func TestGet_PhaseYAML(t *testing.T) {
-	repo := newTaskRepo(t, phaseFixtures())
+	repo := newTaskRepoFromFixture(t, "phases")
 
 	output := getStdout(t, repo, "p01", "--format", "yaml")
 
@@ -897,7 +739,7 @@ func TestGet_PhaseYAML(t *testing.T) {
 }
 
 func TestGet_PhaseOmittedWhenEmpty_YAML(t *testing.T) {
-	repo := newTaskRepo(t, phaseFixtures())
+	repo := newTaskRepoFromFixture(t, "phases")
 
 	output := getStdout(t, repo, "p02", "--format", "yaml")
 

@@ -32,9 +32,12 @@ package cli
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,6 +46,13 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
+
+// fixturesFS embeds the shared canonical task fixtures under testdata/ so tests
+// can seed a repo without depending on the working directory. Each immediate
+// subdirectory is one named fixture set; see testdata/README.md.
+//
+//go:embed testdata
+var fixturesFS embed.FS
 
 // cliResult captures the observable outcome of running a CLI command in a test.
 type cliResult struct {
@@ -161,6 +171,47 @@ func newTaskRepo(t *testing.T, files map[string]string) *taskRepo {
 		r.Write(name, content)
 	}
 	return r
+}
+
+// newTaskRepoFromFixture creates a temp repo seeded from a named fixture set
+// under testdata/ (see testdata/README.md). It replaces hand-written inline
+// task-YAML maps for the canonical, recurring task shapes. Layer additional
+// one-off files on afterward with Write, or overlay another set with SeedFixture.
+func newTaskRepoFromFixture(t *testing.T, set string) *taskRepo {
+	t.Helper()
+	r := &taskRepo{t: t, Dir: t.TempDir()}
+	r.SeedFixture(set)
+	return r
+}
+
+// SeedFixture copies every task file from the named testdata/ fixture set into
+// the repo, preserving the set's relative directory layout (so nested sets like
+// subdir-projects land in cli/ and backend/ subdirs). It fails the test if the
+// set does not exist, so a typo surfaces immediately rather than as a silently
+// empty repo.
+func (r *taskRepo) SeedFixture(set string) {
+	r.t.Helper()
+	root := path.Join("testdata", set)
+	entries, err := fs.ReadDir(fixturesFS, root)
+	if err != nil || len(entries) == 0 {
+		r.t.Fatalf("fixture set %q not found under testdata/", set)
+	}
+	walkErr := fs.WalkDir(fixturesFS, root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		content, readErr := fixturesFS.ReadFile(p)
+		if readErr != nil {
+			return readErr
+		}
+		// embed paths always use forward slashes; strip the set root prefix to
+		// get the repo-relative name and let Write handle OS-native joining.
+		r.Write(strings.TrimPrefix(p, root+"/"), string(content))
+		return nil
+	})
+	if walkErr != nil {
+		r.t.Fatalf("seed fixture %q: %v", set, walkErr)
+	}
 }
 
 // Write creates or overwrites a repo-relative file, creating parent dirs, and
