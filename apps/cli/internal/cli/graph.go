@@ -9,7 +9,6 @@ import (
 
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 var (
@@ -87,7 +86,6 @@ func init() {
 	graphCmd.Flags().StringVar(&graphPhase, "phase", "", "filter by phase (use 'none'/'any' to match tasks without/with a phase)")
 }
 
-//nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
 func runGraph(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
@@ -101,31 +99,34 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		graphExcludeStatus = []string{}
 	}
 
-	scanDir := ResolveScanDir(args)
-
-	// Create scanner and scan for tasks
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(ResolveScanDir(args), flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	tasks := result.Tasks
-
-	// Report any scan errors if verbose
-	if flags.Verbose && len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "\nWarning: encountered %d errors during scan:\n", len(result.Errors))
-		for _, scanErr := range result.Errors {
-			fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
-		}
-		fmt.Fprintln(os.Stderr)
+	tasks, err = filterGraphTasks(tasks)
+	if err != nil {
+		return err
 	}
 
-	warnDuplicateIDs(tasks)
+	g, err := buildGraphView(tasks)
+	if err != nil {
+		return err
+	}
 
+	output, err := renderGraph(g)
+	if err != nil {
+		return err
+	}
+
+	return writeGraphOutput(output, g, flags)
+}
+
+// filterGraphTasks applies shortcut/status filters and prunes dependency
+// references to tasks that were filtered out.
+func filterGraphTasks(tasks []*model.Task) ([]*model.Task, error) {
 	filtered := false
 
-	// Apply shortcut and generic filters
 	shortcuts := FilterShortcuts{
 		Status:   graphStatus,
 		Priority: graphPriority,
@@ -136,14 +137,14 @@ func runGraph(cmd *cobra.Command, args []string) error {
 	hasShortcutFilters := shortcuts.Status != "" || shortcuts.Priority != "" ||
 		shortcuts.Phase != "" || shortcuts.Scope != "" || len(shortcuts.Filters) > 0
 	if hasShortcutFilters {
+		var err error
 		tasks, err = applyShortcutFilters(tasks, shortcuts)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		filtered = true
 	}
 
-	// Filter tasks by status if requested
 	if len(graphExcludeStatus) > 0 {
 		excludeMap := make(map[string]bool)
 		for _, status := range graphExcludeStatus {
@@ -160,118 +161,127 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		filtered = true
 	}
 
-	// Clean up dependencies that reference filtered-out tasks
 	if filtered {
-		remainingTaskIDs := make(map[string]bool)
-		for _, task := range tasks {
-			remainingTaskIDs[task.ID] = true
-		}
-
-		for _, task := range tasks {
-			if len(task.Dependencies) > 0 {
-				cleanedDeps := make([]string, 0, len(task.Dependencies))
-				for _, depID := range task.Dependencies {
-					if remainingTaskIDs[depID] {
-						cleanedDeps = append(cleanedDeps, depID)
-					}
-				}
-				task.Dependencies = cleanedDeps
-			}
-		}
+		pruneDanglingDependencies(tasks)
 	}
 
-	// Build graph
+	return tasks, nil
+}
+
+// pruneDanglingDependencies removes dependency references that point to tasks
+// no longer present in the slice.
+func pruneDanglingDependencies(tasks []*model.Task) {
+	remainingTaskIDs := make(map[string]bool)
+	for _, task := range tasks {
+		remainingTaskIDs[task.ID] = true
+	}
+
+	for _, task := range tasks {
+		if len(task.Dependencies) == 0 {
+			continue
+		}
+		cleanedDeps := make([]string, 0, len(task.Dependencies))
+		for _, depID := range task.Dependencies {
+			if remainingTaskIDs[depID] {
+				cleanedDeps = append(cleanedDeps, depID)
+			}
+		}
+		task.Dependencies = cleanedDeps
+	}
+}
+
+// buildGraphView builds the graph and applies root-based and focus filtering.
+func buildGraphView(tasks []*model.Task) (*graph.Graph, error) {
 	g := graph.NewGraph(tasks)
 
-	// Filter graph based on flags
 	if graphRoot != "" {
-		// Validate root task exists
 		if _, exists := g.TaskMap[graphRoot]; !exists {
-			return fmt.Errorf("root task %s not found", graphRoot)
+			return nil, fmt.Errorf("root task %s not found", graphRoot)
 		}
-
-		// Filter tasks based on direction
-		var filteredIDs map[string]bool
-		if graphDownstream {
-			// Show tasks that depend on root
-			filteredIDs = g.GetDownstream(graphRoot)
-		} else if graphUpstream {
-			// Show tasks that root depends on
-			filteredIDs = g.GetUpstream(graphRoot)
-		} else {
-			// Show both upstream and downstream
-			upstream := g.GetUpstream(graphRoot)
-			downstream := g.GetDownstream(graphRoot)
-			filteredIDs = make(map[string]bool)
-			for id := range upstream {
-				filteredIDs[id] = true
-			}
-			for id := range downstream {
-				filteredIDs[id] = true
-			}
-		}
-
-		// Always include the root task itself
-		filteredIDs[graphRoot] = true
-
-		// Create filtered graph
-		g = g.FilterTasks(filteredIDs)
+		g = g.FilterTasks(rootFilterIDs(g))
 	} else if graphUpstream || graphDownstream {
-		return fmt.Errorf("--upstream and --downstream require --root")
+		return nil, fmt.Errorf("--upstream and --downstream require --root")
 	}
 
-	// Validate focus task exists if specified
 	if graphFocus != "" {
 		if _, exists := g.TaskMap[graphFocus]; !exists {
-			return fmt.Errorf("focus task %s not found", graphFocus)
+			return nil, fmt.Errorf("focus task %s not found", graphFocus)
 		}
 	}
 
-	// Generate output based on format
-	var output string
+	return g, nil
+}
+
+// rootFilterIDs computes the set of task IDs to keep when filtering from a root,
+// honoring the --upstream/--downstream direction flags.
+func rootFilterIDs(g *graph.Graph) map[string]bool {
+	var filteredIDs map[string]bool
+	switch {
+	case graphDownstream:
+		filteredIDs = g.GetDownstream(graphRoot)
+	case graphUpstream:
+		filteredIDs = g.GetUpstream(graphRoot)
+	default:
+		filteredIDs = make(map[string]bool)
+		for id := range g.GetUpstream(graphRoot) {
+			filteredIDs[id] = true
+		}
+		for id := range g.GetDownstream(graphRoot) {
+			filteredIDs[id] = true
+		}
+	}
+
+	// Always include the root task itself
+	filteredIDs[graphRoot] = true
+	return filteredIDs
+}
+
+// renderGraph renders the graph in the requested output format.
+func renderGraph(g *graph.Graph) (string, error) {
 	switch graphFormat {
 	case "mermaid":
-		output = g.ToMermaid(graphFocus)
+		return g.ToMermaid(graphFocus), nil
 	case "dot":
-		output = g.ToDot(graphFocus)
+		return g.ToDot(graphFocus), nil
 	case "ascii":
-		// For ASCII, use root if specified, otherwise show all roots
-		rootID := graphRoot
 		showDownstream := !graphUpstream // Default to downstream for ASCII
-		if graphUpstream {
-			showDownstream = false
-		}
-		r := getRenderer()
-		formatter := &graph.ASCIIFormatter{
-			FormatID: func(id string) string {
-				return formatTaskID(id, r)
-			},
-			FormatTitle: func(title, status string) string {
-				return formatTaskTitle(title, status, r)
-			},
-			FormatStatusIndicator: func(indicator, status string) string {
-				return getStatusColor(status, r).Render(indicator)
-			},
-			FormatConnector: func(connector string) string {
-				return formatDim(connector, r)
-			},
-			FormatReference: func(text string) string {
-				return formatDim(text, r)
-			},
-		}
-		output = g.ToASCII(rootID, showDownstream, formatter)
+		return g.ToASCII(graphRoot, showDownstream, newASCIIFormatter()), nil
 	case "json":
-		jsonData := g.ToJSON()
-		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
+		jsonBytes, err := json.MarshalIndent(g.ToJSON(), "", "  ")
 		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
+			return "", fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		output = string(jsonBytes) + "\n"
+		return string(jsonBytes) + "\n", nil
 	default:
-		return fmt.Errorf("unsupported format: %s (supported: mermaid, dot, ascii, json)", graphFormat)
+		return "", fmt.Errorf("unsupported format: %s (supported: mermaid, dot, ascii, json)", graphFormat)
 	}
+}
 
-	// Determine output destination
+// newASCIIFormatter builds the renderer-aware formatter for ASCII output.
+func newASCIIFormatter() *graph.ASCIIFormatter {
+	r := getRenderer()
+	return &graph.ASCIIFormatter{
+		FormatID: func(id string) string {
+			return formatTaskID(id, r)
+		},
+		FormatTitle: func(title, status string) string {
+			return formatTaskTitle(title, status, r)
+		},
+		FormatStatusIndicator: func(indicator, status string) string {
+			return getStatusColor(status, r).Render(indicator)
+		},
+		FormatConnector: func(connector string) string {
+			return formatDim(connector, r)
+		},
+		FormatReference: func(text string) string {
+			return formatDim(text, r)
+		},
+	}
+}
+
+// writeGraphOutput writes the rendered graph to the destination and reports
+// any detected dependency cycles.
+func writeGraphOutput(output string, g *graph.Graph, flags GlobalFlags) error {
 	var outFile *os.File
 	if graphOut != "" {
 		f, err := os.Create(graphOut)
@@ -284,25 +294,30 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		outFile = os.Stdout
 	}
 
-	// Write output
-	_, err = outFile.WriteString(output)
-	if err != nil {
+	if _, err := outFile.WriteString(output); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
-	// Print warning about cycles if any detected (only in verbose mode or for JSON format)
+	reportGraphCycles(g, flags)
+	return nil
+}
+
+// reportGraphCycles prints detected circular dependencies to stderr when
+// verbose mode is on and output is not JSON to stdout.
+func reportGraphCycles(g *graph.Graph, flags GlobalFlags) {
 	cycles := g.DetectCycles()
-	if len(cycles) > 0 {
-		if flags.Verbose || graphFormat == "json" {
-			if graphOut == "" && graphFormat != "json" {
-				// Only print to stderr if not outputting JSON to stdout
-				fmt.Fprintf(os.Stderr, "\nWarning: detected %d circular dependencies:\n", len(cycles))
-				for i, cycle := range cycles {
-					fmt.Fprintf(os.Stderr, "  Cycle %d: %v\n", i+1, cycle)
-				}
-			}
-		}
+	if len(cycles) == 0 {
+		return
+	}
+	if !flags.Verbose && graphFormat != "json" {
+		return
+	}
+	if graphOut != "" || graphFormat == "json" {
+		return
 	}
 
-	return nil
+	fmt.Fprintf(os.Stderr, "\nWarning: detected %d circular dependencies:\n", len(cycles))
+	for i, cycle := range cycles {
+		fmt.Fprintf(os.Stderr, "  Cycle %d: %v\n", i+1, cycle)
+	}
 }

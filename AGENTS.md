@@ -140,7 +140,7 @@ make check
 - **Code quality**: errcheck, staticcheck, govet, unused code detection
 - **Formatting**: gofmt, goimports
 
-**Note on file length**: Unlike some languages, Go doesn't enforce file-length limits. Instead, the focus is on keeping functions small and focused. If functions stay under 60 lines, files naturally remain manageable.
+**Note on file length**: golangci-lint has no built-in file-length rule, so the primary focus is on keeping functions small and focused — if functions stay under 60 lines, files naturally remain manageable. As a soft guardrail, `scripts/check-go-file-length.sh` warns about non-test `.go` files over 300 lines. It runs as part of `make check-lite` (and thus the pre-commit hook) but is **non-blocking** — it prints warnings and always exits 0. Treat warnings as a nudge to split a file, not a hard gate. Run it directly with `make check-file-length`.
 
 **Common lint rules**:
 - Use `any` instead of `interface{}`

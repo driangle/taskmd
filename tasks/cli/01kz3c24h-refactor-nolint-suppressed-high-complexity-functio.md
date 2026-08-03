@@ -1,7 +1,7 @@
 ---
 id: "01kz3c24h"
 title: "Refactor nolint-suppressed high-complexity functions"
-status: pending
+status: completed
 priority: medium
 effort: medium
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [cli, refactor, tech-debt]
 created_at: 2026-08-03
+completed_at: 2026-08-03
 ---
 
 # Refactor nolint-suppressed high-complexity functions
@@ -25,12 +26,12 @@ to enforce. Pay the debt down.
 
 ## Tasks
 
-- [ ] Refactor `runGraph` (`graph.go:90`) into focused helpers under the funlen/complexity limits
-- [ ] Refactor `runSnapshot` (`snapshot.go`) to remove its `//nolint:funlen`
-- [ ] Refactor the suppressed function in `stats.go`
-- [ ] Refactor `internal/watcher/watcher.go` to remove its `//nolint:gocognit`
-- [ ] Remove the corresponding `//nolint` directives and confirm `make lint` passes clean
-- [ ] Grep for any remaining `//nolint ... TODO: refactor` and file follow-ups or fix them
+- [x] Refactor `runGraph` (`graph.go:90`) into focused helpers under the funlen/complexity limits
+- [x] Refactor `runSnapshot` (`snapshot.go`) to remove its `//nolint:funlen`
+- [x] Refactor the suppressed function in `stats.go`
+- [x] Refactor `internal/watcher/watcher.go` to remove its `//nolint:gocognit`
+- [x] Remove the corresponding `//nolint` directives and confirm `make lint` passes clean
+- [x] Grep for any remaining `//nolint ... TODO: refactor` and file follow-ups or fix them
 
 ## Acceptance Criteria
 

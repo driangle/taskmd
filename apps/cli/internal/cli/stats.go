@@ -102,8 +102,6 @@ func outputStatsJSON(m *metrics.Metrics) error {
 }
 
 // outputStatsTable outputs metrics in a human-readable table format
-//
-//nolint:funlen // stats display has many sections by nature
 func outputStatsTable(m *metrics.Metrics, groupBy string) error {
 	r := getRenderer()
 
@@ -111,15 +109,7 @@ func outputStatsTable(m *metrics.Metrics, groupBy string) error {
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Println()
 
-	// Overall stats
-	tw := NewTableWriter()
-	tw.AddRow([]string{"Total Tasks:", fmt.Sprintf("%d", m.TotalTasks)}, []string{"Total Tasks:", fmt.Sprintf("%d", m.TotalTasks)})
-	tw.AddRow([]string{"Blocked Tasks:", fmt.Sprintf("%d", m.BlockedTasksCount)}, []string{"Blocked Tasks:", fmt.Sprintf("%d", m.BlockedTasksCount)})
-	tw.AddRow([]string{"Critical Path Length:", fmt.Sprintf("%d", m.CriticalPathLength)}, []string{"Critical Path Length:", fmt.Sprintf("%d", m.CriticalPathLength)})
-	tw.AddRow([]string{"Max Dependency Depth:", fmt.Sprintf("%d", m.MaxDependencyDepth)}, []string{"Max Dependency Depth:", fmt.Sprintf("%d", m.MaxDependencyDepth)})
-	tw.AddRow([]string{"Avg Dependencies/Task:", fmt.Sprintf("%.2f", m.AvgDependenciesPerTask)}, []string{"Avg Dependencies/Task:", fmt.Sprintf("%.2f", m.AvgDependenciesPerTask)})
-	tw.Flush(os.Stdout)
-	fmt.Println()
+	printStatsOverall(m)
 
 	// Tasks by status
 	fmt.Println(formatLabel("BY STATUS:", r))
@@ -143,6 +133,18 @@ func outputStatsTable(m *metrics.Metrics, groupBy string) error {
 	}
 
 	return nil
+}
+
+// printStatsOverall prints the top-level totals table.
+func printStatsOverall(m *metrics.Metrics) {
+	tw := NewTableWriter()
+	tw.AddRow([]string{"Total Tasks:", fmt.Sprintf("%d", m.TotalTasks)}, []string{"Total Tasks:", fmt.Sprintf("%d", m.TotalTasks)})
+	tw.AddRow([]string{"Blocked Tasks:", fmt.Sprintf("%d", m.BlockedTasksCount)}, []string{"Blocked Tasks:", fmt.Sprintf("%d", m.BlockedTasksCount)})
+	tw.AddRow([]string{"Critical Path Length:", fmt.Sprintf("%d", m.CriticalPathLength)}, []string{"Critical Path Length:", fmt.Sprintf("%d", m.CriticalPathLength)})
+	tw.AddRow([]string{"Max Dependency Depth:", fmt.Sprintf("%d", m.MaxDependencyDepth)}, []string{"Max Dependency Depth:", fmt.Sprintf("%d", m.MaxDependencyDepth)})
+	tw.AddRow([]string{"Avg Dependencies/Task:", fmt.Sprintf("%.2f", m.AvgDependenciesPerTask)}, []string{"Avg Dependencies/Task:", fmt.Sprintf("%.2f", m.AvgDependenciesPerTask)})
+	tw.Flush(os.Stdout)
+	fmt.Println()
 }
 
 func printStatsBreakdownByStatus(m *metrics.Metrics, r *lipgloss.Renderer) {

@@ -31,8 +31,6 @@ func New(dir string, onChange func(), debounce time.Duration) *Watcher {
 }
 
 // Start begins watching. It blocks until Stop is called or an error occurs.
-//
-//nolint:gocognit // TODO: refactor to reduce complexity
 func (w *Watcher) Start() error {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -48,6 +46,12 @@ func (w *Watcher) Start() error {
 		return err
 	}
 
+	return w.eventLoop(fsw)
+}
+
+// eventLoop dispatches filesystem events until the watcher is stopped or a
+// channel closes.
+func (w *Watcher) eventLoop(fsw *fsnotify.Watcher) error {
 	var timer *time.Timer
 	for {
 		select {
@@ -55,33 +59,45 @@ func (w *Watcher) Start() error {
 			if !ok {
 				return nil
 			}
-			if !isMarkdown(event.Name) {
-				// Watch new directories for recursive support
-				if event.Op&fsnotify.Create != 0 {
-					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-						_ = w.addRecursive(fsw, event.Name)
-					}
-				}
-				continue
-			}
-			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
-				continue
-			}
-			// Debounce
-			if timer != nil {
-				timer.Stop()
-			}
-			timer = time.AfterFunc(w.debounce, w.onChange)
+			timer = w.handleEvent(fsw, event, timer)
 
-		case err, ok := <-fsw.Errors:
+		case _, ok := <-fsw.Errors:
 			if !ok {
 				return nil
 			}
-			_ = err // log in verbose mode if needed
+			// errors are ignored; log in verbose mode if needed
 
 		case <-w.done:
 			return nil
 		}
+	}
+}
+
+// handleEvent processes a single event, returning the updated debounce timer.
+func (w *Watcher) handleEvent(fsw *fsnotify.Watcher, event fsnotify.Event, timer *time.Timer) *time.Timer {
+	if !isMarkdown(event.Name) {
+		w.watchNewDir(fsw, event)
+		return timer
+	}
+	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
+		return timer
+	}
+
+	// Debounce
+	if timer != nil {
+		timer.Stop()
+	}
+	return time.AfterFunc(w.debounce, w.onChange)
+}
+
+// watchNewDir adds newly created directories to the watcher so nested markdown
+// files are picked up recursively.
+func (w *Watcher) watchNewDir(fsw *fsnotify.Watcher, event fsnotify.Event) {
+	if event.Op&fsnotify.Create == 0 {
+		return
+	}
+	if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+		_ = w.addRecursive(fsw, event.Name)
 	}
 }
 

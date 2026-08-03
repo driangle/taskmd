@@ -1,4 +1,4 @@
-.PHONY: install-dev install-dev-full check check-lite test lint sync-spec docker-build docker-run
+.PHONY: install-dev install-dev-full check check-lite test lint check-file-length sync-spec docker-build docker-run
 
 # Install development binary (delegates to apps/cli)
 install-dev:
@@ -9,13 +9,17 @@ install-dev-full:
 	$(MAKE) -C apps/cli install-dev-full
 
 # Quick check: compile and lint all projects (no tests)
-check-lite:
+check-lite: check-file-length
 	cd apps/cli && go build ./...
 	$(MAKE) -C apps/cli lint
 	cd sdk/go && go build ./...
 	cd apps/web && pnpm run typeCheck
 	cd apps/web && pnpm run lint
 	cd apps/vscode && pnpm run lint
+
+# Warn about Go files over 300 lines (non-blocking guardrail; excludes tests)
+check-file-length:
+	./scripts/check-go-file-length.sh 300
 
 # Run all checks (compile, lint, tests for all projects + docs build)
 check: check-lite

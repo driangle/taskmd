@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 var (
@@ -79,57 +78,15 @@ type SnapshotOutput struct {
 	Groups map[string][]TaskSnapshot `json:"groups,omitempty" yaml:"groups,omitempty"`
 }
 
-//nolint:funlen // TODO: refactor to reduce length
 func runSnapshot(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 
-	scanDir := ResolveScanDir(args)
-
-	// Create scanner and scan for tasks
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(ResolveScanDir(args), flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	tasks := result.Tasks
-
-	// Report any scan errors if verbose
-	if flags.Verbose && len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "\nWarning: encountered %d errors during scan:\n", len(result.Errors))
-		for _, scanErr := range result.Errors {
-			fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
-		}
-		fmt.Fprintln(os.Stderr)
-	}
-
-	warnDuplicateIDs(tasks)
-
-	// Build task map for derived fields
-	taskMap := buildTaskMap(tasks)
-
-	// Calculate derived fields if requested
-	var depthMap map[string]int
-	var topoOrder map[string]int
-	var criticalPathTasks map[string]bool
-
-	if snapshotDerived {
-		depthMap = calculateDepthMap(tasks, taskMap)
-		topoOrder = calculateTopologicalOrder(tasks, taskMap)
-		criticalPathTasks = calculateCriticalPathTasks(tasks, taskMap)
-	}
-
-	// Convert tasks to snapshots
-	snapshots := make([]TaskSnapshot, 0, len(tasks))
-	for _, task := range tasks {
-		snapshot := taskToSnapshot(task, snapshotCore, snapshotDerived, depthMap, topoOrder, criticalPathTasks, taskMap)
-		snapshots = append(snapshots, snapshot)
-	}
-
-	// Sort snapshots by ID
-	sort.Slice(snapshots, func(i, j int) bool {
-		return snapshots[i].ID < snapshots[j].ID
-	})
+	snapshots := buildSnapshots(tasks)
 
 	// Prepare output
 	var output any
@@ -144,17 +101,11 @@ func runSnapshot(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine output destination
-	var outFile *os.File
-	if snapshotOut != "" {
-		f, err := os.Create(snapshotOut)
-		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
-		}
-		defer f.Close()
-		outFile = f
-	} else {
-		outFile = os.Stdout
+	outFile, cleanup, err := openSnapshotOutput()
+	if err != nil {
+		return err
 	}
+	defer cleanup()
 
 	// Output in requested format
 	switch snapshotFormat {
@@ -167,6 +118,47 @@ func runSnapshot(cmd *cobra.Command, args []string) error {
 	default:
 		return ValidateFormat(snapshotFormat, []string{"json", "yaml", "md"})
 	}
+}
+
+// buildSnapshots converts tasks into ID-sorted snapshots, computing derived
+// fields when --derived is set.
+func buildSnapshots(tasks []*model.Task) []TaskSnapshot {
+	taskMap := buildTaskMap(tasks)
+
+	var depthMap map[string]int
+	var topoOrder map[string]int
+	var criticalPathTasks map[string]bool
+	if snapshotDerived {
+		depthMap = calculateDepthMap(tasks, taskMap)
+		topoOrder = calculateTopologicalOrder(tasks, taskMap)
+		criticalPathTasks = calculateCriticalPathTasks(tasks, taskMap)
+	}
+
+	snapshots := make([]TaskSnapshot, 0, len(tasks))
+	for _, task := range tasks {
+		snapshot := taskToSnapshot(task, snapshotCore, snapshotDerived, depthMap, topoOrder, criticalPathTasks, taskMap)
+		snapshots = append(snapshots, snapshot)
+	}
+
+	sort.Slice(snapshots, func(i, j int) bool {
+		return snapshots[i].ID < snapshots[j].ID
+	})
+
+	return snapshots
+}
+
+// openSnapshotOutput returns the output destination and a cleanup function.
+// When --out is set it creates the file; otherwise it writes to stdout.
+func openSnapshotOutput() (*os.File, func(), error) {
+	if snapshotOut == "" {
+		return os.Stdout, func() {}, nil
+	}
+
+	f, err := os.Create(snapshotOut)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create output file: %w", err)
+	}
+	return f, func() { f.Close() }, nil
 }
 
 // taskToSnapshot converts a model.Task to TaskSnapshot
