@@ -33,7 +33,7 @@ phases:
     description: "Expand platform reach to Windows"
   - id: external-integrations
     name: "External Integrations"
-    description: "Sync and import from third-party tools"
+    description: "Sync/import with third-party tools (Jira/Linear/Trello/GitHub). Optional, NON-CORE surface being extracted to a separate module behind a stable task-source API — see docs/adr/0001-core-scope-boundary.md. Tasks here target that module, not core."
   - id: language-libraries
     name: "Language Libraries"
     description: "Expand ecosystem with SDK libraries"

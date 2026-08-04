@@ -2,6 +2,29 @@
 
 This document provides guidelines and conventions for developing the taskmd project. These instructions are designed to help maintain code quality, consistency, and reliability across the codebase.
 
+## Project Scope Boundary
+
+Before proposing or building a new feature, integration, or scanner, check it against
+the **core scope boundary**: [`docs/adr/0001-core-scope-boundary.md`](docs/adr/0001-core-scope-boundary.md).
+
+In short:
+
+- **Core** = reading, writing, and presenting **markdown task files**: parser, scanner,
+  validator, the read views (`list`, `get`, `next`, `board`, `stats`, `graph`, …),
+  mutations (`add`, `set`, `rm`, `archive`), config, and the MCP/web surfaces over that
+  model. Test: *would it still make sense if taskmd only ever touched the local
+  filesystem?*
+- **Optional / adjacent** = anything reaching outside that line — a foreign task system,
+  a network service, or a different source domain.
+  - **`sync`** (Jira/Linear/Trello/GitHub) is being **extracted to a separate module**
+    behind a stable task-source API. New foreign-system integrations belong there, not
+    in core. (Still in-tree and supported until the extraction lands.)
+  - **`todos`** (source-code TODO/FIXME scanner) **stays in core but is capped** — an
+    on-ramp for turning comments into tasks, not a growth area. New languages/markers/
+    analytics must clear the optional-feature bar.
+
+Record non-obvious scope or architecture decisions as a new ADR under `docs/adr/`.
+
 ## Prerequisites
 
 Before developing, ensure you have the following tools installed:

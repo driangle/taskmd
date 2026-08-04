@@ -1,7 +1,7 @@
 ---
 id: "01kz3c24f"
 title: "Define scope boundary for sync and source-TODO scanner"
-status: pending
+status: completed
 priority: high
 effort: medium
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [scope, architecture, decision]
 created_at: 2026-08-03
+completed_at: 2026-08-04
 ---
 
 # Define scope boundary for sync and source-TODO scanner
@@ -25,13 +26,16 @@ future work has a boundary to respect.
 
 ## Tasks
 
-- [ ] Write down the definition of "core taskmd" vs "optional/experimental" modules
-- [ ] Decide the home for `sync` (Jira/Linear/Trello/GitHub): core, optional build tag, or plugin
-- [ ] Decide the home for the source-TODO scanner (`todos`): core or optional
-- [ ] Capture the decision in a short ADR or a section in `AGENTS.md`
-- [ ] Add follow-up tasks for any move (e.g. gate `sync` behind a build tag or split into a
-      separate module) if that is the decision
-- [ ] Align the `.taskmd.yaml` phases (external-integrations, etc.) with the decided scope
+- [x] Write down the definition of "core taskmd" vs "optional/experimental" modules
+- [x] Decide the home for `sync` (Jira/Linear/Trello/GitHub): core, optional build tag, or plugin
+      — decided: **separate module/plugin**
+- [x] Decide the home for the source-TODO scanner (`todos`): core or optional
+      — decided: **stays in core, but capped**
+- [x] Capture the decision in a short ADR or a section in `AGENTS.md`
+      — `docs/adr/0001-core-scope-boundary.md` + Scope Boundary section in `AGENTS.md`
+- [x] Add follow-up tasks for any move (e.g. gate `sync` behind a build tag or split into a
+      separate module) if that is the decision — created `01kz6013n` (extract sync module)
+- [x] Align the `.taskmd.yaml` phases (external-integrations, etc.) with the decided scope
 
 ## Acceptance Criteria
 
