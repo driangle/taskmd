@@ -34,8 +34,8 @@ describe("PhasesPage", () => {
       mutate: vi.fn(),
       isValidating: false,
     });
-    const { container } = render(<PhasesPage />);
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    render(<PhasesPage />);
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("renders error state", () => {

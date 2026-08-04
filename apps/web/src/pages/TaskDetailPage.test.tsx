@@ -91,8 +91,8 @@ describe("TaskDetailPage", () => {
   it("shows loading state", () => {
     mockLoading = true;
     mockTask = undefined;
-    const { container } = renderPage();
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    renderPage();
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("shows error state with retry", () => {
@@ -108,10 +108,8 @@ describe("TaskDetailPage", () => {
     mockTask = makeTask({ dependencies: ["010", "020"] });
     renderPage();
     expect(screen.getByText("Dependencies")).toBeInTheDocument();
-    const depLinks = screen.getAllByText(/^0[12]0$/);
-    expect(depLinks).toHaveLength(2);
-    expect(depLinks[0].closest("a")).toHaveAttribute("href", "/tasks/010");
-    expect(depLinks[1].closest("a")).toHaveAttribute("href", "/tasks/020");
+    expect(screen.getByRole("link", { name: "010" })).toHaveAttribute("href", "/tasks/010");
+    expect(screen.getByRole("link", { name: "020" })).toHaveAttribute("href", "/tasks/020");
   });
 
   it("does not render dependencies section when empty", () => {
@@ -142,8 +140,8 @@ describe("TaskDetailPage", () => {
 
   it("does not render body section when empty", () => {
     mockTask = makeTask({ body: "" });
-    const { container } = renderPage();
-    expect(container.querySelector(".prose")).not.toBeInTheDocument();
+    renderPage();
+    expect(screen.queryByRole("region", { name: "Task description" })).not.toBeInTheDocument();
   });
 
   it("renders file_path when present", () => {
@@ -156,8 +154,7 @@ describe("TaskDetailPage", () => {
     mockTask = makeTask({ parent: "001" });
     renderPage();
     expect(screen.getByText("Parent")).toBeInTheDocument();
-    const parentLink = screen.getByText("001");
-    expect(parentLink.closest("a")).toHaveAttribute("href", "/tasks/001");
+    expect(screen.getByRole("link", { name: "001" })).toHaveAttribute("href", "/tasks/001");
   });
 
   it("renders effort, phase, owner, group, created fields", () => {

@@ -31,8 +31,8 @@ describe("ValidatePage", () => {
       mutate: vi.fn(),
       isValidating: false,
     });
-    const { container } = render(<ValidatePage />);
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    render(<ValidatePage />);
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("renders error state", () => {

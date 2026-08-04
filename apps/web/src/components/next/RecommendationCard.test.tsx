@@ -50,16 +50,16 @@ describe("RecommendationCard", () => {
     expect(screen.getByText("critical")).toBeInTheDocument();
   });
 
-  it("applies ring-2 class when focused=true", () => {
+  it("marks the card as focused when focused=true", () => {
     const { container } = renderCard({}, true);
     const card = container.firstChild as HTMLElement;
-    expect(card.className).toContain("ring-2");
+    expect(card).toHaveAttribute("data-focused", "true");
   });
 
-  it("does not apply ring-2 class when focused=false", () => {
+  it("is not marked focused when focused=false", () => {
     const { container } = renderCard({}, false);
     const card = container.firstChild as HTMLElement;
-    expect(card.className).not.toContain("ring-2");
+    expect(card).toHaveAttribute("data-focused", "false");
   });
 
   it("shows 'critical path' badge when on_critical_path=true", () => {
@@ -92,15 +92,12 @@ describe("RecommendationCard", () => {
     expect(screen.getByText("High priority")).toBeInTheDocument();
     expect(screen.getByText("No blockers")).toBeInTheDocument();
     expect(screen.getByText("Critical path")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("renders no reason badges when reasons is empty", () => {
     renderCard({ reasons: [] });
-    // No reason spans should be present
-    const reasonBadges = document.querySelectorAll(
-      ".bg-gray-100.text-gray-600",
-    );
-    expect(reasonBadges.length).toBe(0);
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 
   it("link points to /tasks/{id}", () => {

@@ -38,36 +38,33 @@ describe("TaskNode", () => {
     expect(source).toHaveAttribute("data-position", "bottom");
   });
 
-  it("applies highlight ring when highlighted", () => {
+  it("marks the node as highlighted when highlighted", () => {
     const { container } = render(
       <TaskNode
         data={{ taskId: "001", label: "Task", status: "pending", highlighted: true }}
       />,
     );
 
-    const node = container.querySelector(".ring-2.ring-blue-500");
-    expect(node).toBeInTheDocument();
+    expect(container.querySelector('[data-highlighted="true"]')).toBeInTheDocument();
   });
 
-  it("applies dimmed opacity when dimmed", () => {
+  it("marks the node as dimmed when dimmed", () => {
     const { container } = render(
       <TaskNode
         data={{ taskId: "001", label: "Task", status: "pending", dimmed: true }}
       />,
     );
 
-    const node = container.querySelector(".opacity-40");
-    expect(node).toBeInTheDocument();
+    expect(container.querySelector('[data-dimmed="true"]')).toBeInTheDocument();
   });
 
-  it("shows priority border for critical priority", () => {
+  it("exposes the task priority for critical priority", () => {
     const { container } = render(
       <TaskNode
         data={{ taskId: "001", label: "Task", status: "pending", priority: "critical" }}
       />,
     );
 
-    const node = container.querySelector(".border-l-4.border-l-red-500");
-    expect(node).toBeInTheDocument();
+    expect(container.querySelector('[data-priority="critical"]')).toBeInTheDocument();
   });
 });

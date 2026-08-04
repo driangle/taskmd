@@ -23,7 +23,7 @@ export function LoadingState({ variant = "default" }: LoadingStateProps) {
 
 function TableSkeleton() {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse" role="status" aria-label="Loading">
       <div className="h-8 bg-gray-100 dark:bg-gray-700 rounded mb-3" />
       {Array.from({ length: 6 }, (_, i) => (
         <div key={i} className="flex gap-4 mb-2">
@@ -39,7 +39,11 @@ function TableSkeleton() {
 
 function BoardSkeleton() {
   return (
-    <div className="animate-pulse flex flex-col sm:flex-row gap-4">
+    <div
+      className="animate-pulse flex flex-col sm:flex-row gap-4"
+      role="status"
+      aria-label="Loading"
+    >
       {Array.from({ length: 4 }, (_, col) => (
         <div key={col} className="flex-1 sm:min-w-[200px]">
           <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded mb-3 w-24" />
@@ -57,7 +61,11 @@ function BoardSkeleton() {
 
 function GraphSkeleton() {
   return (
-    <div className="animate-pulse bg-white rounded-lg border border-gray-200 h-[calc(100vh-160px)] md:h-[calc(100vh-200px)] min-h-[400px] md:min-h-[500px] flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
+    <div
+      className="animate-pulse bg-white rounded-lg border border-gray-200 h-[calc(100vh-160px)] md:h-[calc(100vh-200px)] min-h-[400px] md:min-h-[500px] flex items-center justify-center dark:bg-gray-800 dark:border-gray-700"
+      role="status"
+      aria-label="Loading"
+    >
       <div className="text-center">
         <div className="h-8 w-8 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-700" />
         <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-32 mx-auto" />
@@ -68,7 +76,7 @@ function GraphSkeleton() {
 
 function CardsSkeleton() {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse" role="status" aria-label="Loading">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="bg-gray-100 dark:bg-gray-700 rounded-lg h-20" />
@@ -84,7 +92,11 @@ function CardsSkeleton() {
 
 function DetailSkeleton() {
   return (
-    <div className="animate-pulse bg-white border border-gray-200 rounded-lg p-6 dark:bg-gray-800 dark:border-gray-700">
+    <div
+      className="animate-pulse bg-white border border-gray-200 rounded-lg p-6 dark:bg-gray-800 dark:border-gray-700"
+      role="status"
+      aria-label="Loading"
+    >
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded w-16 mb-2" />
@@ -111,7 +123,11 @@ function DetailSkeleton() {
 
 function DefaultSkeleton() {
   return (
-    <div className="animate-pulse flex items-center justify-center py-12">
+    <div
+      className="animate-pulse flex items-center justify-center py-12"
+      role="status"
+      aria-label="Loading"
+    >
       <div className="text-center">
         <div className="h-8 w-8 mx-auto mb-3 rounded-full bg-gray-200 dark:bg-gray-600" />
         <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24 mx-auto" />

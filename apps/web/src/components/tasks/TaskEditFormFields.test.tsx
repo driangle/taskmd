@@ -4,18 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { FieldGrid, MetadataFields } from "./TaskEditFormFields.tsx";
 import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "./TaskTable/constants.ts";
 
-function getSelectByLabel(container: HTMLElement, label: string): HTMLSelectElement {
-  const labelEl = Array.from(container.querySelectorAll("label")).find(
-    (l) => l.textContent?.trim() === label,
-  )!;
-  return labelEl.parentElement!.querySelector("select")!;
-}
-
-function getInputByLabel(container: HTMLElement, label: string): HTMLInputElement {
-  const labelEl = Array.from(container.querySelectorAll("label")).find(
-    (l) => l.textContent?.trim() === label,
-  )!;
-  return labelEl.parentElement!.querySelector("input")!;
+function optionValues(select: HTMLElement): string[] {
+  return Array.from((select as HTMLSelectElement).options).map((o) => o.value);
 }
 
 describe("FieldGrid", () => {
@@ -35,26 +25,23 @@ describe("FieldGrid", () => {
     return { ...render(<FieldGrid {...props} />), props };
   }
 
-  it("renders all four select fields with labels", () => {
+  it("renders all four labelled select fields", () => {
     renderFieldGrid();
-    expect(screen.getByText("Status")).toBeInTheDocument();
-    expect(screen.getByText("Priority")).toBeInTheDocument();
-    expect(screen.getByText("Effort")).toBeInTheDocument();
-    expect(screen.getByText("Type")).toBeInTheDocument();
-    expect(document.querySelectorAll("select")).toHaveLength(4);
+    expect(screen.getByLabelText("Status")).toBeInTheDocument();
+    expect(screen.getByLabelText("Priority")).toBeInTheDocument();
+    expect(screen.getByLabelText("Effort")).toBeInTheDocument();
+    expect(screen.getByLabelText("Type")).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox")).toHaveLength(4);
   });
 
   it("renders all status options", () => {
-    const { container } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Status");
-    const options = Array.from(select.options).map((o) => o.value);
-    expect(options).toEqual(STATUSES);
+    renderFieldGrid();
+    expect(optionValues(screen.getByLabelText("Status"))).toEqual(STATUSES);
   });
 
   it("exposes all 6 spec statuses including in-review", () => {
-    const { container } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Status");
-    const options = Array.from(select.options).map((o) => o.value);
+    renderFieldGrid();
+    const options = optionValues(screen.getByLabelText("Status"));
     expect(options).toEqual(
       expect.arrayContaining([
         "pending",
@@ -69,54 +56,47 @@ describe("FieldGrid", () => {
   });
 
   it("renders priority options with empty default", () => {
-    const { container } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Priority");
-    const options = Array.from(select.options).map((o) => o.value);
-    expect(options).toEqual(["", ...PRIORITIES]);
+    renderFieldGrid();
+    const select = screen.getByLabelText("Priority") as HTMLSelectElement;
+    expect(optionValues(select)).toEqual(["", ...PRIORITIES]);
     expect(select.options[0].textContent).toBe("-");
   });
 
   it("renders effort options with empty default", () => {
-    const { container } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Effort");
-    const options = Array.from(select.options).map((o) => o.value);
-    expect(options).toEqual(["", ...EFFORTS]);
+    renderFieldGrid();
+    const select = screen.getByLabelText("Effort") as HTMLSelectElement;
+    expect(optionValues(select)).toEqual(["", ...EFFORTS]);
     expect(select.options[0].textContent).toBe("-");
   });
 
   it("renders type options with empty default", () => {
-    const { container } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Type");
-    const options = Array.from(select.options).map((o) => o.value);
-    expect(options).toEqual(["", ...TYPES]);
+    renderFieldGrid();
+    const select = screen.getByLabelText("Type") as HTMLSelectElement;
+    expect(optionValues(select)).toEqual(["", ...TYPES]);
     expect(select.options[0].textContent).toBe("-");
   });
 
   it("calls onStatusChange when status is changed", async () => {
-    const { container, props } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Status");
-    await userEvent.selectOptions(select, "completed");
+    const { props } = renderFieldGrid();
+    await userEvent.selectOptions(screen.getByLabelText("Status"), "completed");
     expect(props.onStatusChange).toHaveBeenCalledWith("completed");
   });
 
   it("calls onPriorityChange when priority is changed", async () => {
-    const { container, props } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Priority");
-    await userEvent.selectOptions(select, "high");
+    const { props } = renderFieldGrid();
+    await userEvent.selectOptions(screen.getByLabelText("Priority"), "high");
     expect(props.onPriorityChange).toHaveBeenCalledWith("high");
   });
 
   it("calls onEffortChange when effort is changed", async () => {
-    const { container, props } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Effort");
-    await userEvent.selectOptions(select, "large");
+    const { props } = renderFieldGrid();
+    await userEvent.selectOptions(screen.getByLabelText("Effort"), "large");
     expect(props.onEffortChange).toHaveBeenCalledWith("large");
   });
 
   it("calls onTaskTypeChange when type is changed", async () => {
-    const { container, props } = renderFieldGrid();
-    const select = getSelectByLabel(container, "Type");
-    await userEvent.selectOptions(select, "bug");
+    const { props } = renderFieldGrid();
+    await userEvent.selectOptions(screen.getByLabelText("Type"), "bug");
     expect(props.onTaskTypeChange).toHaveBeenCalledWith("bug");
   });
 });
@@ -138,13 +118,13 @@ describe("MetadataFields", () => {
     return { ...render(<MetadataFields {...props} />), props };
   }
 
-  it("renders all four input fields with labels", () => {
+  it("renders all four labelled input fields", () => {
     renderMetadataFields();
-    expect(screen.getByText("Phase")).toBeInTheDocument();
-    expect(screen.getByText("Owner")).toBeInTheDocument();
-    expect(screen.getByText("Parent")).toBeInTheDocument();
-    expect(screen.getByText("Tags (comma-separated)")).toBeInTheDocument();
-    expect(document.querySelectorAll("input")).toHaveLength(4);
+    expect(screen.getByLabelText("Phase")).toBeInTheDocument();
+    expect(screen.getByLabelText("Owner")).toBeInTheDocument();
+    expect(screen.getByLabelText("Parent")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tags (comma-separated)")).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox")).toHaveLength(4);
   });
 
   it("renders correct placeholders", () => {
@@ -156,22 +136,20 @@ describe("MetadataFields", () => {
   });
 
   it("calls onOwnerChange when owner input changes", async () => {
-    const { container, props } = renderMetadataFields();
-    const input = getInputByLabel(container, "Owner");
-    await userEvent.type(input, "bob");
+    const { props } = renderMetadataFields();
+    await userEvent.type(screen.getByLabelText("Owner"), "bob");
     expect(props.onOwnerChange).toHaveBeenCalled();
   });
 
   it("calls onParentChange when parent input changes", async () => {
-    const { container, props } = renderMetadataFields();
-    const input = getInputByLabel(container, "Parent");
-    await userEvent.type(input, "042");
+    const { props } = renderMetadataFields();
+    await userEvent.type(screen.getByLabelText("Parent"), "042");
     expect(props.onParentChange).toHaveBeenCalled();
   });
 
   it("calls onTagsChange when tags input changes", async () => {
     const { props } = renderMetadataFields();
-    await userEvent.type(screen.getByPlaceholderText("e.g. backend, api, feature"), "test");
+    await userEvent.type(screen.getByLabelText("Tags (comma-separated)"), "test");
     expect(props.onTagsChange).toHaveBeenCalled();
   });
 });

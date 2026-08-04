@@ -134,16 +134,14 @@ describe("Shell", () => {
     expect(screen.getByTestId("search-dialog")).toBeDefined();
   });
 
-  it("applies graph page layout class when on /graph", () => {
+  it("uses the graph page layout when on /graph", () => {
     renderShell(["/graph"]);
-    const main = screen.getByTestId("child-content").closest("main");
-    expect(main?.className).toContain("flex-1");
+    expect(screen.getByRole("main")).toHaveAttribute("data-layout", "graph");
   });
 
-  it("does not apply graph page layout class on other pages", () => {
+  it("uses the default layout on other pages", () => {
     renderShell(["/"]);
-    const main = screen.getByTestId("child-content").closest("main");
-    expect(main?.className).not.toContain("flex-1");
+    expect(screen.getByRole("main")).toHaveAttribute("data-layout", "default");
   });
 
   it("does not open search for / key on TEXTAREA", () => {

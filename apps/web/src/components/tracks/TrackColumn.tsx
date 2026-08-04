@@ -29,10 +29,11 @@ export function TrackColumn({ track }: TrackColumnProps) {
           </span>
         </h3>
         {track.scopes.length > 0 && (
-          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap" role="list" aria-label="Scopes">
             {track.scopes.map((scope) => (
               <span
                 key={scope}
+                role="listitem"
                 className="px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 {scope}

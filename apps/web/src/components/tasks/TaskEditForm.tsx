@@ -100,10 +100,11 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
       />
 
       <div>
-        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+        <label htmlFor="task-body" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
           Body (Markdown)
         </label>
         <textarea
+          id="task-body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={24}

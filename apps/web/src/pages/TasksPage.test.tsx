@@ -42,8 +42,8 @@ describe("TasksPage", () => {
       mutate: vi.fn(),
       isValidating: false,
     });
-    const { container } = renderWithRouter();
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    renderWithRouter();
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("renders error state", () => {

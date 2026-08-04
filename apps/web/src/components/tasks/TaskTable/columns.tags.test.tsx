@@ -70,23 +70,21 @@ describe("columns tags", () => {
     expect(toggleTag).toHaveBeenCalledWith("frontend");
   });
 
-  it("applies active styling when tag is in selectedTags", () => {
+  it("marks the tag button as pressed when tag is in selectedTags", () => {
     const task = createTask({ tags: ["backend"] });
     const cols = getColumns(new Set(["backend"]));
     const tagsCol = cols.find((c) => (c as { accessorKey?: string }).accessorKey === "tags")!;
     const cellFn = tagsCol.cell as (ctx: CellContext<Task, string[]>) => React.ReactNode;
     renderCell(cellFn(makeCellContext(task, "tags") as CellContext<Task, string[]>));
-    const btn = screen.getByRole("button", { name: "backend" });
-    expect(btn.className).toContain("bg-blue-100");
+    expect(screen.getByRole("button", { name: "backend" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("applies inactive styling when tag is not in selectedTags", () => {
+  it("marks the tag button as not pressed when tag is not in selectedTags", () => {
     const task = createTask({ tags: ["backend"] });
     const cols = getColumns(new Set());
     const tagsCol = cols.find((c) => (c as { accessorKey?: string }).accessorKey === "tags")!;
     const cellFn = tagsCol.cell as (ctx: CellContext<Task, string[]>) => React.ReactNode;
     renderCell(cellFn(makeCellContext(task, "tags") as CellContext<Task, string[]>));
-    const btn = screen.getByRole("button", { name: "backend" });
-    expect(btn.className).toContain("bg-gray-100");
+    expect(screen.getByRole("button", { name: "backend" })).toHaveAttribute("aria-pressed", "false");
   });
 });

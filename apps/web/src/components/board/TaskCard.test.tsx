@@ -31,9 +31,10 @@ function renderCard(props: Partial<React.ComponentProps<typeof TaskCard>> = {}) 
 describe("TaskCard", () => {
   it("renders task title as a link", () => {
     renderCard();
-    const link = screen.getByText("Implement feature X");
-    expect(link).toBeInTheDocument();
-    expect(link.closest("a")).toHaveAttribute("href", "/tasks/042");
+    expect(screen.getByRole("link", { name: "Implement feature X" })).toHaveAttribute(
+      "href",
+      "/tasks/042",
+    );
   });
 
   it("renders task id", () => {
@@ -61,16 +62,6 @@ describe("TaskCard", () => {
     const { container } = renderCard({ canDrag: false });
     const card = container.firstElementChild!;
     expect(card).toHaveAttribute("draggable", "false");
-  });
-
-  it("shows drag handle only when canDrag is true", () => {
-    const { container } = renderCard({ canDrag: true });
-    expect(container.querySelector("svg")).toBeInTheDocument();
-  });
-
-  it("hides drag handle when canDrag is false", () => {
-    const { container } = renderCard({ canDrag: false });
-    expect(container.querySelector("svg")).not.toBeInTheDocument();
   });
 
   describe("drag events", () => {
@@ -123,11 +114,11 @@ describe("TaskCard", () => {
       removeSpy.mockRestore();
     });
 
-    it("applies opacity-50 class while dragging", () => {
+    it("marks the card as dragging while a drag is in progress", () => {
       const { container } = renderCard();
       const card = container.firstElementChild!;
 
-      expect(card.className).not.toContain("opacity-50");
+      expect(card).toHaveAttribute("data-dragging", "false");
 
       const startEvent = new Event("dragstart", { bubbles: true });
       Object.defineProperty(startEvent, "dataTransfer", {
@@ -135,10 +126,10 @@ describe("TaskCard", () => {
       });
       fireEvent(card, startEvent);
 
-      expect(card.className).toContain("opacity-50");
+      expect(card).toHaveAttribute("data-dragging", "true");
 
       fireEvent.dragEnd(card);
-      expect(card.className).not.toContain("opacity-50");
+      expect(card).toHaveAttribute("data-dragging", "false");
     });
 
     it("cleans up document listeners on unmount while dragging", () => {
@@ -164,15 +155,15 @@ describe("TaskCard", () => {
     });
   });
 
-  it("applies ring-2 class when focused", () => {
+  it("marks the card as focused when focused", () => {
     const { container } = renderCard({ focused: true });
     const card = container.firstElementChild!;
-    expect(card.className).toContain("ring-2");
+    expect(card).toHaveAttribute("data-focused", "true");
   });
 
-  it("does not apply ring-2 when not focused", () => {
+  it("is not marked focused when not focused", () => {
     const { container } = renderCard({ focused: false });
     const card = container.firstElementChild!;
-    expect(card.className).not.toContain("ring-2");
+    expect(card).toHaveAttribute("data-focused", "false");
   });
 });

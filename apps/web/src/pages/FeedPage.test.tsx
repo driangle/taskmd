@@ -32,8 +32,8 @@ describe("FeedPage", () => {
       mutate: vi.fn(),
       isValidating: false,
     });
-    const { container } = render(<FeedPage />);
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    render(<FeedPage />);
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("renders error state", () => {

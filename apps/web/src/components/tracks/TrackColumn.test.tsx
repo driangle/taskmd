@@ -53,8 +53,7 @@ describe("TrackColumn", () => {
 
     // The header should still render
     expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent("Track 1");
-    // With empty scopes the wrapper div for scopes should not be rendered
-    const header = screen.getByRole("heading", { level: 3 }).parentElement!;
-    expect(header.querySelectorAll(".mt-1\\.5")).toHaveLength(0);
+    // With empty scopes the scopes list should not be rendered
+    expect(screen.queryByRole("list", { name: "Scopes" })).not.toBeInTheDocument();
   });
 });

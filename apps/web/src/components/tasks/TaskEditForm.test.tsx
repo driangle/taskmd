@@ -147,10 +147,9 @@ describe("TaskEditForm", () => {
   });
 
   it("handles empty body in task", () => {
-    const { container } = render(
+    render(
       <TaskEditForm task={makeTask({ body: "" })} onSave={vi.fn()} onCancel={vi.fn()} error={null} />,
     );
-    const textarea = container.querySelector("textarea")!;
-    expect(textarea).toHaveValue("");
+    expect(screen.getByLabelText("Body (Markdown)")).toHaveValue("");
   });
 });

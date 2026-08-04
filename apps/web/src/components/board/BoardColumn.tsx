@@ -49,6 +49,9 @@ export function BoardColumn({ group, canDrag, onTaskDrop, focusedCardIndex = -1,
 
   return (
     <div
+      role="group"
+      aria-label={group.group}
+      data-drop-active={dragOver}
       onDragOver={canDrag ? handleDragOver : undefined}
       onDragLeave={canDrag ? handleDragLeave : undefined}
       onDrop={canDrag ? handleDrop : undefined}

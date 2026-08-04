@@ -134,8 +134,8 @@ describe("NextPage URL sync", () => {
   it("shows loading state", () => {
     mockNextLoading = true;
     mockNextData = undefined;
-    const { container } = renderPage();
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    renderPage();
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("returns null when data is undefined and not loading", () => {

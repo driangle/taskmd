@@ -36,6 +36,9 @@ export const TaskNode = memo(function TaskNode({ data }: { data: TaskNodeData })
     <>
       <Handle type="target" position={Position.Top} className="!bg-gray-400 dark:!bg-gray-500 !w-2 !h-2" />
       <div
+        data-highlighted={!!data.highlighted}
+        data-dimmed={!!data.dimmed}
+        data-priority={data.priority ?? ""}
         className={`w-[200px] rounded-md border shadow-sm px-3 py-2 cursor-pointer transition-opacity duration-200 ${bg} ${priorityBorder} ${highlight} ${dim}`}
       >
         <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">{data.taskId}</div>

@@ -172,7 +172,11 @@ export function TaskDetailPage() {
             )}
 
             {task.body && (
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div
+                className="border-t border-gray-200 dark:border-gray-700 pt-4"
+                role="region"
+                aria-label="Task description"
+              >
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}

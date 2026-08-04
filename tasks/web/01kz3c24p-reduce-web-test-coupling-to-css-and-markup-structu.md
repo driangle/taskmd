@@ -1,7 +1,7 @@
 ---
 id: "01kz3c24p"
 title: "Reduce web test coupling to CSS and markup structure"
-status: pending
+status: completed
 priority: low
 effort: medium
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [web, testing, tech-debt]
 created_at: 2026-08-03
+completed_at: 2026-08-04
 ---
 
 # Reduce web test coupling to CSS and markup structure
@@ -24,12 +25,12 @@ low-value test cluster in the repo. Rework them toward behavior/role-based queri
 
 ## Tasks
 
-- [ ] Inventory the ~105 CSS-class / `querySelector` assertions across the 29 files
-- [ ] For presentational components, replace class/structure assertions with role/text/a11y queries
+- [x] Inventory the ~105 CSS-class / `querySelector` assertions across the 29 files
+- [x] For presentational components, replace class/structure assertions with role/text/a11y queries
       (Testing Library `getByRole`, `getByText`, etc.)
-- [ ] Delete assertions that only check styling with no behavioral meaning
-- [ ] Keep (or add) tests that assert user-visible behavior and state transitions
-- [ ] Confirm web coverage stays reasonable after removing brittle assertions
+- [x] Delete assertions that only check styling with no behavioral meaning
+- [x] Keep (or add) tests that assert user-visible behavior and state transitions
+- [x] Confirm web coverage stays reasonable after removing brittle assertions
 
 ## Acceptance Criteria
 

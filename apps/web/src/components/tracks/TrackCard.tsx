@@ -37,10 +37,11 @@ export function TrackCard({ task }: TrackCardProps) {
       </div>
 
       {task.touches && task.touches.length > 0 && (
-        <div className="flex items-center gap-1 mt-2 flex-wrap">
+        <div className="flex items-center gap-1 mt-2 flex-wrap" role="list" aria-label="Touched scopes">
           {task.touches.map((scope) => (
             <span
               key={scope}
+              role="listitem"
               className="px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
             >
               {scope}

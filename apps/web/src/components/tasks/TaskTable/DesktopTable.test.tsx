@@ -114,35 +114,25 @@ describe("DesktopTable", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/tasks/007");
   });
 
-  it("renders asc sort indicator in column header", () => {
+  it("marks an ascending-sorted column header with aria-sort", () => {
     const headers = [{ id: "id", header: "ID", isSorted: "asc" as const }];
-    const { container } = renderDesktopTable({
-      table: createMockTable(headers),
-      columns: { length: 1 },
-    });
-    // The indicator is rendered as a text node inside the header div
-    const headerDiv = container.querySelector("th div");
-    expect(headerDiv?.textContent).toContain("^");
+    renderDesktopTable({ table: createMockTable(headers), columns: { length: 1 } });
+    expect(screen.getByRole("columnheader")).toHaveAttribute("aria-sort", "ascending");
   });
 
-  it("renders desc sort indicator in column header", () => {
+  it("marks a descending-sorted column header with aria-sort", () => {
     const headers = [{ id: "id", header: "ID", isSorted: "desc" as const }];
-    const { container } = renderDesktopTable({
-      table: createMockTable(headers),
-      columns: { length: 1 },
-    });
-    const headerDiv = container.querySelector("th div");
-    expect(headerDiv?.textContent).toContain("v");
+    renderDesktopTable({ table: createMockTable(headers), columns: { length: 1 } });
+    expect(screen.getByRole("columnheader")).toHaveAttribute("aria-sort", "descending");
   });
 
-  it("renders no sort indicator when column is not sorted", () => {
+  it("marks an unsorted column header with aria-sort none", () => {
     const headers = [{ id: "id", header: "ID", isSorted: false as const }];
     renderDesktopTable({ table: createMockTable(headers), columns: { length: 1 } });
-    expect(screen.queryByText(" ^")).not.toBeInTheDocument();
-    expect(screen.queryByText(" v")).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader")).toHaveAttribute("aria-sort", "none");
   });
 
-  it("marks focused row with aria-selected and ring class", () => {
+  it("marks the focused row with aria-selected", () => {
     const task = createTask();
     const row = createMockRow(task, [{ id: "col-id", value: task.id }]);
     renderDesktopTable({ rows: [row] });
@@ -152,6 +142,5 @@ describe("DesktopTable", () => {
 
     const taskRow = document.getElementById("task-row-0");
     expect(taskRow).toHaveAttribute("aria-selected", "true");
-    expect(taskRow?.className).toContain("ring-2");
   });
 });

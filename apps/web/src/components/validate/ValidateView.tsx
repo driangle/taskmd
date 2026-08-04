@@ -73,6 +73,8 @@ function IssueRow({ issue }: { issue: ValidationIssue }) {
   return (
     <div className="flex items-start gap-2 text-sm">
       <span
+        role="img"
+        aria-label={issue.level}
         className={`mt-1.5 h-2 w-2 rounded-full flex-shrink-0 ${dotColor}`}
       />
       {issue.task_id && (

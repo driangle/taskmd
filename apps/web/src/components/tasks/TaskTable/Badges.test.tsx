@@ -4,54 +4,38 @@ import { StatusBadge, PriorityBadge, TypeBadge, PhaseBadge, BlockedStatusBadge }
 import { STATUS_COLORS, PRIORITY_COLORS, TYPE_COLORS, getPhaseColor } from "./constants.ts";
 
 describe("StatusBadge", () => {
-  it.each(Object.keys(STATUS_COLORS))("renders '%s' with correct color classes", (status) => {
-    const { container } = render(<StatusBadge status={status} />);
-    const badge = container.querySelector("span")!;
-    expect(badge).toHaveTextContent(status);
-    for (const cls of STATUS_COLORS[status].split(" ")) {
-      expect(badge.className).toContain(cls);
-    }
+  it.each(Object.keys(STATUS_COLORS))("renders the '%s' status label", (status) => {
+    render(<StatusBadge status={status} />);
+    expect(screen.getByText(status)).toBeInTheDocument();
   });
 
-  it("falls back to gray for unknown status", () => {
-    const { container } = render(<StatusBadge status="unknown" />);
-    const badge = container.querySelector("span")!;
-    expect(badge).toHaveTextContent("unknown");
-    expect(badge.className).toContain("bg-gray-100");
+  it("still renders the label for an unknown status", () => {
+    render(<StatusBadge status="unknown" />);
+    expect(screen.getByText("unknown")).toBeInTheDocument();
   });
 });
 
 describe("PriorityBadge", () => {
-  it.each(Object.keys(PRIORITY_COLORS))("renders '%s' with correct color classes", (priority) => {
-    const { container } = render(<PriorityBadge priority={priority} />);
-    const badge = container.querySelector("span")!;
-    expect(badge).toHaveTextContent(priority);
-    for (const cls of PRIORITY_COLORS[priority].split(" ")) {
-      expect(badge.className).toContain(cls);
-    }
+  it.each(Object.keys(PRIORITY_COLORS))("renders the '%s' priority label", (priority) => {
+    render(<PriorityBadge priority={priority} />);
+    expect(screen.getByText(priority)).toBeInTheDocument();
   });
 
-  it("falls back to gray for unknown priority", () => {
-    const { container } = render(<PriorityBadge priority="unknown" />);
-    const badge = container.querySelector("span")!;
-    expect(badge.className).toContain("bg-gray-100");
+  it("still renders the label for an unknown priority", () => {
+    render(<PriorityBadge priority="unknown" />);
+    expect(screen.getByText("unknown")).toBeInTheDocument();
   });
 });
 
 describe("TypeBadge", () => {
-  it.each(Object.keys(TYPE_COLORS))("renders '%s' with correct color classes", (type) => {
-    const { container } = render(<TypeBadge type={type} />);
-    const badge = container.querySelector("span")!;
-    expect(badge).toHaveTextContent(type);
-    for (const cls of TYPE_COLORS[type].split(" ")) {
-      expect(badge.className).toContain(cls);
-    }
+  it.each(Object.keys(TYPE_COLORS))("renders the '%s' type label", (type) => {
+    render(<TypeBadge type={type} />);
+    expect(screen.getByText(type)).toBeInTheDocument();
   });
 
-  it("falls back to gray for unknown type", () => {
-    const { container } = render(<TypeBadge type="unknown" />);
-    const badge = container.querySelector("span")!;
-    expect(badge.className).toContain("bg-gray-100");
+  it("still renders the label for an unknown type", () => {
+    render(<TypeBadge type="unknown" />);
+    expect(screen.getByText("unknown")).toBeInTheDocument();
   });
 });
 
@@ -61,21 +45,15 @@ describe("PhaseBadge", () => {
     expect(screen.getByText("alpha")).toBeInTheDocument();
   });
 
-  it("applies color classes from getPhaseColor", () => {
-    const { container } = render(<PhaseBadge phase="beta" />);
-    const badge = container.querySelector("span")!;
-    const expectedColor = getPhaseColor("beta");
-    for (const cls of expectedColor.split(" ")) {
-      expect(badge.className).toContain(cls);
-    }
-  });
-
+  // getPhaseColor is a pure hashing function; test its contract directly rather than
+  // asserting the resulting Tailwind classes on the rendered badge.
   it("assigns different colors to different phases", () => {
-    const color1 = getPhaseColor("alpha");
-    const color2 = getPhaseColor("beta");
-    const color3 = getPhaseColor("gamma");
-    // At least two of the three should differ (hash collision is theoretically possible but unlikely)
-    const unique = new Set([color1, color2, color3]);
+    const unique = new Set([
+      getPhaseColor("alpha"),
+      getPhaseColor("beta"),
+      getPhaseColor("gamma"),
+    ]);
+    // Hash collisions are theoretically possible but unlikely for three distinct inputs.
     expect(unique.size).toBeGreaterThanOrEqual(2);
   });
 
@@ -112,18 +90,6 @@ describe("BlockedStatusBadge", () => {
     render(<BlockedStatusBadge dependencies={["005", "010"]} />);
     const badge = screen.getByLabelText("Blocked by: 005, 010");
     expect(badge).toHaveAttribute("title", "Blocked by: 005, 010");
-  });
-
-  it("applies green styling for Ready state", () => {
-    const { container } = render(<BlockedStatusBadge dependencies={null} />);
-    const badge = container.querySelector("span")!;
-    expect(badge.className).toContain("bg-green-100");
-  });
-
-  it("applies amber styling for Blocked state", () => {
-    const { container } = render(<BlockedStatusBadge dependencies={["001"]} />);
-    const badge = container.querySelector("span")!;
-    expect(badge.className).toContain("bg-amber-100");
   });
 
   it("shows Ready when all dependencies are completed", () => {

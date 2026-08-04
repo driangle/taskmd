@@ -94,21 +94,14 @@ describe("FilterBar", () => {
   });
 
   describe("active filters indicator", () => {
-    it("shows blue dot indicator when hasActiveFilters is true", () => {
-      const { container } = render(
-        <FilterBar {...buildDefaultProps({ hasActiveFilters: true })} />,
-      );
-      // The blue dot is a <span> with bg-blue-500 class
-      const dot = container.querySelector(".bg-blue-500");
-      expect(dot).toBeInTheDocument();
+    it("shows the active-filters indicator when hasActiveFilters is true", () => {
+      render(<FilterBar {...buildDefaultProps({ hasActiveFilters: true })} />);
+      expect(screen.getByLabelText("Active filters")).toBeInTheDocument();
     });
 
-    it("does not show blue dot when hasActiveFilters is false", () => {
-      const { container } = render(
-        <FilterBar {...buildDefaultProps({ hasActiveFilters: false })} />,
-      );
-      const dot = container.querySelector(".bg-blue-500");
-      expect(dot).not.toBeInTheDocument();
+    it("does not show the active-filters indicator when hasActiveFilters is false", () => {
+      render(<FilterBar {...buildDefaultProps({ hasActiveFilters: false })} />);
+      expect(screen.queryByLabelText("Active filters")).not.toBeInTheDocument();
     });
 
     it("shows Clear filters button when hasActiveFilters is true", () => {

@@ -68,7 +68,7 @@ describe("ValidateView", () => {
     expect(link).toHaveAttribute("href", "/tasks/042");
   });
 
-  it("shows a red dot for errors and a yellow dot for warnings", () => {
+  it("labels each issue with its severity level", () => {
     const issues = [
       createValidationIssue({
         level: "error",
@@ -82,14 +82,10 @@ describe("ValidateView", () => {
       }),
     ];
 
-    const { container } = renderView(
-      createValidationResult({ issues, errors: 1, warnings: 1 }),
-    );
+    renderView(createValidationResult({ issues, errors: 1, warnings: 1 }));
 
-    const dots = container.querySelectorAll("span.rounded-full");
-    expect(dots).toHaveLength(2);
-    expect(dots[0].className).toContain("bg-red-500");
-    expect(dots[1].className).toContain("bg-yellow-400");
+    expect(screen.getByLabelText("error")).toBeInTheDocument();
+    expect(screen.getByLabelText("warning")).toBeInTheDocument();
   });
 
   it("groups issues without file_path under (general)", () => {

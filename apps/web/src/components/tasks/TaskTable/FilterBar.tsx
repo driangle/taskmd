@@ -117,7 +117,11 @@ export function FilterBar({
           </svg>
           Filters
           {hasActiveFilters && (
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            <span
+              role="img"
+              aria-label="Active filters"
+              className="w-1.5 h-1.5 rounded-full bg-blue-500"
+            />
           )}
         </button>
         {hasActiveFilters && (

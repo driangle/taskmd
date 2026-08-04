@@ -9,7 +9,10 @@ interface RecommendationCardProps {
 
 export function RecommendationCard({ rec, focused = false }: RecommendationCardProps) {
   return (
-    <div className={`flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700 ${focused ? "ring-2 ring-blue-500" : ""}`}>
+    <div
+      data-focused={focused}
+      className={`flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700 ${focused ? "ring-2 ring-blue-500" : ""}`}
+    >
       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white text-sm font-bold shrink-0 dark:bg-white dark:text-gray-900">
         {rec.rank}
       </div>
@@ -42,10 +45,11 @@ export function RecommendationCard({ rec, focused = false }: RecommendationCardP
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+        <div className="flex items-center gap-1.5 mt-2 flex-wrap" role="list" aria-label="Reasons">
           {rec.reasons.map((reason) => (
             <span
               key={reason}
+              role="listitem"
               className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
             >
               {reason}

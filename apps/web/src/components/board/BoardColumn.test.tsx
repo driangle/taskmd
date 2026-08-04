@@ -61,33 +61,31 @@ describe("BoardColumn", () => {
     expect(screen.getByText("No tasks")).toBeInTheDocument();
   });
 
-  it("applies in-review status color to column", () => {
-    const { container } = renderColumn({
+  it("labels the column with its group name", () => {
+    renderColumn({
       group: makeGroup({
         group: "in-review",
         count: 1,
         tasks: [{ id: "001", title: "Review task", status: "in-review" }],
       }),
     });
-    const col = container.firstElementChild!;
-    expect(col.className).toContain("border-purple-300");
+    expect(screen.getByRole("group", { name: "in-review" })).toBeInTheDocument();
   });
 
   describe("drag handlers", () => {
-    it("handleDragOver sets dropEffect to move", () => {
-      const { container } = renderColumn();
-      const col = container.firstElementChild!;
+    it("marks the column as an active drop target on dragOver", () => {
+      renderColumn();
+      const col = screen.getByRole("group");
       const event = makeDragEvent("dragover");
       event.currentTarget = col;
       fireEvent.dragOver(col, event);
-      // The ring class should be applied after dragOver
-      expect(col.className).toContain("ring-2");
+      expect(col).toHaveAttribute("data-drop-active", "true");
     });
 
     it("handleDrop calls onTaskDrop when source !== target", () => {
       const onTaskDrop = vi.fn();
-      const { container } = renderColumn({ onTaskDrop });
-      const col = container.firstElementChild!;
+      renderColumn({ onTaskDrop });
+      const col = screen.getByRole("group");
 
       // Simulate drop with different source group
       const dropEvent = new Event("drop", { bubbles: true }) as unknown as DragEvent;
@@ -108,8 +106,8 @@ describe("BoardColumn", () => {
 
     it("handleDrop does NOT call onTaskDrop when source === target", () => {
       const onTaskDrop = vi.fn();
-      const { container } = renderColumn({ onTaskDrop });
-      const col = container.firstElementChild!;
+      renderColumn({ onTaskDrop });
+      const col = screen.getByRole("group");
 
       const dropEvent = new Event("drop", { bubbles: true }) as unknown as DragEvent;
       const store: Record<string, string> = {
@@ -126,8 +124,8 @@ describe("BoardColumn", () => {
     });
 
     it("handleDragLeave removes highlight", () => {
-      const { container } = renderColumn();
-      const col = container.firstElementChild!;
+      renderColumn();
+      const col = screen.getByRole("group");
 
       // First trigger dragOver with a proper dataTransfer to set highlight
       const overEvent = new Event("dragover", { bubbles: true });
@@ -136,19 +134,19 @@ describe("BoardColumn", () => {
       });
       Object.defineProperty(overEvent, "preventDefault", { value: vi.fn() });
       fireEvent(col, overEvent);
-      expect(col.className).toContain("ring-2");
+      expect(col).toHaveAttribute("data-drop-active", "true");
 
       // Then trigger dragLeave with relatedTarget outside column
       fireEvent.dragLeave(col, { relatedTarget: document.body });
-      expect(col.className).not.toContain("ring-2");
+      expect(col).toHaveAttribute("data-drop-active", "false");
     });
   });
 
   describe("canDrag=false", () => {
     it("does not call onTaskDrop on drop", () => {
       const onTaskDrop = vi.fn();
-      const { container } = renderColumn({ canDrag: false, onTaskDrop });
-      const col = container.firstElementChild!;
+      renderColumn({ canDrag: false, onTaskDrop });
+      const col = screen.getByRole("group");
 
       const dropEvent = new Event("drop", { bubbles: true }) as unknown as DragEvent;
       const store: Record<string, string> = {
@@ -164,11 +162,11 @@ describe("BoardColumn", () => {
       expect(onTaskDrop).not.toHaveBeenCalled();
     });
 
-    it("does not show ring highlight on dragOver", () => {
-      const { container } = renderColumn({ canDrag: false });
-      const col = container.firstElementChild!;
+    it("does not become an active drop target on dragOver", () => {
+      renderColumn({ canDrag: false });
+      const col = screen.getByRole("group");
       fireEvent.dragOver(col);
-      expect(col.className).not.toContain("ring-2");
+      expect(col).toHaveAttribute("data-drop-active", "false");
     });
   });
 });

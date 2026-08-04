@@ -28,6 +28,11 @@ export function PhaseProgressBar({ phase }: PhaseProgressBarProps) {
       </div>
       <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
         <div
+          role="progressbar"
+          aria-label={`${phase.name} progress`}
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
           className={`h-full rounded-full transition-all ${barColor(pct)}`}
           style={{ width: `${pct}%` }}
         />

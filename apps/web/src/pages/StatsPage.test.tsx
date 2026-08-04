@@ -52,8 +52,8 @@ describe("StatsPage", () => {
       mutate: vi.fn(),
       isValidating: false,
     });
-    const { container } = render(<StatsPage />);
-    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    render(<StatsPage />);
+    expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
   });
 
   it("renders error state", () => {

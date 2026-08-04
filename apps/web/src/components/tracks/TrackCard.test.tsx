@@ -76,7 +76,6 @@ describe("TrackCard", () => {
     renderCard(task);
 
     // Default fixture has no touches; the section should be absent
-    const container = document.querySelector(".mt-2");
-    expect(container).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Touched scopes" })).not.toBeInTheDocument();
   });
 });

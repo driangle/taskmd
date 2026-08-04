@@ -23,43 +23,25 @@ describe("PhaseProgressBar", () => {
   it("renders 0% for a phase with zero tasks", () => {
     render(<PhaseProgressBar phase={makePhase({ total: 0, completed: 0 })} />);
     expect(screen.getByText("0 / 0 tasks (0%)")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
   });
 
   it("renders 100% for fully completed phase", () => {
     render(<PhaseProgressBar phase={makePhase({ total: 8, completed: 8 })} />);
     expect(screen.getByText("8 / 8 tasks (100%)")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
   });
 
-  it("applies green color for high completion (>=75%)", () => {
-    const { container } = render(
-      <PhaseProgressBar phase={makePhase({ total: 4, completed: 3 })} />,
-    );
-    const bar = container.querySelector("[style]");
-    expect(bar?.className).toContain("bg-green-500");
-    expect(bar?.getAttribute("style")).toBe("width: 75%;");
+  it("exposes completion as an accessible progressbar value", () => {
+    render(<PhaseProgressBar phase={makePhase({ total: 4, completed: 3 })} />);
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "75");
+    expect(bar).toHaveAttribute("aria-valuemin", "0");
+    expect(bar).toHaveAttribute("aria-valuemax", "100");
   });
 
-  it("applies yellow color for mid completion (25-74%)", () => {
-    const { container } = render(
-      <PhaseProgressBar phase={makePhase({ total: 10, completed: 5 })} />,
-    );
-    const bar = container.querySelector("[style]");
-    expect(bar?.className).toContain("bg-yellow-500");
-  });
-
-  it("applies gray color for low completion (<25%)", () => {
-    const { container } = render(
-      <PhaseProgressBar phase={makePhase({ total: 10, completed: 1 })} />,
-    );
-    const bar = container.querySelector("[style]");
-    expect(bar?.className).toContain("bg-gray-400");
-  });
-
-  it("sets bar width proportional to completion", () => {
-    const { container } = render(
-      <PhaseProgressBar phase={makePhase({ total: 10, completed: 3 })} />,
-    );
-    const bar = container.querySelector("[style]");
-    expect(bar?.getAttribute("style")).toBe("width: 30%;");
+  it("sets progressbar value proportional to completion", () => {
+    render(<PhaseProgressBar phase={makePhase({ total: 10, completed: 3 })} />);
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "30");
   });
 });

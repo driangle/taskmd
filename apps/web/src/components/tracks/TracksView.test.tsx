@@ -42,15 +42,12 @@ describe("TracksView", () => {
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
-  it("highlights the active limit button", () => {
+  it("marks the active limit button as pressed", () => {
     const data = createTracksResult();
     render(<TracksView data={data} limit={3} onLimitChange={() => {}} />);
 
-    const activeButton = screen.getByText("3");
-    expect(activeButton.className).toContain("bg-gray-900");
-
-    const inactiveButton = screen.getByText("All");
-    expect(inactiveButton.className).not.toContain("bg-gray-900");
+    expect(screen.getByRole("button", { name: "3" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("calls onLimitChange when a limit button is clicked", () => {

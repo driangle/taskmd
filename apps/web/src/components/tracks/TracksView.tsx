@@ -25,6 +25,7 @@ export function TracksView({ data, limit, onLimitChange }: TracksViewProps) {
             <button
               key={n}
               onClick={() => onLimitChange(n)}
+              aria-pressed={limit === n}
               className={`min-h-[44px] sm:min-h-0 inline-flex items-center px-3 py-1 text-sm rounded-md transition-colors ${
                 limit === n
                   ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"

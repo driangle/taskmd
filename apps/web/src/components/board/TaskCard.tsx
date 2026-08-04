@@ -50,6 +50,8 @@ export function TaskCard({ task, sourceGroup, canDrag, focused = false, showPhas
   return (
     <div
       draggable={canDrag}
+      data-dragging={dragging}
+      data-focused={focused}
       onDragStart={canDrag ? handleDragStart : undefined}
       onDragEnd={canDrag ? handleDragEnd : undefined}
       className={`p-3 bg-white rounded border border-gray-100 shadow-sm dark:bg-gray-800/50 dark:border-gray-700 group transition-opacity ${dragging ? "opacity-50" : ""} ${focused ? "ring-2 ring-blue-500" : ""}`}

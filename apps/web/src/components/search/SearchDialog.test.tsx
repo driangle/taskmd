@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent, within } from "@testing-library/react";
 import { mockApi, resetMockApi } from "../../test-utils/mock-api.ts";
 import { createSearchResult, resetFixtureCounter } from "../../test-utils/fixtures.ts";
 import { renderWithProviders } from "../../test-utils/render.ts";
@@ -160,7 +160,7 @@ describe("SearchDialog", () => {
     const input = screen.getByRole("combobox");
     fireEvent.change(input, { target: { value: "click" } });
 
-    const button = screen.getByRole("option").querySelector("button")!;
+    const button = within(screen.getByRole("option")).getByRole("button");
     fireEvent.click(button);
 
     expect(onClose).toHaveBeenCalledOnce();

@@ -210,6 +210,7 @@ export function Shell({ children }: ShellProps) {
       <main
         id="main-content"
         tabIndex={-1}
+        data-layout={isGraphPage ? "graph" : "default"}
         className={isGraphPage ? "px-2 py-2 flex-1 min-h-0" : "max-w-7xl mx-auto px-4 sm:px-6 py-4 md:py-6"}
         onKeyDown={(e) => {
           if (e.key === "ArrowUp" && e.target === e.currentTarget) {

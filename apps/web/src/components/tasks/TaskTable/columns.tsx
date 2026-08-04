@@ -98,6 +98,7 @@ export function createTaskColumns(
                 <button
                   key={t}
                   onClick={() => toggleTag(t)}
+                  aria-pressed={isActive}
                   className={`px-1.5 py-0.5 text-xs rounded cursor-pointer transition-colors duration-150 ${
                     isActive
                       ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-700"

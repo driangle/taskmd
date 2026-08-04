@@ -171,11 +171,11 @@ describe("BoardPage", () => {
   });
 
   describe("loading skeleton", () => {
-    it("shows animate-pulse skeleton when isLoading is true", () => {
+    it("shows loading skeleton when isLoading is true", () => {
       mockBoardData = undefined;
       mockBoardLoading = true;
-      const { container } = renderPage();
-      expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+      renderPage();
+      expect(screen.getByRole("status", { name: /loading/i })).toBeInTheDocument();
     });
   });
 

@@ -30,23 +30,31 @@ export function DesktopTable({ table, rows, columns, clearFilters }: DesktopTabl
           <thead className="bg-gray-50 dark:bg-gray-800">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
-                {hg.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    onClick={header.column.getToggleSortingHandler()}
-                    className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none ${(header.column.columnDef.meta as Record<string, string>)?.className ?? ""}`}
-                  >
-                    <div className="flex items-center gap-1">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {{ asc: " ^", desc: " v" }[
-                        header.column.getIsSorted() as string
-                      ] ?? ""}
-                    </div>
-                  </th>
-                ))}
+                {hg.headers.map((header) => {
+                  const sorted = header.column.getIsSorted();
+                  return (
+                    <th
+                      key={header.id}
+                      onClick={header.column.getToggleSortingHandler()}
+                      aria-sort={
+                        sorted === "asc"
+                          ? "ascending"
+                          : sorted === "desc"
+                            ? "descending"
+                            : "none"
+                      }
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none ${(header.column.columnDef.meta as Record<string, string>)?.className ?? ""}`}
+                    >
+                      <div className="flex items-center gap-1">
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                        {{ asc: " ^", desc: " v" }[sorted as string] ?? ""}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             ))}
           </thead>
