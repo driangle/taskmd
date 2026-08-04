@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/worklog"
 )
 
@@ -42,17 +41,14 @@ func runWorklog(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
-
-	warnDuplicateIDs(result.Tasks)
 
 	// Find the task by ID
 	var taskFilePath string
-	for _, t := range result.Tasks {
+	for _, t := range tasks {
 		if t.ID == taskID {
 			taskFilePath = t.FilePath
 			break

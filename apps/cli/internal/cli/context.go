@@ -10,7 +10,6 @@ import (
 
 	"github.com/driangle/taskmd/apps/cli/internal/taskcontext"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 var (
@@ -69,15 +68,12 @@ func runContext(cmd *cobra.Command, _ []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	warnDuplicateIDs(result.Tasks)
-
-	task := findExactMatch(ctxTaskID, result.Tasks)
+	task := findExactMatch(ctxTaskID, tasks)
 	if task == nil {
 		return fmt.Errorf("task not found: %s", ctxTaskID)
 	}
@@ -99,10 +95,10 @@ func runContext(cmd *cobra.Command, _ []string) error {
 	}
 
 	if ctxIncludeDeps {
-		mergeDependencyFiles(task, result.Tasks, opts, ctxResult)
+		mergeDependencyFiles(task, tasks, opts, ctxResult)
 	}
 
-	addDependencyEntries(task, result.Tasks, ctxResult)
+	addDependencyEntries(task, tasks, ctxResult)
 
 	return outputContext(ctxResult, ctxFormat)
 }

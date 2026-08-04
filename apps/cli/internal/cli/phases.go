@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/validator"
 )
 
@@ -59,20 +58,9 @@ func runPhases(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(args)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
-	}
-
-	tasks := result.Tasks
-
-	if flags.Verbose && len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "\nWarning: encountered %d errors during scan:\n", len(result.Errors))
-		for _, scanErr := range result.Errors {
-			fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
-		}
-		fmt.Fprintln(os.Stderr)
+		return err
 	}
 
 	allPhases := parsePhasesConfig(viper.Get("phases"))

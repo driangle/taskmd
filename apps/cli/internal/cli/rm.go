@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/worklog"
 )
 
@@ -55,24 +54,23 @@ func runRm(_ *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	task := findExactMatch(taskID, result.Tasks)
+	task := findExactMatch(taskID, tasks)
 	if task == nil {
 		return fmt.Errorf("task not found: %s", taskID)
 	}
 
-	if dupes := findDuplicatesByID(taskID, result.Tasks); len(dupes) > 1 {
+	if dupes := findDuplicatesByID(taskID, tasks); len(dupes) > 1 {
 		return fmt.Errorf("refusing to delete task %s: found %d files with this ID\n%s\nRun 'taskmd deduplicate' to fix",
 			taskID, len(dupes), formatDuplicatePaths(dupes))
 	}
 
 	if !rmForce {
-		if err := checkTaskReferences(taskID, result.Tasks); err != nil {
+		if err := checkTaskReferences(taskID, tasks); err != nil {
 			return err
 		}
 	}

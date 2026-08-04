@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 var (
@@ -99,19 +98,14 @@ func runList(cmd *cobra.Command, args []string) error {
 	scanDir := ResolveScanDir(args)
 	debugLog("scan directory: %s", scanDir)
 
-	// Create scanner and scan for tasks
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	// Scan for tasks
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
-
-	tasks := result.Tasks
 	debugLog("found %d task(s)", len(tasks))
 
 	makeFilePathsRelative(tasks, scanDir)
-	reportScanWarnings(result, flags)
-	warnDuplicateIDs(tasks)
 
 	debugLog("format: %s, sort: %q, filters: %v", listFormat, listSort, listFilters)
 
@@ -386,17 +380,6 @@ func colorizeColumn(task *model.Task, column string, r *lipgloss.Renderer) strin
 		return formatEffort(value, r)
 	default:
 		return value
-	}
-}
-
-// reportScanWarnings prints scan errors to stderr when verbose mode is enabled.
-func reportScanWarnings(result *scanner.ScanResult, flags GlobalFlags) {
-	if flags.Verbose && len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "\nWarning: encountered %d errors during scan:\n", len(result.Errors))
-		for _, scanErr := range result.Errors {
-			fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
-		}
-		fmt.Fprintln(os.Stderr)
 	}
 }
 

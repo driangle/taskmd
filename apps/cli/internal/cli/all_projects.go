@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // ProjectTask wraps a task with its originating project ID.
@@ -72,7 +71,7 @@ func scanProjectTasks(entry GlobalProjectEntry) ([]*model.Task, error) {
 	}
 
 	scanDir := resolveProjectScanDir(entry.Path)
-	taskScanner := scanner.NewScanner(scanDir, false, nil)
+	taskScanner := newTaskScanner(scanDir, GlobalFlags{})
 	result, err := taskScanner.Scan()
 	if err != nil {
 		return nil, fmt.Errorf("scan failed: %w", err)

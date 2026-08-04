@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // archiveStdin is the reader for interactive confirmation prompts.
@@ -81,13 +80,12 @@ func runArchive(_ *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	selected := filterArchiveTasks(result.Tasks)
+	selected := filterArchiveTasks(tasks)
 
 	if len(selected) == 0 {
 		return fmt.Errorf("no tasks match the given criteria")

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/sdk/go/next"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // Recommendation is re-exported from the shared package.
@@ -118,21 +117,11 @@ func runNext(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(args)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	allTasks, archivedTasks, err := scanActiveAndArchived(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
-
-	allTasks := result.Tasks
 	makeFilePathsRelative(allTasks, scanDir)
-
-	warnDuplicateIDs(allTasks)
-
-	archivedTasks, err := taskScanner.ScanArchive()
-	if err != nil {
-		return fmt.Errorf("archive scan failed: %w", err)
-	}
 
 	expandNextShortcutFilters()
 

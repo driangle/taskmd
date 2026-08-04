@@ -9,7 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 var projectsFormat string
@@ -134,7 +133,7 @@ func scanProjectSummary(p GlobalProjectEntry) (ProjectSummary, error) {
 	}
 
 	scanDir := resolveProjectScanDir(p.Path)
-	taskScanner := scanner.NewScanner(scanDir, false, nil)
+	taskScanner := newTaskScanner(scanDir, GlobalFlags{})
 	result, err := taskScanner.Scan()
 	if err != nil {
 		return ProjectSummary{}, fmt.Errorf("scan failed: %w", err)

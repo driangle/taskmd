@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/taskfile"
 )
 
@@ -104,7 +103,7 @@ func runDeduplicate(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(args)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
+	taskScanner := newTaskScanner(scanDir, flags)
 	scanResult, err := taskScanner.Scan()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)

@@ -11,7 +11,6 @@ import (
 
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/taskfile"
 	"github.com/driangle/taskmd/sdk/go/verify"
 )
@@ -115,27 +114,26 @@ func runSet(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
 	debugLog("scan directory: %s", scanDir)
-	debugLog("found %d task(s)", len(result.Tasks))
+	debugLog("found %d task(s)", len(tasks))
 
-	task := findExactMatch(taskID, result.Tasks)
+	task := findExactMatch(taskID, tasks)
 	if task == nil {
 		return fmt.Errorf("task not found: %s", taskID)
 	}
 
-	if dupes := findDuplicatesByID(taskID, result.Tasks); len(dupes) > 1 {
+	if dupes := findDuplicatesByID(taskID, tasks); len(dupes) > 1 {
 		return fmt.Errorf("refusing to modify task %s: found %d files with this ID\n%s\nRun 'taskmd deduplicate' to fix",
 			taskID, len(dupes), formatDuplicatePaths(dupes))
 	}
 
 	if req.Dependencies != nil {
-		if err := validateDependencies(task, *req.Dependencies, result.Tasks); err != nil {
+		if err := validateDependencies(task, *req.Dependencies, tasks); err != nil {
 			return err
 		}
 	}

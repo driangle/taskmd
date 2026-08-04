@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/feed"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // feedFuzzyThreshold is the fuzzy-match sensitivity used when resolving a
@@ -127,13 +126,10 @@ func resolveFeedTaskFile(query string) (string, string, error) {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return "", "", fmt.Errorf("scan failed: %w", err)
+		return "", "", err
 	}
-
-	tasks := result.Tasks
 	makeFilePathsRelative(tasks, scanDir)
 
 	task, err := resolveTask(query, tasks, false, feedFuzzyThreshold)

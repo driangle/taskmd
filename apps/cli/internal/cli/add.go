@@ -12,7 +12,6 @@ import (
 
 	"github.com/driangle/taskmd/apps/cli/internal/template"
 	"github.com/driangle/taskmd/sdk/go/nextid"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/slug"
 	"github.com/driangle/taskmd/sdk/go/taskfile"
 	"github.com/driangle/taskmd/sdk/go/validator"
@@ -148,13 +147,12 @@ func runAdd(cmd *cobra.Command, args []string) error {
 }
 
 func resolveNextID(scanDir string, flags GlobalFlags) (string, error) {
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return "", fmt.Errorf("scan failed: %w", err)
+		return "", err
 	}
-	ids := make([]string, len(result.Tasks))
-	for i, task := range result.Tasks {
+	ids := make([]string, len(tasks))
+	for i, task := range tasks {
 		ids[i] = task.ID
 	}
 

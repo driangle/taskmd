@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/driangle/taskmd/sdk/go/nextid"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/validator"
 )
 
@@ -43,24 +42,13 @@ func runNextID(_ *cobra.Command, args []string) error {
 
 	scanDir := ResolveScanDir(args)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	if flags.Verbose && len(result.Errors) > 0 {
-		fmt.Fprintf(os.Stderr, "\nWarning: encountered %d errors during scan:\n", len(result.Errors))
-		for _, scanErr := range result.Errors {
-			fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
-		}
-		fmt.Fprintln(os.Stderr)
-	}
-
-	warnDuplicateIDs(result.Tasks)
-
-	ids := make([]string, len(result.Tasks))
-	for i, task := range result.Tasks {
+	ids := make([]string, len(tasks))
+	for i, task := range tasks {
 		ids[i] = task.ID
 	}
 

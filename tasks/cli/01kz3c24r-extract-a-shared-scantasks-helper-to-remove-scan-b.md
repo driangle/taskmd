@@ -1,7 +1,7 @@
 ---
 id: "01kz3c24r"
 title: "Extract a shared scanTasks helper to remove scan boilerplate"
-status: pending
+status: completed
 priority: low
 effort: small
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [cli, refactor, dry]
 created_at: 2026-08-03
+completed_at: 2026-08-04
 ---
 
 # Extract a shared scanTasks helper to remove scan boilerplate
@@ -23,11 +24,11 @@ low-risk debt that also shrinks the per-command test surface once centralized.
 
 ## Tasks
 
-- [ ] Add a `scanTasks(cmd, args) ([]Task, error)` (or similar) helper in the `cli` package
-- [ ] Have it resolve the scan dir, build the scanner, scan, and wrap errors consistently
-- [ ] Replace the ~26 duplicated scan blocks across command files with calls to the helper
-- [ ] Relocate the misplaced generic `levenshtein` util out of `get.go` into a string-util home
-- [ ] Run the full CLI test suite to confirm no behavior change
+- [x] Add a `scanTasks(cmd, args) ([]Task, error)` (or similar) helper in the `cli` package
+- [x] Have it resolve the scan dir, build the scanner, scan, and wrap errors consistently
+- [x] Replace the ~26 duplicated scan blocks across command files with calls to the helper
+- [x] Relocate the misplaced generic `levenshtein` util out of `get.go` into a string-util home
+- [x] Run the full CLI test suite to confirm no behavior change
 
 ## Acceptance Criteria
 

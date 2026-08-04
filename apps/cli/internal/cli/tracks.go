@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/tracks"
 )
 
@@ -61,21 +60,11 @@ func runTracks(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(args)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	scanResult, err := taskScanner.Scan()
+	allTasks, archivedTasks, err := scanActiveAndArchived(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
-
-	allTasks := scanResult.Tasks
 	makeFilePathsRelative(allTasks, scanDir)
-
-	warnDuplicateIDs(allTasks)
-
-	archivedTasks, err := taskScanner.ScanArchive()
-	if err != nil {
-		return fmt.Errorf("archive scan failed: %w", err)
-	}
 
 	knownScopes := loadScopesConfig()
 

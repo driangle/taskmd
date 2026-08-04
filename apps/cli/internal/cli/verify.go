@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/verify"
 )
 
@@ -96,15 +95,12 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
 
-	warnDuplicateIDs(result.Tasks)
-
-	task := findExactMatch(taskID, result.Tasks)
+	task := findExactMatch(taskID, tasks)
 	if task == nil {
 		return fmt.Errorf("task not found: %s", taskID)
 	}

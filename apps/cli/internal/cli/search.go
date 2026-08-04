@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/search"
 )
 
@@ -56,16 +55,11 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 	scanDir := ResolveScanDir(nil)
 
-	taskScanner := scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
-	result, err := taskScanner.Scan()
+	tasks, err := scanTasks(scanDir, flags)
 	if err != nil {
-		return fmt.Errorf("scan failed: %w", err)
+		return err
 	}
-
-	tasks := result.Tasks
 	makeFilePathsRelative(tasks, scanDir)
-
-	warnDuplicateIDs(tasks)
 
 	// Apply filters before search (narrows which tasks are searched)
 	if len(searchFilters) > 0 {
