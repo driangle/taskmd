@@ -1,7 +1,7 @@
 ---
 id: "01kz3nmfy"
 title: "Migrate per-command test helpers to the shared harness"
-status: pending
+status: completed
 priority: medium
 effort: large
 parent: "01kz3c24m"
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: ["01kz3nm85", "01kz3nmbc"]
 tags: ["cli", "testing", "tech-debt"]
 created_at: 2026-08-03
+completed_at: 2026-08-04
 ---
 
 # Migrate per-command test helpers to the shared harness
@@ -24,12 +25,12 @@ test rewrite.
 
 ## Tasks
 
-- [ ] Migrate command test files in batches (group by command), replacing `captureXOutput` with the
+- [x] Migrate command test files in batches (group by command), replacing `captureXOutput` with the
       harness run+capture and `resetXFlags`/`resetViper` with the harness reset
-- [ ] Replace `createXTestFiles` call sites with the harness temp-repo builder / fixture loader
-- [ ] Delete the now-dead per-command helpers as each file is migrated
-- [ ] Remove `os.Pipe`-based stdout swapping from the test files (currently ~35 files)
-- [ ] Run the full suite (`go test ./internal/cli/...` and `make e2e`) after each batch to catch
+- [x] Replace `createXTestFiles` call sites with the harness temp-repo builder / fixture loader
+- [x] Delete the now-dead per-command helpers as each file is migrated
+- [x] Remove `os.Pipe`-based stdout swapping from the test files (currently ~35 files)
+- [x] Run the full suite (`go test ./internal/cli/...` and `make e2e`) after each batch to catch
       regressions early
 
 ## Acceptance Criteria

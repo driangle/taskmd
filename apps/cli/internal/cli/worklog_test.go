@@ -1,22 +1,17 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/sdk/go/worklog"
 )
 
-func createWorklogTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	task := `---
+// Worklog fixtures are command-specific (a single in-progress task plus an
+// optional pre-seeded .worklogs entry), so they stay inline here.
+const worklogTaskFile = `---
 id: "015"
 title: "Add user auth"
 status: in-progress
@@ -28,24 +23,8 @@ created: 2026-02-08
 
 # Add user auth
 `
-	if err := os.WriteFile(filepath.Join(tmpDir, "015-auth.md"), []byte(task), 0644); err != nil {
-		t.Fatalf("Failed to create test task: %v", err)
-	}
 
-	return tmpDir
-}
-
-func createWorklogTestFilesWithWorklog(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := createWorklogTestFiles(t)
-
-	wlDir := filepath.Join(tmpDir, ".worklogs")
-	if err := os.MkdirAll(wlDir, 0755); err != nil {
-		t.Fatalf("Failed to create .worklogs dir: %v", err)
-	}
-
-	wlContent := `## 2026-02-15T10:00:00Z
+const worklogEntries = `## 2026-02-15T10:00:00Z
 
 Started working on authentication module.
 
@@ -53,44 +32,33 @@ Started working on authentication module.
 
 Completed login endpoint.
 `
-	if err := os.WriteFile(filepath.Join(wlDir, "015.md"), []byte(wlContent), 0644); err != nil {
-		t.Fatalf("Failed to create test worklog: %v", err)
-	}
 
-	return tmpDir
-}
-
-func resetWorklogFlags() {
-	worklogAdd = ""
-	worklogFormat = "text"
-	taskDir = "."
-}
-
-func captureWorklogOutput(t *testing.T, taskID string) (string, error) {
+func newWorklogRepo(t *testing.T) *taskRepo {
 	t.Helper()
+	return newTaskRepo(t, map[string]string{"015-auth.md": worklogTaskFile})
+}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func newWorklogRepoWithLog(t *testing.T) *taskRepo {
+	t.Helper()
+	repo := newWorklogRepo(t)
+	repo.Write(".worklogs/015.md", worklogEntries)
+	return repo
+}
 
-	err := runWorklog(worklogCmd, []string{taskID})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+// worklogStdout runs `worklog <args...>`, fails on error, returns stdout.
+func worklogStdout(t *testing.T, repo *taskRepo, args ...string) string {
+	t.Helper()
+	res := repo.Run(append([]string{"worklog"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("worklog %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 func TestWorklog_ViewEntries(t *testing.T) {
-	tmpDir := createWorklogTestFilesWithWorklog(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
-	output, err := captureWorklogOutput(t, "015")
-	if err != nil {
-		t.Fatalf("runWorklog failed: %v", err)
-	}
+	repo := newWorklogRepoWithLog(t)
+
+	output := worklogStdout(t, repo, "015")
 
 	if !strings.Contains(output, "015") {
 		t.Error("Expected output to contain task ID")
@@ -110,15 +78,9 @@ func TestWorklog_ViewEntries(t *testing.T) {
 }
 
 func TestWorklog_ViewJSON(t *testing.T) {
-	tmpDir := createWorklogTestFilesWithWorklog(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
-	worklogFormat = "json"
+	repo := newWorklogRepoWithLog(t)
 
-	output, err := captureWorklogOutput(t, "015")
-	if err != nil {
-		t.Fatalf("runWorklog failed: %v", err)
-	}
+	output := worklogStdout(t, repo, "015", "--format", "json")
 
 	var wl worklog.Worklog
 	if err := json.Unmarshal([]byte(output), &wl); err != nil {
@@ -134,15 +96,9 @@ func TestWorklog_ViewJSON(t *testing.T) {
 }
 
 func TestWorklog_ViewYAML(t *testing.T) {
-	tmpDir := createWorklogTestFilesWithWorklog(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
-	worklogFormat = "yaml"
+	repo := newWorklogRepoWithLog(t)
 
-	output, err := captureWorklogOutput(t, "015")
-	if err != nil {
-		t.Fatalf("runWorklog failed: %v", err)
-	}
+	output := worklogStdout(t, repo, "015", "--format", "yaml")
 
 	if !strings.Contains(output, "task_id: \"015\"") {
 		t.Errorf("Expected YAML output to contain task_id, got:\n%s", output)
@@ -153,75 +109,43 @@ func TestWorklog_ViewYAML(t *testing.T) {
 }
 
 func TestWorklog_NoWorklogExists(t *testing.T) {
-	tmpDir := createWorklogTestFiles(t) // no worklog created
-	resetWorklogFlags()
-	taskDir = tmpDir
+	repo := newWorklogRepo(t) // no worklog created
 
-	// Capture stderr too
-	oldStderr := os.Stderr
-	rErr, wErr, _ := os.Pipe()
-	os.Stderr = wErr
-
-	_, err := captureWorklogOutput(t, "015")
-
-	wErr.Close()
-	os.Stderr = oldStderr
-
-	var stderrBuf bytes.Buffer
-	stderrBuf.ReadFrom(rErr)
-
-	if err != nil {
-		t.Fatalf("Expected no error for missing worklog, got: %v", err)
+	res := repo.Run("worklog", "015")
+	if res.Err != nil {
+		t.Fatalf("Expected no error for missing worklog, got: %v", res.Err)
 	}
-	if !strings.Contains(stderrBuf.String(), "No worklog found") {
-		t.Errorf("Expected stderr to say 'No worklog found', got: %q", stderrBuf.String())
+	if !strings.Contains(res.Stderr, "No worklog found") {
+		t.Errorf("Expected stderr to say 'No worklog found', got: %q", res.Stderr)
 	}
 }
 
 func TestWorklog_TaskNotFound(t *testing.T) {
-	tmpDir := createWorklogTestFiles(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
+	repo := newWorklogRepo(t)
 
-	_, err := captureWorklogOutput(t, "999")
-	if err == nil {
+	res := repo.Run("worklog", "999")
+	if res.Err == nil {
 		t.Fatal("Expected error for non-existent task")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestWorklog_AddEntry(t *testing.T) {
-	tmpDir := createWorklogTestFiles(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
-	worklogAdd = "Started implementation of auth module"
+	repo := newWorklogRepo(t)
 
-	// Capture stderr for the success message
-	oldStderr := os.Stderr
-	rErr, wErr, _ := os.Pipe()
-	os.Stderr = wErr
-
-	_, err := captureWorklogOutput(t, "015")
-
-	wErr.Close()
-	os.Stderr = oldStderr
-
-	var stderrBuf bytes.Buffer
-	stderrBuf.ReadFrom(rErr)
-
-	if err != nil {
-		t.Fatalf("runWorklog --add failed: %v", err)
+	res := repo.Run("worklog", "015", "--add", "Started implementation of auth module")
+	if res.Err != nil {
+		t.Fatalf("runWorklog --add failed: %v", res.Err)
 	}
 
-	if !strings.Contains(stderrBuf.String(), "Added worklog entry") {
-		t.Errorf("Expected success message, got: %q", stderrBuf.String())
+	if !strings.Contains(res.Stderr, "Added worklog entry") {
+		t.Errorf("Expected success message, got: %q", res.Stderr)
 	}
 
 	// Verify the file was created
-	wlPath := filepath.Join(tmpDir, ".worklogs", "015.md")
-	data, err := os.ReadFile(wlPath)
+	data, err := os.ReadFile(repo.Path(".worklogs/015.md"))
 	if err != nil {
 		t.Fatalf("Worklog file not created: %v", err)
 	}
@@ -232,24 +156,15 @@ func TestWorklog_AddEntry(t *testing.T) {
 }
 
 func TestWorklog_AddThenView(t *testing.T) {
-	tmpDir := createWorklogTestFiles(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
-	worklogAdd = "First entry"
+	repo := newWorklogRepo(t)
 
-	_, err := captureWorklogOutput(t, "015")
-	if err != nil {
-		t.Fatalf("First add failed: %v", err)
+	res := repo.Run("worklog", "015", "--add", "First entry")
+	if res.Err != nil {
+		t.Fatalf("First add failed: %v", res.Err)
 	}
 
 	// Now view
-	worklogAdd = ""
-	worklogFormat = "json"
-
-	output, err := captureWorklogOutput(t, "015")
-	if err != nil {
-		t.Fatalf("View after add failed: %v", err)
-	}
+	output := worklogStdout(t, repo, "015", "--format", "json")
 
 	var wl worklog.Worklog
 	if err := json.Unmarshal([]byte(output), &wl); err != nil {
@@ -262,16 +177,13 @@ func TestWorklog_AddThenView(t *testing.T) {
 }
 
 func TestWorklog_UnsupportedFormat(t *testing.T) {
-	tmpDir := createWorklogTestFilesWithWorklog(t)
-	resetWorklogFlags()
-	taskDir = tmpDir
-	worklogFormat = "csv"
+	repo := newWorklogRepoWithLog(t)
 
-	_, err := captureWorklogOutput(t, "015")
-	if err == nil {
+	res := repo.Run("worklog", "015", "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("Expected error for unsupported format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
 	}
 }

@@ -1,52 +1,28 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/apps/cli/internal/template"
 )
 
-func resetTemplatesFlags() {
-	templatesFormat = "table"
-	taskDir = "."
-}
-
-func captureTemplatesListOutput(t *testing.T) (string, error) {
+// templatesListStdout runs `templates list <args...>`, fails on error, returns stdout.
+func templatesListStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTemplatesList(templatesListCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	res := repo.Run(append([]string{"templates", "list"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("templates list %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 func TestTemplatesList_BuiltinTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
 
-	// Change to tmpDir so resolveProjectRoot() doesn't find the real project root
-	oldDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
-
-	output, err := captureTemplatesListOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := templatesListStdout(t, repo)
 
 	// Should list built-in templates
 	if !strings.Contains(output, "feature") {
@@ -64,15 +40,9 @@ func TestTemplatesList_BuiltinTemplates(t *testing.T) {
 }
 
 func TestTemplatesList_JSONFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
-	templatesFormat = "json"
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureTemplatesListOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := templatesListStdout(t, repo, "--format", "json")
 
 	var items []templateListItem
 	if err := json.Unmarshal([]byte(output), &items); err != nil {
@@ -96,20 +66,10 @@ func TestTemplatesList_JSONFormat(t *testing.T) {
 }
 
 func TestTemplatesList_YAMLFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
-	templatesFormat = "yaml"
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
 
-	// Change to tmpDir so resolveProjectRoot() doesn't find the real project root
-	oldDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
-
-	output, err := captureTemplatesListOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := templatesListStdout(t, repo, "--format", "yaml")
 
 	if !strings.Contains(output, "name: feature") {
 		t.Error("expected YAML output with feature template")
@@ -120,29 +80,22 @@ func TestTemplatesList_YAMLFormat(t *testing.T) {
 }
 
 func TestTemplatesList_InvalidFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
-	templatesFormat = "xml"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureTemplatesListOutput(t)
-	if err == nil {
+	res := repo.Run("templates", "list", "--format", "xml")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestTemplatesList_ProjectTemplatesShown(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
 	// Create a project-level template in a known project root.
 	// Use the template package Discover directly to avoid viper dependency.
-	projectDir := filepath.Join(tmpDir, ".taskmd", "templates")
-	os.MkdirAll(projectDir, 0755)
 	customTemplate := `---
 _template:
   name: custom
@@ -154,10 +107,10 @@ status: pending
 
 # {{title}}
 `
-	os.WriteFile(filepath.Join(projectDir, "custom.md"), []byte(customTemplate), 0644)
+	repo.Write(".taskmd/templates/custom.md", customTemplate)
 
 	// Discover templates directly with known paths to verify project templates work.
-	templates := template.Discover(tmpDir, "")
+	templates := template.Discover(repo.Dir, "")
 	foundCustom := false
 	for _, tmpl := range templates {
 		if tmpl.Name == "custom" && tmpl.Source == "project" {
@@ -170,24 +123,15 @@ status: pending
 }
 
 func TestTemplatesList_NoTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
-
-	// Change to tmpDir so resolveProjectRoot() doesn't find the real project root
-	oldDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldDir)
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
 
 	// Clear built-in templates
 	oldBuiltins := template.BuiltinTemplates
 	template.BuiltinTemplates = nil
 	defer func() { template.BuiltinTemplates = oldBuiltins }()
 
-	output, err := captureTemplatesListOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := templatesListStdout(t, repo)
 
 	if !strings.Contains(output, "No templates found") {
 		t.Errorf("expected 'No templates found', got: %s", output)
@@ -195,14 +139,9 @@ func TestTemplatesList_NoTemplates(t *testing.T) {
 }
 
 func TestTemplatesList_TableHeaders(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetTemplatesFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureTemplatesListOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := templatesListStdout(t, repo)
 
 	if !strings.Contains(output, "NAME") {
 		t.Error("expected NAME header")

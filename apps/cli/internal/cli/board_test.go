@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,19 +10,12 @@ import (
 	"github.com/driangle/taskmd/sdk/go/board"
 )
 
-// createBoardTestFiles creates test task files with varied statuses, priorities, tags, and efforts.
-func createBoardTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	// Create a subdirectory for group testing
-	subDir := filepath.Join(tmpDir, "backend")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
-		t.Fatalf("Failed to create subdir: %v", err)
-	}
-
-	tasks := map[string]string{
+// boardFixtures returns task files with varied statuses, priorities, tags,
+// efforts, and a grouped subdirectory task. Kept inline (not promoted to a
+// shared testdata set) because the board tests depend on this specific mix —
+// a blocked status, three pending tasks, and a group: field.
+func boardFixtures() map[string]string {
+	return map[string]string{
 		"001-setup.md": `---
 id: "001"
 title: "Setup project"
@@ -104,55 +96,22 @@ created: 2026-02-08
 # Database migrations
 `,
 	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-// resetBoardFlags resets board command flags to defaults before each test.
-// Colors are disabled by default so content-checking tests aren't affected by ANSI codes.
-// Tests that verify color output should explicitly set noColor = false.
-func resetBoardFlags() {
-	boardGroupBy = "status"
-	boardFormat = "md"
-	boardOut = ""
-	noColor = true
-}
-
-// captureBoardOutput runs the board command and captures stdout.
-func captureBoardOutput(t *testing.T, dir string) string {
+// boardStdout runs `board <args...>` against repo, fails on error, and returns stdout.
+func boardStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runBoard(boardCmd, []string{dir})
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("runBoard failed: %v", err)
+	res := repo.Run(append([]string{"board"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("board %v failed: %v", args, res.Err)
 	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
+	return res.Stdout
 }
 
 func TestBoardCommand_DefaultGroupByStatus(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo)
 
 	// Should have status group headers
 	if !strings.Contains(output, "## pending") {
@@ -170,11 +129,9 @@ func TestBoardCommand_DefaultGroupByStatus(t *testing.T) {
 }
 
 func TestBoardCommand_GroupByPriority(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardGroupBy = "priority"
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "priority")
 
 	if !strings.Contains(output, "## critical") {
 		t.Error("Expected output to contain '## critical' header")
@@ -191,11 +148,9 @@ func TestBoardCommand_GroupByPriority(t *testing.T) {
 }
 
 func TestBoardCommand_GroupByEffort(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardGroupBy = "effort"
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "effort")
 
 	if !strings.Contains(output, "## small") {
 		t.Error("Expected output to contain '## small' header")
@@ -209,11 +164,9 @@ func TestBoardCommand_GroupByEffort(t *testing.T) {
 }
 
 func TestBoardCommand_GroupByTag(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardGroupBy = "tag"
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "tag")
 
 	// Tasks with tags should appear under their tag groups
 	if !strings.Contains(output, "## backend") {
@@ -244,11 +197,9 @@ func TestBoardCommand_GroupByTag(t *testing.T) {
 }
 
 func TestBoardCommand_GroupByGroup(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardGroupBy = "group"
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "group")
 
 	// Task 006 has group: "backend"
 	if !strings.Contains(output, "## backend") {
@@ -262,11 +213,9 @@ func TestBoardCommand_GroupByGroup(t *testing.T) {
 }
 
 func TestBoardCommand_JSONFormat(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "json"
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "json")
 
 	var result []board.JSONGroup
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -295,11 +244,9 @@ func TestBoardCommand_JSONFormat(t *testing.T) {
 }
 
 func TestBoardCommand_TextFormat(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "txt"
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "txt")
 
 	// Text format should have divider lines
 	if !strings.Contains(output, "---") {
@@ -321,16 +268,13 @@ func TestBoardCommand_TextFormat(t *testing.T) {
 }
 
 func TestBoardCommand_OutputToFile(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
+	repo := newTaskRepo(t, boardFixtures())
 	outFile := filepath.Join(t.TempDir(), "board.md")
 
-	resetBoardFlags()
-	boardOut = outFile
-
 	// Run command (output goes to file, not stdout)
-	err := runBoard(boardCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runBoard failed: %v", err)
+	res := repo.Run("board", "--out", outFile)
+	if res.Err != nil {
+		t.Fatalf("board failed: %v", res.Err)
 	}
 
 	// Verify file was created
@@ -349,10 +293,9 @@ func TestBoardCommand_OutputToFile(t *testing.T) {
 }
 
 func TestBoardCommand_TaskCounts(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo)
 
 	// We have: 1 completed, 1 in-progress, 3 pending, 1 blocked
 	if !strings.Contains(output, "## completed (1)") {
@@ -370,10 +313,9 @@ func TestBoardCommand_TaskCounts(t *testing.T) {
 }
 
 func TestBoardCommand_GroupOrdering(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo)
 
 	// Status ordering: pending < in-progress < blocked < completed
 	pendingIdx := strings.Index(output, "## pending")
@@ -397,25 +339,22 @@ func TestBoardCommand_GroupOrdering(t *testing.T) {
 }
 
 func TestBoardCommand_InvalidGroupBy(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardGroupBy = "nonexistent"
+	repo := newTaskRepo(t, boardFixtures())
 
-	err := runBoard(boardCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("board", "--group-by", "nonexistent")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid group-by field")
 	}
 
-	if !strings.Contains(err.Error(), "unsupported group-by field") {
-		t.Errorf("Expected 'unsupported group-by field' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported group-by field") {
+		t.Errorf("Expected 'unsupported group-by field' error, got: %v", res.Err)
 	}
 }
 
 func TestBoardCommand_EmptyDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetBoardFlags()
+	repo := newTaskRepo(t, nil)
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo)
 
 	// With no tasks, output should be empty
 	if strings.TrimSpace(output) != "" {
@@ -424,17 +363,14 @@ func TestBoardCommand_EmptyDirectory(t *testing.T) {
 }
 
 func TestBoardCommand_ColorEnabled(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "txt"
-	noColor = false
+	repo := newTaskRepo(t, boardFixtures())
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "txt")
 
 	// With colors enabled, output should contain ANSI escape codes
 	// ANSI codes start with \x1b[ or \033[
@@ -444,15 +380,12 @@ func TestBoardCommand_ColorEnabled(t *testing.T) {
 }
 
 func TestBoardCommand_NoColorFlag(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "txt"
-	noColor = true
+	repo := newTaskRepo(t, boardFixtures())
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "txt", "--no-color")
 
 	// With --no-color flag, output should NOT contain ANSI escape codes
 	if strings.Contains(output, "\x1b[") || strings.Contains(output, "\033[") {
@@ -466,10 +399,7 @@ func TestBoardCommand_NoColorFlag(t *testing.T) {
 }
 
 func TestBoardCommand_NoColorEnvVar(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "txt"
-	noColor = false // explicitly enable color, then let env var override
+	repo := newTaskRepo(t, boardFixtures())
 	forceColor = true
 	defer func() { forceColor = false }()
 
@@ -477,7 +407,7 @@ func TestBoardCommand_NoColorEnvVar(t *testing.T) {
 	os.Setenv("NO_COLOR", "1")
 	defer os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "txt")
 
 	// With NO_COLOR env var, output should NOT contain ANSI escape codes
 	if strings.Contains(output, "\x1b[") || strings.Contains(output, "\033[") {
@@ -491,17 +421,14 @@ func TestBoardCommand_NoColorEnvVar(t *testing.T) {
 }
 
 func TestBoardCommand_ColorMarkdownFormat(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "md"
-	noColor = false
+	repo := newTaskRepo(t, boardFixtures())
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "md")
 
 	// Markdown format should also support colors
 	if !strings.Contains(output, "\x1b[") && !strings.Contains(output, "\033[") {
@@ -515,14 +442,12 @@ func TestBoardCommand_ColorMarkdownFormat(t *testing.T) {
 }
 
 func TestBoardCommand_ColorJSONFormat(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "json"
+	repo := newTaskRepo(t, boardFixtures())
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "json")
 
 	// JSON format should NOT have colors (would break JSON parsing)
 	if strings.Contains(output, "\x1b[") || strings.Contains(output, "\033[") {
@@ -537,17 +462,14 @@ func TestBoardCommand_ColorJSONFormat(t *testing.T) {
 }
 
 func TestBoardCommand_ColorStatusBased(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "txt"
-	noColor = false
+	repo := newTaskRepo(t, boardFixtures())
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	// Ensure NO_COLOR is not set
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "txt")
 
 	// Different statuses should have different colors
 	// We can't easily test the exact colors, but we can verify that:
@@ -568,13 +490,9 @@ func TestBoardCommand_ColorStatusBased(t *testing.T) {
 }
 
 func TestBoardCommand_ColorOutputToFile(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
+	repo := newTaskRepo(t, boardFixtures())
 	outFile := filepath.Join(t.TempDir(), "board.txt")
 
-	resetBoardFlags()
-	boardFormat = "txt"
-	boardOut = outFile
-	noColor = false
 	forceColor = true
 	defer func() { forceColor = false }()
 
@@ -582,9 +500,9 @@ func TestBoardCommand_ColorOutputToFile(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 
 	// Run command (output goes to file)
-	err := runBoard(boardCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runBoard failed: %v", err)
+	res := repo.Run("board", "--format", "txt", "--out", outFile)
+	if res.Err != nil {
+		t.Fatalf("board failed: %v", res.Err)
 	}
 
 	content, err := os.ReadFile(outFile)
@@ -599,16 +517,13 @@ func TestBoardCommand_ColorOutputToFile(t *testing.T) {
 }
 
 func TestBoardCommand_HeadingColoredByStatus(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "md"
-	noColor = false
+	repo := newTaskRepo(t, boardFixtures())
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "md")
 
 	// Headings should contain ANSI codes (since they are now colored by status)
 	if !strings.Contains(output, "\x1b[") {
@@ -622,17 +537,13 @@ func TestBoardCommand_HeadingColoredByStatus(t *testing.T) {
 }
 
 func TestBoardCommand_HeadingColoredByPriority(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardGroupBy = "priority"
-	boardFormat = "txt"
-	noColor = false
+	repo := newTaskRepo(t, boardFixtures())
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "priority", "--format", "txt")
 
 	// Should have colored headings
 	if !strings.Contains(output, "\x1b[") {
@@ -649,9 +560,7 @@ func TestBoardCommand_HeadingColoredByPriority(t *testing.T) {
 }
 
 func TestBoardCommand_GroupByType(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001-feat.md": `---
 id: "001"
 title: "New feature"
@@ -672,15 +581,9 @@ title: "No type task"
 status: pending
 ---
 `,
-	}
-	for name, content := range tasks {
-		os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644)
-	}
+	})
 
-	resetBoardFlags()
-	boardGroupBy = "type"
-
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "type")
 
 	if !strings.Contains(output, "## feature") {
 		t.Error("Expected output to contain '## feature' header")
@@ -694,9 +597,7 @@ status: pending
 }
 
 func TestBoardCommand_GroupByPhase(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001.md": `---
 id: "001"
 title: "V0.2 feature"
@@ -717,15 +618,9 @@ title: "No phase"
 status: pending
 ---
 `,
-	}
-	for name, content := range tasks {
-		os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644)
-	}
+	})
 
-	resetBoardFlags()
-	boardGroupBy = "phase"
-
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--group-by", "phase")
 
 	if !strings.Contains(output, "## v0.2") {
 		t.Error("Expected output to contain '## v0.2' header")
@@ -739,12 +634,9 @@ status: pending
 }
 
 func TestBoardCommand_HeadingNoColorFlag(t *testing.T) {
-	tmpDir := createBoardTestFiles(t)
-	resetBoardFlags()
-	boardFormat = "md"
-	// noColor is already true from resetBoardFlags
+	repo := newTaskRepo(t, boardFixtures())
 
-	output := captureBoardOutput(t, tmpDir)
+	output := boardStdout(t, repo, "--format", "md", "--no-color")
 
 	// With no-color, headings should be plain text
 	if strings.Contains(output, "\x1b[") {

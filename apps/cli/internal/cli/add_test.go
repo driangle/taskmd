@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,63 +8,27 @@ import (
 	"testing"
 )
 
-func resetAddFlags() {
-	addPriority = "medium"
-	addEffort = ""
-	addTags = ""
-	addStatus = "pending"
-	addOwner = ""
-	addDependsOn = ""
-	addParent = ""
-	addGroup = ""
-	addFormat = "plain"
-	addEdit = false
-	addTemplate = ""
-	addSlug = ""
-	addPhase = ""
-	taskDir = "."
-
-	// Reset cobra flag "changed" state for template override tests
-	for _, name := range []string{"priority", "status", "effort", "tags", "owner", "depends-on", "parent", "phase"} {
-		if f := addCmd.Flags().Lookup(name); f != nil {
-			f.Changed = false
-		}
-	}
-}
-
-func captureAddOutput(t *testing.T, title string) (string, error) {
+// addStdout runs `add <args...>` against repo, fails on error, and returns stdout.
+func addStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runAdd(addCmd, []string{title})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	res := repo.Run(append([]string{"add"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("add %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 func TestAdd_HappyPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureAddOutput(t, "My first task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "My first task")
 
 	if !strings.Contains(output, "Created task 001") {
 		t.Errorf("expected 'Created task 001' in output, got: %s", output)
 	}
 
 	// Verify file was created
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file matching 001-*.md, got %d", len(files))
 	}
@@ -115,23 +78,19 @@ func TestAdd_HappyPath(t *testing.T) {
 }
 
 func TestAdd_AllFlags(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addPriority = "high"
-	addEffort = "large"
-	addTags = "backend,api"
-	addStatus = "in-progress"
-	addOwner = "alice"
-	addDependsOn = "001,002"
-	addParent = "010"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Full featured task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Full featured task",
+		"--priority", "high",
+		"--effort", "large",
+		"--tags", "backend,api",
+		"--status", "in-progress",
+		"--owner", "alice",
+		"--depends-on", "001,002",
+		"--parent", "010",
+	)
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -163,18 +122,12 @@ func TestAdd_AllFlags(t *testing.T) {
 }
 
 func TestAdd_GroupFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addGroup = "cli"
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureAddOutput(t, "CLI task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "CLI task", "--group", "cli")
 
 	// Verify file created in subdirectory
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "cli", "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "cli", "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file in cli/, got %d", len(files))
 	}
@@ -185,15 +138,9 @@ func TestAdd_GroupFlag(t *testing.T) {
 }
 
 func TestAdd_JSONOutput(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addFormat = "json"
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureAddOutput(t, "JSON task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "JSON task", "--format", "json")
 
 	var result addResult
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -218,61 +165,47 @@ func TestAdd_JSONOutput(t *testing.T) {
 }
 
 func TestAdd_InvalidPriority(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addPriority = "urgent"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Bad priority")
-	if err == nil {
+	res := repo.Run("add", "Bad priority", "--priority", "urgent")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid priority")
 	}
-	if !strings.Contains(err.Error(), "invalid priority") {
-		t.Errorf("expected 'invalid priority' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid priority") {
+		t.Errorf("expected 'invalid priority' error, got: %v", res.Err)
 	}
 }
 
 func TestAdd_InvalidEffort(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addEffort = "huge"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Bad effort")
-	if err == nil {
+	res := repo.Run("add", "Bad effort", "--effort", "huge")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid effort")
 	}
-	if !strings.Contains(err.Error(), "invalid effort") {
-		t.Errorf("expected 'invalid effort' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid effort") {
+		t.Errorf("expected 'invalid effort' error, got: %v", res.Err)
 	}
 }
 
 func TestAdd_InvalidStatus(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addStatus = "invalid"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Bad status")
-	if err == nil {
+	res := repo.Run("add", "Bad status", "--status", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid status")
 	}
-	if !strings.Contains(err.Error(), "invalid status") {
-		t.Errorf("expected 'invalid status' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid status") {
+		t.Errorf("expected 'invalid status' error, got: %v", res.Err)
 	}
 }
 
 func TestAdd_SpecialCharactersInTitle(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Fix bug: login/auth (urgent!)")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Fix bug: login/auth (urgent!)")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -285,14 +218,9 @@ func TestAdd_SpecialCharactersInTitle(t *testing.T) {
 }
 
 func TestAdd_EmptyDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureAddOutput(t, "First task ever")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "First task ever")
 
 	if !strings.Contains(output, "Created task 001") {
 		t.Errorf("expected ID 001 for first task, got: %s", output)
@@ -300,10 +228,8 @@ func TestAdd_EmptyDirectory(t *testing.T) {
 }
 
 func TestAdd_SequentialIDs(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create an existing task file
-	existing := `---
+	repo := newTaskRepo(t, map[string]string{
+		"005-existing.md": `---
 id: "005"
 title: "Existing task"
 status: pending
@@ -314,18 +240,10 @@ created: 2026-02-16
 ---
 
 # Existing task
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "005-existing.md"), []byte(existing), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetAddFlags()
-	taskDir = tmpDir
-
-	output, err := captureAddOutput(t, "Next task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "Next task")
 
 	if !strings.Contains(output, "Created task 006") {
 		t.Errorf("expected ID 006 (next after 005), got: %s", output)
@@ -333,17 +251,11 @@ created: 2026-02-16
 }
 
 func TestAdd_DependsOnParsing(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addDependsOn = "001, 002, 003"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Dependent task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Dependent task", "--depends-on", "001, 002, 003")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -355,17 +267,11 @@ func TestAdd_DependsOnParsing(t *testing.T) {
 }
 
 func TestAdd_TagsParsing(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTags = "frontend, backend, api"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Tagged task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Tagged task", "--tags", "frontend, backend, api")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -377,25 +283,19 @@ func TestAdd_TagsParsing(t *testing.T) {
 }
 
 func TestAdd_InvalidFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addFormat = "xml"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Bad format")
-	if err == nil {
+	res := repo.Run("add", "Bad format", "--format", "xml")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestAdd_EditorNotSet(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addEdit = true
+	repo := newTaskRepo(t, nil)
 
 	// Ensure EDITOR is not set
 	origEditor := os.Getenv("EDITOR")
@@ -406,26 +306,21 @@ func TestAdd_EditorNotSet(t *testing.T) {
 		}
 	}()
 
-	_, err := captureAddOutput(t, "Edit task")
-	if err == nil {
+	res := repo.Run("add", "Edit task", "--edit")
+	if res.Err == nil {
 		t.Fatal("expected error when $EDITOR is not set")
 	}
-	if !strings.Contains(err.Error(), "$EDITOR is not set") {
-		t.Errorf("expected '$EDITOR is not set' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "$EDITOR is not set") {
+		t.Errorf("expected '$EDITOR is not set' error, got: %v", res.Err)
 	}
 }
 
 func TestAdd_EffortOmittedWhenEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "No effort task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "No effort task")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -437,33 +332,24 @@ func TestAdd_EffortOmittedWhenEmpty(t *testing.T) {
 }
 
 func TestAdd_SuggestionOnTypo(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addPriority = "hihg"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Typo task")
-	if err == nil {
+	res := repo.Run("add", "Typo task", "--priority", "hihg")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid priority")
 	}
-	if !strings.Contains(err.Error(), `did you mean "high"`) {
-		t.Errorf("expected suggestion for 'high', got: %v", err)
+	if !strings.Contains(res.Err.Error(), `did you mean "high"`) {
+		t.Errorf("expected suggestion for 'high', got: %v", res.Err)
 	}
 }
 
 func TestAdd_GroupCreatesDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addGroup = "new-group"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Group task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Group task", "--group", "new-group")
 
 	// Verify directory was created
-	info, err := os.Stat(filepath.Join(tmpDir, "new-group"))
+	info, err := os.Stat(repo.Path("new-group"))
 	if err != nil {
 		t.Fatalf("expected group directory to be created: %v", err)
 	}
@@ -473,21 +359,15 @@ func TestAdd_GroupCreatesDirectory(t *testing.T) {
 }
 
 func TestAdd_TemplateFlag_Bug(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "bug"
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureAddOutput(t, "Login fails on Safari")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "Login fails on Safari", "--template", "bug")
 
 	if !strings.Contains(output, "Created task 001") {
 		t.Errorf("expected 'Created task 001' in output, got: %s", output)
 	}
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -527,17 +407,11 @@ func TestAdd_TemplateFlag_Bug(t *testing.T) {
 }
 
 func TestAdd_TemplateFlag_Feature(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "feature"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Dark mode support")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Dark mode support", "--template", "feature")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -557,21 +431,12 @@ func TestAdd_TemplateFlag_Feature(t *testing.T) {
 }
 
 func TestAdd_TemplateFlag_WithPriorityOverride(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "bug"
+	repo := newTaskRepo(t, nil)
 
-	// Simulate explicit --priority flag
-	addCmd.Flags().Set("priority", "critical")
-	defer addCmd.Flags().Set("priority", "medium") // reset
+	// Explicit --priority flag overrides the bug template's default.
+	addStdout(t, repo, "Critical bug", "--template", "bug", "--priority", "critical")
 
-	_, err := captureAddOutput(t, "Critical bug")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -586,18 +451,12 @@ func TestAdd_TemplateFlag_WithPriorityOverride(t *testing.T) {
 }
 
 func TestAdd_TemplateFlag_DefaultPriorityNotOverridden(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "bug"
+	repo := newTaskRepo(t, nil)
 
 	// Do NOT set --priority flag, so it should use template's default (high)
-	_, err := captureAddOutput(t, "Normal bug")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Normal bug", "--template", "bug")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -612,36 +471,27 @@ func TestAdd_TemplateFlag_DefaultPriorityNotOverridden(t *testing.T) {
 }
 
 func TestAdd_TemplateFlag_NotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "nonexistent"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "No template")
-	if err == nil {
+	res := repo.Run("add", "No template", "--template", "nonexistent")
+	if res.Err == nil {
 		t.Fatal("expected error for nonexistent template")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("expected 'not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", res.Err)
 	}
 	// Should list available templates
-	if !strings.Contains(err.Error(), "feature") {
-		t.Errorf("expected available templates in error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "feature") {
+		t.Errorf("expected available templates in error, got: %v", res.Err)
 	}
 }
 
 func TestAdd_TemplateFlag_Chore(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "chore"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Update dependencies")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Update dependencies", "--template", "chore")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -658,22 +508,16 @@ func TestAdd_TemplateFlag_Chore(t *testing.T) {
 }
 
 func TestAdd_CustomSlug(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addSlug = "fix-login"
+	repo := newTaskRepo(t, nil)
 
-	output, err := captureAddOutput(t, "Fix the login bug")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := addStdout(t, repo, "Fix the login bug", "--slug", "fix-login")
 
 	if !strings.Contains(output, "Created task 001") {
 		t.Errorf("expected 'Created task 001' in output, got: %s", output)
 	}
 
 	// Verify the file uses the custom filename
-	expectedFile := filepath.Join(tmpDir, "001-fix-login.md")
+	expectedFile := repo.Path("001-fix-login.md")
 	if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
 		t.Fatalf("expected file %s to exist", expectedFile)
 	}
@@ -688,38 +532,24 @@ func TestAdd_CustomSlug(t *testing.T) {
 }
 
 func TestAdd_CustomSlug_NotUsedWhenEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "My great task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "My great task")
 
 	// Should fall back to slugified title
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-my-great-task.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-my-great-task.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected file 001-my-great-task.md, got files: %v", files)
 	}
 }
 
 func TestAdd_TemplateFlag_WithTagsOverride(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addTemplate = "feature"
+	repo := newTaskRepo(t, nil)
 
-	// Simulate explicit --tags flag
-	addCmd.Flags().Set("tags", "ui,frontend")
-	defer addCmd.Flags().Set("tags", "") // reset
+	// Explicit --tags flag overrides the feature template's tags.
+	addStdout(t, repo, "Tagged feature", "--template", "feature", "--tags", "ui,frontend")
 
-	_, err := captureAddOutput(t, "Tagged feature")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -733,17 +563,11 @@ func TestAdd_TemplateFlag_WithTagsOverride(t *testing.T) {
 }
 
 func TestAdd_WithPhase(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
-	addPhase = "v0.2"
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "Phase task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "Phase task", "--phase", "v0.2")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
@@ -757,16 +581,11 @@ func TestAdd_WithPhase(t *testing.T) {
 }
 
 func TestAdd_PhaseOmittedWhenEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetAddFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, nil)
 
-	_, err := captureAddOutput(t, "No phase task")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	addStdout(t, repo, "No phase task")
 
-	files, _ := filepath.Glob(filepath.Join(tmpDir, "001-*.md"))
+	files, _ := filepath.Glob(filepath.Join(repo.Dir, "001-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}

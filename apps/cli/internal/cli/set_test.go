@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,12 +11,13 @@ import (
 	"github.com/driangle/taskmd/sdk/go/taskfile"
 )
 
-func createSetTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// setTestFiles returns the canonical 3-task shape used across the set tests.
+// It is kept inline rather than reusing the shared "dependency-chain" fixture
+// because these tests assert on task 001 being `pending` with tags `[infra]`
+// and task 003 being `blocked` — both differ from the shared fixture, and the
+// assertions depend on those exact starting values.
+func setTestFiles() map[string]string {
+	return map[string]string{
 		"001-setup.md": `---
 id: "001"
 title: "Setup project"
@@ -65,23 +64,13 @@ created: 2026-02-08
 Create reusable component library.
 `,
 	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-func createMultilineTagTestFile(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	content := `---
+// multilineTagFile returns a one-off task whose tags use the multiline YAML
+// sequence form, so tests can assert that the multiline format is preserved.
+func multilineTagFile() map[string]string {
+	return map[string]string{
+		"010-multiline.md": `---
 id: "010"
 title: "Multiline tags task"
 status: pending
@@ -97,77 +86,41 @@ created: 2026-02-08
 # Multiline tags task
 
 Task with multiline YAML tags.
-`
-	path := filepath.Join(tmpDir, "010-multiline.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-
-	return tmpDir
-}
-
-func resetSetFlags() {
-	setTaskID = ""
-	setStatus = ""
-	setPriority = ""
-	setEffort = ""
-	setType = ""
-	setOwner = ""
-	setParent = ""
-	setDependsOn = ""
-	setPhase = ""
-	setDone = false
-	setDryRun = false
-	setVerify = false
-	setAddTags = nil
-	setRemoveTags = nil
-	setAddPRs = nil
-	setRemovePRs = nil
-	setAddTouches = nil
-	setRemoveTouches = nil
-	taskDir = "."
-
-	// Reset cobra flag Changed state to avoid test interference
-	for _, name := range []string{"status", "parent", "depends-on", "phase"} {
-		if f := setCmd.Flags().Lookup(name); f != nil {
-			f.Changed = false
-		}
+`,
 	}
 }
 
-func captureSetOutput(t *testing.T) (string, error) {
-	t.Helper()
-	return captureSetOutputWithArgs(t, nil)
+// verifySetFile returns a one-off task with an optional verify block, used by
+// the --verify gating tests.
+func verifySetFile(id, verifyYAML string) map[string]string {
+	return map[string]string{
+		id + "-verify.md": fmt.Sprintf(`---
+id: "%s"
+title: "Task with verify"
+status: pending
+created: 2026-02-14
+%s---
+
+# Task with verify
+`, id, verifyYAML),
+	}
 }
 
-func captureSetOutputWithArgs(t *testing.T, args []string) (string, error) {
+// setStdout runs `set <args...>` against repo, fails on error, and returns stdout.
+func setStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runSet(setCmd, args)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	res := repo.Run(append([]string{"set"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("set %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 func TestSet_Status(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	// Identify the task via the --task-id flag (rather than a positional arg).
+	output := setStdout(t, repo, "--task-id", "001", "--status", "completed")
 
 	if !strings.Contains(output, "Updated task 001") {
 		t.Error("Expected confirmation message")
@@ -176,82 +129,60 @@ func TestSet_Status(t *testing.T) {
 		t.Errorf("Expected status change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "status: completed") {
 		t.Error("Expected file to contain updated status")
 	}
 }
 
 func TestSet_Priority(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setPriority = "low"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--priority", "low")
 
 	if !strings.Contains(output, "priority: high -> low") {
 		t.Errorf("Expected priority change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "priority: low") {
 		t.Error("Expected file to contain updated priority")
 	}
 }
 
 func TestSet_Effort(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setEffort = "small"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "002", "--effort", "small")
 
 	if !strings.Contains(output, "effort: large -> small") {
 		t.Errorf("Expected effort change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	if !strings.Contains(string(content), "effort: small") {
 		t.Error("Expected file to contain updated effort")
 	}
 }
 
 func TestSet_Owner(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setOwner = "alice"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--owner", "alice")
 
 	if !strings.Contains(output, "owner: (unset) -> alice") {
 		t.Errorf("Expected owner change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "owner: alice") {
 		t.Errorf("Expected file to contain owner: alice, got:\n%s", string(content))
 	}
 }
 
 func TestSet_OwnerUpdateExisting(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"020-owned.md": `---
 id: "020"
 title: "Task with owner"
 status: pending
@@ -260,67 +191,40 @@ created: 2026-02-08
 ---
 
 # Task with owner
-`
-	path := filepath.Join(tmpDir, "020-owned.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "020"
-	setOwner = "bob"
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "020", "--owner", "bob")
 
 	if !strings.Contains(output, "owner: alice -> bob") {
 		t.Errorf("Expected owner change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("020-owned.md"))
 	if !strings.Contains(string(updated), "owner: bob") {
 		t.Errorf("Expected file to contain owner: bob, got:\n%s", string(updated))
 	}
 }
 
 func TestSet_DoneFlag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setDone = true
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--done")
 
 	if !strings.Contains(output, "status: pending -> completed") {
 		t.Errorf("Expected --done to set status to completed, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "status: completed") {
 		t.Error("Expected file to contain completed status")
 	}
 }
 
 func TestSet_MultipleFields(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "003"
-	setStatus = "in-progress"
-	setPriority = "critical"
-	setEffort = "large"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "003", "--status", "in-progress", "--priority", "critical", "--effort", "large")
 
 	if !strings.Contains(output, "status: blocked -> in-progress") {
 		t.Error("Expected status change in output")
@@ -332,7 +236,7 @@ func TestSet_MultipleFields(t *testing.T) {
 		t.Error("Expected effort change in output")
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "003-ui.md"))
+	content, _ := os.ReadFile(repo.Path("003-ui.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, "status: in-progress") {
 		t.Error("Expected file to contain updated status")
@@ -349,18 +253,14 @@ func TestSet_AllValidStatuses(t *testing.T) {
 	statuses := []string{"pending", "in-progress", "completed", "in-review", "blocked", "cancelled"}
 	for _, status := range statuses {
 		t.Run(status, func(t *testing.T) {
-			tmpDir := createSetTestFiles(t)
-			resetSetFlags()
-			taskDir = tmpDir
-			setTaskID = "001"
-			setStatus = status
+			repo := newTaskRepo(t, setTestFiles())
 
-			_, err := captureSetOutput(t)
-			if err != nil {
-				t.Fatalf("unexpected error for status %q: %v", status, err)
+			res := repo.Run("set", "001", "--status", status)
+			if res.Err != nil {
+				t.Fatalf("unexpected error for status %q: %v", status, res.Err)
 			}
 
-			content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+			content, _ := os.ReadFile(repo.Path("001-setup.md"))
 			if !strings.Contains(string(content), "status: "+status) {
 				t.Errorf("Expected file to contain status: %s", status)
 			}
@@ -369,22 +269,15 @@ func TestSet_AllValidStatuses(t *testing.T) {
 }
 
 func TestSet_CancelledStatus(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setStatus = "cancelled"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error when setting status to cancelled: %v", err)
-	}
+	output := setStdout(t, repo, "002", "--status", "cancelled")
 
 	if !strings.Contains(output, "status: in-progress -> cancelled") {
 		t.Errorf("Expected status change to cancelled in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	if !strings.Contains(string(content), "status: cancelled") {
 		t.Error("Expected file to contain status: cancelled")
 	}
@@ -394,18 +287,14 @@ func TestSet_AllValidPriorities(t *testing.T) {
 	priorities := []string{"low", "medium", "high", "critical"}
 	for _, priority := range priorities {
 		t.Run(priority, func(t *testing.T) {
-			tmpDir := createSetTestFiles(t)
-			resetSetFlags()
-			taskDir = tmpDir
-			setTaskID = "001"
-			setPriority = priority
+			repo := newTaskRepo(t, setTestFiles())
 
-			_, err := captureSetOutput(t)
-			if err != nil {
-				t.Fatalf("unexpected error for priority %q: %v", priority, err)
+			res := repo.Run("set", "001", "--priority", priority)
+			if res.Err != nil {
+				t.Fatalf("unexpected error for priority %q: %v", priority, res.Err)
 			}
 
-			content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+			content, _ := os.ReadFile(repo.Path("001-setup.md"))
 			if !strings.Contains(string(content), "priority: "+priority) {
 				t.Errorf("Expected file to contain priority: %s", priority)
 			}
@@ -417,18 +306,14 @@ func TestSet_AllValidEfforts(t *testing.T) {
 	efforts := []string{"small", "medium", "large"}
 	for _, effort := range efforts {
 		t.Run(effort, func(t *testing.T) {
-			tmpDir := createSetTestFiles(t)
-			resetSetFlags()
-			taskDir = tmpDir
-			setTaskID = "002"
-			setEffort = effort
+			repo := newTaskRepo(t, setTestFiles())
 
-			_, err := captureSetOutput(t)
-			if err != nil {
-				t.Fatalf("unexpected error for effort %q: %v", effort, err)
+			res := repo.Run("set", "002", "--effort", effort)
+			if res.Err != nil {
+				t.Fatalf("unexpected error for effort %q: %v", effort, res.Err)
 			}
 
-			content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+			content, _ := os.ReadFile(repo.Path("002-auth.md"))
 			if !strings.Contains(string(content), "effort: "+effort) {
 				t.Errorf("Expected file to contain effort: %s", effort)
 			}
@@ -437,159 +322,110 @@ func TestSet_AllValidEfforts(t *testing.T) {
 }
 
 func TestSet_InvalidStatus(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "invalid"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--status", "invalid")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid status")
 	}
-	if !strings.Contains(err.Error(), "invalid status") {
-		t.Errorf("Expected 'invalid status' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid status") {
+		t.Errorf("Expected 'invalid status' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_InvalidPriority(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setPriority = "urgent"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--priority", "urgent")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid priority")
 	}
-	if !strings.Contains(err.Error(), "invalid priority") {
-		t.Errorf("Expected 'invalid priority' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid priority") {
+		t.Errorf("Expected 'invalid priority' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_InvalidEffort(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setEffort = "huge"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--effort", "huge")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid effort")
 	}
-	if !strings.Contains(err.Error(), "invalid effort") {
-		t.Errorf("Expected 'invalid effort' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid effort") {
+		t.Errorf("Expected 'invalid effort' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_Type(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setType = "bug"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--type", "bug")
 
 	if !strings.Contains(output, "type: (unset) -> bug") {
 		t.Errorf("Expected type change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "type: bug") {
 		t.Errorf("Expected file to contain type: bug, got:\n%s", string(content))
 	}
 }
 
 func TestSet_InvalidType(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setType = "task"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--type", "task")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid type")
 	}
-	if !strings.Contains(err.Error(), "invalid type") {
-		t.Errorf("Expected 'invalid type' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid type") {
+		t.Errorf("Expected 'invalid type' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_TaskNotFound(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "nonexistent"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "nonexistent", "--status", "completed")
+	if res.Err == nil {
 		t.Fatal("Expected error for non-existent task")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_NoFlagsProvided(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001")
+	if res.Err == nil {
 		t.Fatal("Expected error when no update flags provided")
 	}
-	if !strings.Contains(err.Error(), "nothing to update") {
-		t.Errorf("Expected 'nothing to update' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "nothing to update") {
+		t.Errorf("Expected 'nothing to update' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_DoneWithStatusMutuallyExclusive(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setDone = true
-	setStatus = "blocked"
+	repo := newTaskRepo(t, setTestFiles())
 
-	// Mark the --status flag as changed to simulate CLI usage
-	setCmd.Flags().Set("status", "blocked")
-	defer func() {
-		// Reset the changed state by creating a fresh flag set lookup
-		setCmd.Flags().Set("status", "")
-	}()
-
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--done", "--status", "blocked")
+	if res.Err == nil {
 		t.Fatal("Expected error when --done and --status are both set")
 	}
-	if !strings.Contains(err.Error(), "mutually exclusive") {
-		t.Errorf("Expected 'mutually exclusive' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "mutually exclusive") {
+		t.Errorf("Expected 'mutually exclusive' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_BodyPreserved(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "002", "--status", "completed")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	fileStr := string(content)
 
 	if !strings.Contains(fileStr, "# Implement authentication") {
@@ -601,18 +437,11 @@ func TestSet_BodyPreserved(t *testing.T) {
 }
 
 func TestSet_OtherFieldsPreserved(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "002", "--status", "completed")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	fileStr := string(content)
 
 	// Verify non-updated fields are preserved
@@ -672,16 +501,9 @@ func TestSet_FrontmatterBounds(t *testing.T) {
 }
 
 func TestSet_MatchByTitle(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "Setup project"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "Setup project", "--status", "completed")
 
 	if !strings.Contains(output, "Updated task 001") {
 		t.Error("Expected confirmation for task found by title match")
@@ -689,166 +511,111 @@ func TestSet_MatchByTitle(t *testing.T) {
 }
 
 func TestSet_AddSingleTag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTags = []string{"new-tag"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--add-tag", "new-tag")
 
 	if !strings.Contains(output, "tags: [infra] -> [infra, new-tag]") {
 		t.Errorf("Expected tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), `tags: ["infra", "new-tag"]`) {
 		t.Errorf("Expected file to contain updated tags, got:\n%s", string(content))
 	}
 }
 
 func TestSet_AddMultipleTags(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTags = []string{"tag-a", "tag-b"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--add-tag", "tag-a", "--add-tag", "tag-b")
 
 	if !strings.Contains(output, "tags: [infra] -> [infra, tag-a, tag-b]") {
 		t.Errorf("Expected tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), `tags: ["infra", "tag-a", "tag-b"]`) {
 		t.Errorf("Expected file to contain updated tags, got:\n%s", string(content))
 	}
 }
 
 func TestSet_RemoveTag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setRemoveTags = []string{"security"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "002", "--remove-tag", "security")
 
 	if !strings.Contains(output, "tags: [backend, security] -> [backend]") {
 		t.Errorf("Expected tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	if !strings.Contains(string(content), `tags: ["backend"]`) {
 		t.Errorf("Expected file to contain updated tags, got:\n%s", string(content))
 	}
 }
 
 func TestSet_AddAndRemoveTag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setAddTags = []string{"new-feature"}
-	setRemoveTags = []string{"security"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "002", "--add-tag", "new-feature", "--remove-tag", "security")
 
 	if !strings.Contains(output, "tags: [backend, security] -> [backend, new-feature]") {
 		t.Errorf("Expected tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	if !strings.Contains(string(content), `tags: ["backend", "new-feature"]`) {
 		t.Errorf("Expected file to contain updated tags, got:\n%s", string(content))
 	}
 }
 
 func TestSet_AddDuplicateTag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTags = []string{"infra"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--add-tag", "infra")
 
 	// Tags should remain unchanged since "infra" already exists.
 	if !strings.Contains(output, "tags: [infra] -> [infra]") {
 		t.Errorf("Expected no-op tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), `tags: ["infra"]`) {
 		t.Errorf("Expected tags to remain unchanged, got:\n%s", string(content))
 	}
 }
 
 func TestSet_RemoveNonexistentTag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setRemoveTags = []string{"nonexistent"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--remove-tag", "nonexistent")
 
 	// Tags should remain unchanged since "nonexistent" isn't present.
 	if !strings.Contains(output, "tags: [infra] -> [infra]") {
 		t.Errorf("Expected no-op tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), `tags: ["infra"]`) {
 		t.Errorf("Expected tags to remain unchanged, got:\n%s", string(content))
 	}
 }
 
 func TestSet_TagOnlyUpdate(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTags = []string{"new-tag"}
+	repo := newTaskRepo(t, setTestFiles())
 
 	// Should NOT produce "nothing to update" error.
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("tag-only update should succeed, got error: %v", err)
+	res := repo.Run("set", "001", "--add-tag", "new-tag")
+	if res.Err != nil {
+		t.Fatalf("tag-only update should succeed, got error: %v", res.Err)
 	}
 }
 
 func TestSet_TagsWithOtherFlags(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "completed"
-	setAddTags = []string{"done-tag"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--status", "completed", "--add-tag", "done-tag")
 
 	if !strings.Contains(output, "status: pending -> completed") {
 		t.Error("Expected status change in output")
@@ -857,7 +624,7 @@ func TestSet_TagsWithOtherFlags(t *testing.T) {
 		t.Errorf("Expected tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, "status: completed") {
 		t.Error("Expected file to contain updated status")
@@ -868,18 +635,11 @@ func TestSet_TagsWithOtherFlags(t *testing.T) {
 }
 
 func TestSet_TagsPreservedFormat(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTags = []string{"extra"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "001", "--add-tag", "extra")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	fileStr := string(content)
 
 	// Inline format should stay inline.
@@ -897,22 +657,15 @@ func TestSet_TagsPreservedFormat(t *testing.T) {
 }
 
 func TestSet_MultilineTagFormat(t *testing.T) {
-	tmpDir := createMultilineTagTestFile(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "010"
-	setAddTags = []string{"new-tag"}
+	repo := newTaskRepo(t, multilineTagFile())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "010", "--add-tag", "new-tag")
 
 	if !strings.Contains(output, "tags: [backend, api] -> [backend, api, new-tag]") {
 		t.Errorf("Expected tag change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "010-multiline.md"))
+	content, _ := os.ReadFile(repo.Path("010-multiline.md"))
 	fileStr := string(content)
 
 	// Multiline format should stay multiline.
@@ -930,18 +683,11 @@ func TestSet_MultilineTagFormat(t *testing.T) {
 }
 
 func TestSet_MultilineTagRemove(t *testing.T) {
-	tmpDir := createMultilineTagTestFile(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "010"
-	setRemoveTags = []string{"api"}
+	repo := newTaskRepo(t, multilineTagFile())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "010", "--remove-tag", "api")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "010-multiline.md"))
+	content, _ := os.ReadFile(repo.Path("010-multiline.md"))
 	fileStr := string(content)
 
 	if !strings.Contains(fileStr, "tags:\n  - backend\ncreated:") {
@@ -950,17 +696,9 @@ func TestSet_MultilineTagRemove(t *testing.T) {
 }
 
 func TestSet_TagConfirmationOutput(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setAddTags = []string{"feature"}
-	setRemoveTags = []string{"security"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "002", "--add-tag", "feature", "--remove-tag", "security")
 
 	if !strings.Contains(output, "Updated task 002") {
 		t.Error("Expected confirmation message with task ID")
@@ -971,35 +709,23 @@ func TestSet_TagConfirmationOutput(t *testing.T) {
 }
 
 func TestSet_Parent(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setParent = "002"
+	repo := newTaskRepo(t, setTestFiles())
 
-	// Mark the --parent flag as changed
-	setCmd.Flags().Set("parent", "002")
-	defer setCmd.Flags().Set("parent", "")
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--parent", "002")
 
 	if !strings.Contains(output, "parent: (unset) -> 002") {
 		t.Errorf("Expected parent change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "parent: 002") {
 		t.Errorf("Expected file to contain parent: 002, got:\n%s", string(content))
 	}
 }
 
 func TestSet_ParentClear(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"030-child.md": `---
 id: "030"
 title: "Task with parent"
 status: pending
@@ -1008,121 +734,64 @@ created: 2026-02-08
 ---
 
 # Task with parent
-`
-	path := filepath.Join(tmpDir, "030-child.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "030"
-	setParent = ""
-
-	// Mark the --parent flag as changed (to clear)
-	setCmd.Flags().Set("parent", "")
-	defer setCmd.Flags().Set("parent", "")
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "030", "--parent", "")
 
 	if !strings.Contains(output, "parent: 001 ->") {
 		t.Errorf("Expected parent change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("030-child.md"))
 	if strings.Contains(string(updated), "parent: 001") {
 		t.Error("Expected parent to be cleared, but still found 'parent: 001'")
 	}
 }
 
-func createVerifySetTestFile(t *testing.T, id, verifyYAML string) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	content := fmt.Sprintf(`---
-id: "%s"
-title: "Task with verify"
-status: pending
-created: 2026-02-14
-%s---
-
-# Task with verify
-`, id, verifyYAML)
-
-	path := filepath.Join(tmpDir, id+"-verify.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
-	return tmpDir
-}
-
 func TestSet_VerifyPassThenComplete(t *testing.T) {
-	tmpDir := createVerifySetTestFile(t, "050", `verify:
+	repo := newTaskRepo(t, verifySetFile("050", `verify:
   - type: bash
     run: "echo pass"
-`)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "050"
-	setStatus = "completed"
-	setVerify = true
+`))
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "050", "--status", "completed", "--verify")
 
 	if !strings.Contains(output, "status: pending -> completed") {
 		t.Errorf("expected status change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "050-verify.md"))
+	content, _ := os.ReadFile(repo.Path("050-verify.md"))
 	if !strings.Contains(string(content), "status: completed") {
 		t.Error("Expected file to contain completed status")
 	}
 }
 
 func TestSet_VerifyFailAborts(t *testing.T) {
-	tmpDir := createVerifySetTestFile(t, "051", `verify:
+	repo := newTaskRepo(t, verifySetFile("051", `verify:
   - type: bash
     run: "exit 1"
-`)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "051"
-	setStatus = "completed"
-	setVerify = true
+`))
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "051", "--status", "completed", "--verify")
+	if res.Err == nil {
 		t.Fatal("expected error when verify fails")
 	}
-	if !strings.Contains(err.Error(), "verification failed") {
-		t.Errorf("expected 'verification failed' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "verification failed") {
+		t.Errorf("expected 'verification failed' error, got: %v", res.Err)
 	}
 
 	// Status should NOT be changed
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "051-verify.md"))
+	content, _ := os.ReadFile(repo.Path("051-verify.md"))
 	if strings.Contains(string(content), "status: completed") {
 		t.Error("Status should not be changed when verification fails")
 	}
 }
 
 func TestSet_VerifyNoFieldProceeds(t *testing.T) {
-	tmpDir := createVerifySetTestFile(t, "052", "")
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "052"
-	setStatus = "completed"
-	setVerify = true
+	repo := newTaskRepo(t, verifySetFile("052", ""))
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "052", "--status", "completed", "--verify")
 
 	if !strings.Contains(output, "status: pending -> completed") {
 		t.Errorf("expected status change, got: %s", output)
@@ -1130,20 +799,12 @@ func TestSet_VerifyNoFieldProceeds(t *testing.T) {
 }
 
 func TestSet_VerifyNonCompletedSkips(t *testing.T) {
-	tmpDir := createVerifySetTestFile(t, "053", `verify:
+	repo := newTaskRepo(t, verifySetFile("053", `verify:
   - type: bash
     run: "exit 1"
-`)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "053"
-	setStatus = "in-progress"
-	setVerify = true
+`))
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "053", "--status", "in-progress", "--verify")
 
 	// Should succeed because --verify only gates completion
 	if !strings.Contains(output, "status: pending -> in-progress") {
@@ -1152,15 +813,9 @@ func TestSet_VerifyNonCompletedSkips(t *testing.T) {
 }
 
 func TestSet_PositionalArg(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutputWithArgs(t, []string{"001"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--status", "completed")
 
 	if !strings.Contains(output, "Updated task 001") {
 		t.Error("Expected confirmation message")
@@ -1169,23 +824,16 @@ func TestSet_PositionalArg(t *testing.T) {
 		t.Errorf("Expected status change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "status: completed") {
 		t.Error("Expected file to contain updated status")
 	}
 }
 
 func TestSet_PositionalArgAndFlagSameValue(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutputWithArgs(t, []string{"001"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--task-id", "001", "--status", "completed")
 
 	if !strings.Contains(output, "Updated task 001") {
 		t.Error("Expected confirmation message")
@@ -1193,83 +841,62 @@ func TestSet_PositionalArgAndFlagSameValue(t *testing.T) {
 }
 
 func TestSet_PositionalArgAndFlagConflict(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutputWithArgs(t, []string{"001"})
-	if err == nil {
+	res := repo.Run("set", "001", "--task-id", "002", "--status", "completed")
+	if res.Err == nil {
 		t.Fatal("Expected error when positional arg and --task-id conflict")
 	}
-	if !strings.Contains(err.Error(), "conflicting task ID") {
-		t.Errorf("Expected 'conflicting task ID' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "conflicting task ID") {
+		t.Errorf("Expected 'conflicting task ID' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_NeitherPositionalNorFlag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "--status", "completed")
+	if res.Err == nil {
 		t.Fatal("Expected error when neither positional arg nor --task-id provided")
 	}
-	if !strings.Contains(err.Error(), "task ID required") {
-		t.Errorf("Expected 'task ID required' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task ID required") {
+		t.Errorf("Expected 'task ID required' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_InReviewStatus(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "in-review"
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--status", "in-review")
 
 	if !strings.Contains(output, "status: pending -> in-review") {
 		t.Errorf("Expected status change to in-review, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "status: in-review") {
 		t.Error("Expected file to contain status: in-review")
 	}
 }
 
 func TestSet_AddPR(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddPRs = []string{"https://github.com/example/repo/pull/1"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--add-pr", "https://github.com/example/repo/pull/1")
 
 	if !strings.Contains(output, "pr:") {
 		t.Errorf("Expected PR change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "https://github.com/example/repo/pull/1") {
 		t.Errorf("Expected file to contain PR URL, got:\n%s", string(content))
 	}
 }
 
 func TestSet_RemovePR(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"040-pr.md": `---
 id: "040"
 title: "Task with PR"
 status: in-review
@@ -1278,27 +905,16 @@ created: 2026-02-08
 ---
 
 # Task with PR
-`
-	path := filepath.Join(tmpDir, "040-pr.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "040"
-	setRemovePRs = []string{"https://github.com/example/repo/pull/1"}
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "040", "--remove-pr", "https://github.com/example/repo/pull/1")
 
 	if !strings.Contains(output, "pr:") {
 		t.Errorf("Expected PR change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("040-pr.md"))
 	fileStr := string(updated)
 	if strings.Contains(fileStr, "pull/1") {
 		t.Error("Expected PR 1 to be removed")
@@ -1309,8 +925,8 @@ created: 2026-02-08
 }
 
 func TestSet_AddAndRemovePR(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"041-pr.md": `---
 id: "041"
 title: "Task with PR"
 status: in-review
@@ -1319,28 +935,16 @@ created: 2026-02-08
 ---
 
 # Task with PR
-`
-	path := filepath.Join(tmpDir, "041-pr.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "041"
-	setAddPRs = []string{"https://github.com/example/repo/pull/2"}
-	setRemovePRs = []string{"https://github.com/example/repo/pull/1"}
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "041", "--add-pr", "https://github.com/example/repo/pull/2", "--remove-pr", "https://github.com/example/repo/pull/1")
 
 	if !strings.Contains(output, "pr:") {
 		t.Errorf("Expected PR change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("041-pr.md"))
 	fileStr := string(updated)
 	if strings.Contains(fileStr, "pull/1") {
 		t.Error("Expected PR 1 to be removed")
@@ -1351,51 +955,36 @@ created: 2026-02-08
 }
 
 func TestSet_DoneFlag_PRReviewWorkflow(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setDone = true
+	repo := newTaskRepo(t, setTestFiles())
 
-	// Simulate pr-review workflow via viper
-	viper.Set("workflow", "pr-review")
-	defer viper.Set("workflow", "")
-
-	// Use positional arg to avoid flag state leakage
-	output, err := captureSetOutputWithArgs(t, []string{"001"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Simulate pr-review workflow via viper, seeded after the harness reset.
+	// Use positional arg to avoid flag state leakage.
+	res := repo.RunWith(func() { viper.Set("workflow", "pr-review") }, "set", "001", "--done")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "status: pending -> in-review") {
 		t.Errorf("Expected --done to set status to in-review in pr-review workflow, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	if !strings.Contains(string(content), "status: in-review") {
 		t.Error("Expected file to contain in-review status")
 	}
 }
 
 func TestSet_DependsOn(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "003"
-	setDependsOn = "001,002"
+	repo := newTaskRepo(t, setTestFiles())
 
-	setCmd.Flags().Set("depends-on", "001,002")
-	defer func() { setCmd.Flags().Lookup("depends-on").Changed = false }()
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "003", "--depends-on", "001,002")
 
 	if !strings.Contains(output, "dependencies: [002] -> [001, 002]") {
 		t.Errorf("Expected dependencies change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "003-ui.md"))
+	content, _ := os.ReadFile(repo.Path("003-ui.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, `dependencies: ["001", "002"]`) {
 		t.Errorf("Expected file to contain updated dependencies, got:\n%s", fileStr)
@@ -1403,79 +992,47 @@ func TestSet_DependsOn(t *testing.T) {
 }
 
 func TestSet_DependsOn_InvalidID(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setDependsOn = "999"
+	repo := newTaskRepo(t, setTestFiles())
 
-	setCmd.Flags().Set("depends-on", "999")
-	defer func() { setCmd.Flags().Lookup("depends-on").Changed = false }()
-
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--depends-on", "999")
+	if res.Err == nil {
 		t.Fatal("Expected error for non-existent dependency ID")
 	}
-	if !strings.Contains(err.Error(), `dependency "999" not found`) {
-		t.Errorf("Expected 'not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), `dependency "999" not found`) {
+		t.Errorf("Expected 'not found' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_DependsOn_CircularDep(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, setTestFiles())
+
 	// 001 has no deps, 002 depends on 001, 003 depends on 002.
 	// Setting 001 to depend on 003 creates: 001->003->002->001 (cycle).
-	setTaskID = "001"
-	setDependsOn = "003"
-
-	setCmd.Flags().Set("depends-on", "003")
-	defer func() { setCmd.Flags().Lookup("depends-on").Changed = false }()
-
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--depends-on", "003")
+	if res.Err == nil {
 		t.Fatal("Expected error for circular dependency")
 	}
-	if !strings.Contains(err.Error(), "circular dependency detected") {
-		t.Errorf("Expected 'circular dependency' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "circular dependency detected") {
+		t.Errorf("Expected 'circular dependency' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_DependsOn_SelfDep(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setDependsOn = "001"
+	repo := newTaskRepo(t, setTestFiles())
 
-	setCmd.Flags().Set("depends-on", "001")
-	defer func() { setCmd.Flags().Lookup("depends-on").Changed = false }()
-
-	_, err := captureSetOutput(t)
-	if err == nil {
+	res := repo.Run("set", "001", "--depends-on", "001")
+	if res.Err == nil {
 		t.Fatal("Expected error for self-dependency")
 	}
-	if !strings.Contains(err.Error(), "cannot depend on itself") {
-		t.Errorf("Expected 'cannot depend on itself' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "cannot depend on itself") {
+		t.Errorf("Expected 'cannot depend on itself' error, got: %v", res.Err)
 	}
 }
 
 func TestSet_DependsOn_WithOtherFlags(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "003"
-	setStatus = "in-progress"
-	setDependsOn = "001"
+	repo := newTaskRepo(t, setTestFiles())
 
-	setCmd.Flags().Set("depends-on", "001")
-	defer func() { setCmd.Flags().Lookup("depends-on").Changed = false }()
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "003", "--status", "in-progress", "--depends-on", "001")
 
 	if !strings.Contains(output, "status: blocked -> in-progress") {
 		t.Error("Expected status change in output")
@@ -1484,7 +1041,7 @@ func TestSet_DependsOn_WithOtherFlags(t *testing.T) {
 		t.Errorf("Expected dependencies change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "003-ui.md"))
+	content, _ := os.ReadFile(repo.Path("003-ui.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, "status: in-progress") {
 		t.Error("Expected file to contain updated status")
@@ -1495,25 +1052,15 @@ func TestSet_DependsOn_WithOtherFlags(t *testing.T) {
 }
 
 func TestSet_DependsOn_Clear(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "002"
-	setDependsOn = ""
+	repo := newTaskRepo(t, setTestFiles())
 
-	setCmd.Flags().Set("depends-on", "")
-	defer func() { setCmd.Flags().Lookup("depends-on").Changed = false }()
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "002", "--depends-on", "")
 
 	if !strings.Contains(output, "dependencies: [001] -> []") {
 		t.Errorf("Expected dependencies cleared in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "002-auth.md"))
+	content, _ := os.ReadFile(repo.Path("002-auth.md"))
 	fileStr := string(content)
 	// When clearing, the dependencies line should be removed
 	if strings.Contains(fileStr, "dependencies:") {
@@ -1584,22 +1131,15 @@ func TestComputeNewTags(t *testing.T) {
 }
 
 func TestSet_AddTouches(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTouches = []string{"cli/graph", "cli/output"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--add-touches", "cli/graph", "--add-touches", "cli/output")
 
 	if !strings.Contains(output, "touches:") {
 		t.Errorf("Expected touches change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, "cli/graph") {
 		t.Errorf("Expected file to contain cli/graph, got:\n%s", fileStr)
@@ -1610,8 +1150,8 @@ func TestSet_AddTouches(t *testing.T) {
 }
 
 func TestSet_RemoveTouches(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"050-touches.md": `---
 id: "050"
 title: "Task with touches"
 status: pending
@@ -1620,27 +1160,16 @@ created: 2026-02-08
 ---
 
 # Task with touches
-`
-	path := filepath.Join(tmpDir, "050-touches.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "050"
-	setRemoveTouches = []string{"cli/graph"}
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "050", "--remove-touches", "cli/graph")
 
 	if !strings.Contains(output, "touches:") {
 		t.Errorf("Expected touches change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("050-touches.md"))
 	fileStr := string(updated)
 	if strings.Contains(fileStr, "cli/graph") {
 		t.Error("Expected cli/graph to be removed")
@@ -1654,8 +1183,8 @@ created: 2026-02-08
 }
 
 func TestSet_AddTouches_Deduplication(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"051-touches-dedup.md": `---
 id: "051"
 title: "Task with existing touches"
 status: pending
@@ -1664,23 +1193,15 @@ created: 2026-02-08
 ---
 
 # Task with existing touches
-`
-	path := filepath.Join(tmpDir, "051-touches-dedup.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+`,
+	})
+
+	res := repo.Run("set", "051", "--add-touches", "cli/graph", "--add-touches", "cli/output")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "051"
-	setAddTouches = []string{"cli/graph", "cli/output"}
-
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("051-touches-dedup.md"))
 	fileStr := string(updated)
 	// cli/graph should appear exactly once (not duplicated)
 	count := strings.Count(fileStr, "cli/graph")
@@ -1693,8 +1214,8 @@ created: 2026-02-08
 }
 
 func TestSet_RemoveTouches_NonExistent(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"052-touches.md": `---
 id: "052"
 title: "Task with touches"
 status: pending
@@ -1703,23 +1224,15 @@ created: 2026-02-08
 ---
 
 # Task with touches
-`
-	path := filepath.Join(tmpDir, "052-touches.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+`,
+	})
+
+	res := repo.Run("set", "052", "--remove-touches", "nonexistent/scope")
+	if res.Err != nil {
+		t.Fatalf("unexpected error removing non-existent touches value: %v", res.Err)
 	}
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "052"
-	setRemoveTouches = []string{"nonexistent/scope"}
-
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error removing non-existent touches value: %v", err)
-	}
-
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("052-touches.md"))
 	fileStr := string(updated)
 	if !strings.Contains(fileStr, "cli/graph") {
 		t.Error("Expected cli/graph to be preserved")
@@ -1727,8 +1240,8 @@ created: 2026-02-08
 }
 
 func TestSet_Touches_DryRun(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"053-touches-dry.md": `---
 id: "053"
 title: "Task for dry run"
 status: pending
@@ -1737,29 +1250,17 @@ created: 2026-02-08
 ---
 
 # Task for dry run
-`
-	path := filepath.Join(tmpDir, "053-touches-dry.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "053"
-	setAddTouches = []string{"cli/output"}
-	setDryRun = true
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "053", "--add-touches", "cli/output", "--dry-run")
 
 	if !strings.Contains(output, "Dry run") {
 		t.Errorf("Expected dry run message, got: %s", output)
 	}
 
 	// File should be unchanged
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("053-touches-dry.md"))
 	fileStr := string(updated)
 	if strings.Contains(fileStr, "cli/output") {
 		t.Error("Expected file to be unchanged in dry run mode")
@@ -1767,8 +1268,8 @@ created: 2026-02-08
 }
 
 func TestSet_AddAndRemoveTouches(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"054-touches.md": `---
 id: "054"
 title: "Task with touches"
 status: pending
@@ -1777,24 +1278,15 @@ created: 2026-02-08
 ---
 
 # Task with touches
-`
-	path := filepath.Join(tmpDir, "054-touches.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
+`,
+	})
+
+	res := repo.Run("set", "054", "--add-touches", "cli/output", "--remove-touches", "cli/graph")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "054"
-	setAddTouches = []string{"cli/output"}
-	setRemoveTouches = []string{"cli/graph"}
-
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("054-touches.md"))
 	fileStr := string(updated)
 	if strings.Contains(fileStr, "cli/graph") {
 		t.Error("Expected cli/graph to be removed")
@@ -1808,18 +1300,14 @@ created: 2026-02-08
 }
 
 func TestSet_AddTouches_EmptyArray(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setAddTouches = []string{"cli/graph"}
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("set", "001", "--add-touches", "cli/graph")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, "touches:") {
 		t.Error("Expected touches field to be added")
@@ -1830,25 +1318,15 @@ func TestSet_AddTouches_EmptyArray(t *testing.T) {
 }
 
 func TestSet_Phase_Add(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setPhase = "v0.2"
+	repo := newTaskRepo(t, setTestFiles())
 
-	setCmd.Flags().Set("phase", "v0.2")
-	defer func() { setCmd.Flags().Lookup("phase").Changed = false }()
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "001", "--phase", "v0.2")
 
 	if !strings.Contains(output, "phase:") {
 		t.Errorf("Expected phase change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	fileStr := string(content)
 	if !strings.Contains(fileStr, "phase: v0.2") {
 		t.Errorf("Expected file to contain phase: v0.2, got:\n%s", fileStr)
@@ -1856,8 +1334,8 @@ func TestSet_Phase_Add(t *testing.T) {
 }
 
 func TestSet_Phase_Change(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"060-phase.md": `---
 id: "060"
 title: "Task with phase"
 status: pending
@@ -1866,30 +1344,16 @@ created: 2026-02-08
 ---
 
 # Task with phase
-`
-	path := filepath.Join(tmpDir, "060-phase.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "060"
-	setPhase = "v0.2"
-
-	setCmd.Flags().Set("phase", "v0.2")
-	defer func() { setCmd.Flags().Lookup("phase").Changed = false }()
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "060", "--phase", "v0.2")
 
 	if !strings.Contains(output, "phase: v0.1 -> v0.2") {
 		t.Errorf("Expected phase change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("060-phase.md"))
 	fileStr := string(updated)
 	if !strings.Contains(fileStr, "phase: v0.2") {
 		t.Errorf("Expected phase to be updated, got:\n%s", fileStr)
@@ -1897,8 +1361,8 @@ created: 2026-02-08
 }
 
 func TestSet_Phase_Clear(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"061-phase.md": `---
 id: "061"
 title: "Task with phase"
 status: pending
@@ -1907,30 +1371,16 @@ created: 2026-02-08
 ---
 
 # Task with phase
-`
-	path := filepath.Join(tmpDir, "061-phase.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "061"
-	setPhase = ""
-
-	setCmd.Flags().Set("phase", "")
-	defer func() { setCmd.Flags().Lookup("phase").Changed = false }()
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "061", "--phase", "")
 
 	if !strings.Contains(output, "phase:") {
 		t.Errorf("Expected phase change in output, got: %s", output)
 	}
 
-	updated, _ := os.ReadFile(path)
+	updated, _ := os.ReadFile(repo.Path("061-phase.md"))
 	fileStr := string(updated)
 	if !strings.Contains(fileStr, "phase: ") || strings.Contains(fileStr, "phase: v0.1") {
 		t.Errorf("Expected phase to be cleared, got:\n%s", fileStr)
@@ -1938,18 +1388,11 @@ created: 2026-02-08
 }
 
 func TestSet_CompletedDate_AutoSetOnCompleted(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "completed"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "001", "--status", "completed")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	s := string(content)
 	if !strings.Contains(s, "status: completed") {
 		t.Error("Expected status to be completed")
@@ -1960,18 +1403,11 @@ func TestSet_CompletedDate_AutoSetOnCompleted(t *testing.T) {
 }
 
 func TestSet_CancelledDate_AutoSetOnCancelled(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "001"
-	setStatus = "cancelled"
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "001", "--status", "cancelled")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	s := string(content)
 	if !strings.Contains(s, "status: cancelled") {
 		t.Error("Expected status to be cancelled")
@@ -1985,8 +1421,8 @@ func TestSet_CancelledDate_AutoSetOnCancelled(t *testing.T) {
 }
 
 func TestSet_CompletedDate_ClearedOnReopen(t *testing.T) {
-	tmpDir := t.TempDir()
-	taskContent := `---
+	repo := newTaskRepo(t, map[string]string{
+		"070-completed.md": `---
 id: "070"
 title: "Completed task"
 status: completed
@@ -1996,27 +1432,16 @@ created: 2026-02-08
 ---
 
 # Completed task
-`
-	path := filepath.Join(tmpDir, "070-completed.md")
-	if err := os.WriteFile(path, []byte(taskContent), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "070"
-	setStatus = "pending"
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "070", "--status", "pending")
 
 	if !strings.Contains(output, "completed_at:") {
 		t.Errorf("Expected completed_at change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(path)
+	content, _ := os.ReadFile(repo.Path("070-completed.md"))
 	s := string(content)
 	if !strings.Contains(s, "status: pending") {
 		t.Error("Expected status to be pending")
@@ -2027,17 +1452,11 @@ created: 2026-02-08
 }
 
 func TestSet_CompletedDate_DoneFlag(t *testing.T) {
-	tmpDir := createSetTestFiles(t)
-	resetSetFlags()
-	taskDir = tmpDir
-	setDone = true
+	repo := newTaskRepo(t, setTestFiles())
 
-	_, err := captureSetOutputWithArgs(t, []string{"001"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	setStdout(t, repo, "001", "--done")
 
-	content, _ := os.ReadFile(filepath.Join(tmpDir, "001-setup.md"))
+	content, _ := os.ReadFile(repo.Path("001-setup.md"))
 	s := string(content)
 	if !strings.Contains(s, "status: completed") {
 		t.Error("Expected status to be completed via --done")
@@ -2048,8 +1467,8 @@ func TestSet_CompletedDate_DoneFlag(t *testing.T) {
 }
 
 func TestSet_CompletedDate_NonStatusChangePreserves(t *testing.T) {
-	tmpDir := t.TempDir()
-	taskContent := `---
+	repo := newTaskRepo(t, map[string]string{
+		"071-completed.md": `---
 id: "071"
 title: "Completed task"
 status: completed
@@ -2059,23 +1478,12 @@ created: 2026-02-08
 ---
 
 # Completed task
-`
-	path := filepath.Join(tmpDir, "071-completed.md")
-	if err := os.WriteFile(path, []byte(taskContent), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "071"
-	setPriority = "high"
+	setStdout(t, repo, "071", "--priority", "high")
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	content, _ := os.ReadFile(path)
+	content, _ := os.ReadFile(repo.Path("071-completed.md"))
 	s := string(content)
 	if !strings.Contains(s, "priority: high") {
 		t.Error("Expected priority to be updated")
@@ -2086,8 +1494,8 @@ created: 2026-02-08
 }
 
 func TestSet_CancelledDate_ClearedOnReopen(t *testing.T) {
-	tmpDir := t.TempDir()
-	taskContent := `---
+	repo := newTaskRepo(t, map[string]string{
+		"072-cancelled.md": `---
 id: "072"
 title: "Cancelled task"
 status: cancelled
@@ -2097,27 +1505,16 @@ created: 2026-02-08
 ---
 
 # Cancelled task
-`
-	path := filepath.Join(tmpDir, "072-cancelled.md")
-	if err := os.WriteFile(path, []byte(taskContent), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "072"
-	setStatus = "pending"
-
-	output, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := setStdout(t, repo, "072", "--status", "pending")
 
 	if !strings.Contains(output, "cancelled_at:") {
 		t.Errorf("Expected cancelled_at change in output, got: %s", output)
 	}
 
-	content, _ := os.ReadFile(path)
+	content, _ := os.ReadFile(repo.Path("072-cancelled.md"))
 	s := string(content)
 	if !strings.Contains(s, "status: pending") {
 		t.Error("Expected status to be pending")
@@ -2128,8 +1525,8 @@ created: 2026-02-08
 }
 
 func TestSet_CompletedDate_ClearsOnCancel(t *testing.T) {
-	tmpDir := t.TempDir()
-	taskContent := `---
+	repo := newTaskRepo(t, map[string]string{
+		"073-task.md": `---
 id: "073"
 title: "Completed then cancelled"
 status: completed
@@ -2139,23 +1536,12 @@ created: 2026-02-08
 ---
 
 # Completed then cancelled
-`
-	path := filepath.Join(tmpDir, "073-task.md")
-	if err := os.WriteFile(path, []byte(taskContent), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetSetFlags()
-	taskDir = tmpDir
-	setTaskID = "073"
-	setStatus = "cancelled"
+	setStdout(t, repo, "073", "--status", "cancelled")
 
-	_, err := captureSetOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	content, _ := os.ReadFile(path)
+	content, _ := os.ReadFile(repo.Path("073-task.md"))
 	s := string(content)
 	if !strings.Contains(s, "cancelled_at: ") {
 		t.Errorf("Expected cancelled_at to be set, got:\n%s", s)

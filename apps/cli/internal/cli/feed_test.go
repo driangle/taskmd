@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,29 +26,28 @@ A	tasks/cli/043-new-feature.md
 R100	tasks/old/010-rename-me.md	tasks/cli/010-renamed.md
 `
 
-func captureFeedOutput(t *testing.T, fn func() error) (string, error) {
+// feedStdout runs `feed <args...>` against repo, fails on error, and returns stdout.
+func feedStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := fn()
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	res := repo.Run(append([]string{"feed"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("feed %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
-func resetFeedFlags() {
-	feedFormat = "text"
-	feedLimit = 20
-	feedSince = ""
-	feedScope = ""
-	feedSource = "all"
-	feedField = "status"
+// seedWorklogFiles writes a two-entry worklog under cli/.worklogs/015.md.
+func seedWorklogFiles(repo *taskRepo) {
+	repo.Write("cli/.worklogs/015.md", `## 2026-02-15T10:00:00Z
+
+Started implementation of the search feature.
+
+**Approach:** Full-text search with SQLite.
+
+## 2026-02-15T14:30:00Z
+
+Completed login endpoint.
+`)
 }
 
 // noopGitShow returns an error so enrichEntriesWithTaskStatus is a no-op.
@@ -121,9 +118,7 @@ func TestParseGitLogOutput_Empty(t *testing.T) {
 }
 
 func TestFeedCommand_PlainText(t *testing.T) {
-	resetFeedFlags()
-	noColor = true
-	defer func() { noColor = false }()
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -135,12 +130,7 @@ func TestFeedCommand_PlainText(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--no-color")
 
 	if !strings.Contains(output, "Recent task activity") {
 		t.Error("expected header line in output")
@@ -163,8 +153,7 @@ func TestFeedCommand_PlainText(t *testing.T) {
 }
 
 func TestFeedCommand_JSON(t *testing.T) {
-	resetFeedFlags()
-	feedFormat = "json"
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -176,12 +165,7 @@ func TestFeedCommand_JSON(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--format", "json")
 
 	var entries []feed.FeedEntry
 	if err := json.Unmarshal([]byte(output), &entries); err != nil {
@@ -200,8 +184,7 @@ func TestFeedCommand_JSON(t *testing.T) {
 }
 
 func TestFeedCommand_Limit(t *testing.T) {
-	resetFeedFlags()
-	feedLimit = 5
+	repo := newTaskRepo(t, nil)
 
 	var capturedArgs []string
 	oldGitLog := gitLogFunc
@@ -215,11 +198,8 @@ func TestFeedCommand_Limit(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	_, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("feed", "--limit", "5"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	found := false
@@ -235,8 +215,7 @@ func TestFeedCommand_Limit(t *testing.T) {
 }
 
 func TestFeedCommand_Since(t *testing.T) {
-	resetFeedFlags()
-	feedSince = "7d"
+	repo := newTaskRepo(t, nil)
 
 	var capturedArgs []string
 	oldGitLog := gitLogFunc
@@ -250,11 +229,8 @@ func TestFeedCommand_Since(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	_, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("feed", "--since", "7d"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	found := false
@@ -270,8 +246,7 @@ func TestFeedCommand_Since(t *testing.T) {
 }
 
 func TestFeedCommand_Scope(t *testing.T) {
-	resetFeedFlags()
-	feedScope = "cli"
+	repo := newTaskRepo(t, nil)
 
 	var capturedArgs []string
 	oldGitLog := gitLogFunc
@@ -285,11 +260,8 @@ func TestFeedCommand_Scope(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	_, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("feed", "--scope", "cli"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// The last arg should be the path glob containing the scope
@@ -300,7 +272,7 @@ func TestFeedCommand_Scope(t *testing.T) {
 }
 
 func TestFeedCommand_EmptyFeed(t *testing.T) {
-	resetFeedFlags()
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -312,12 +284,7 @@ func TestFeedCommand_EmptyFeed(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo)
 
 	if !strings.Contains(output, "No recent task changes.") {
 		t.Errorf("expected empty feed message, got: %s", output)
@@ -325,8 +292,7 @@ func TestFeedCommand_EmptyFeed(t *testing.T) {
 }
 
 func TestFeedCommand_EmptyFeed_JSON(t *testing.T) {
-	resetFeedFlags()
-	feedFormat = "json"
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -338,12 +304,7 @@ func TestFeedCommand_EmptyFeed_JSON(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--format", "json")
 
 	if strings.TrimSpace(output) != "[]" {
 		t.Errorf("expected empty JSON array, got: %s", output)
@@ -351,8 +312,7 @@ func TestFeedCommand_EmptyFeed_JSON(t *testing.T) {
 }
 
 func TestFeedCommand_InvalidFormat(t *testing.T) {
-	resetFeedFlags()
-	feedFormat = "csv"
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -364,17 +324,17 @@ func TestFeedCommand_InvalidFormat(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	err := runFeed(feedCmd, nil)
-	if err == nil {
+	res := repo.Run("feed", "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestFeedCommand_NonGitRepo(t *testing.T) {
-	resetFeedFlags()
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -386,12 +346,12 @@ func TestFeedCommand_NonGitRepo(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	err := runFeed(feedCmd, nil)
-	if err == nil {
+	res := repo.Run("feed")
+	if res.Err == nil {
 		t.Fatal("expected error for non-git repo")
 	}
-	if !strings.Contains(err.Error(), "git repository") {
-		t.Errorf("expected git repository error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "git repository") {
+		t.Errorf("expected git repository error, got: %v", res.Err)
 	}
 }
 
@@ -467,9 +427,7 @@ func TestNormalizeSince(t *testing.T) {
 }
 
 func TestFeedCommand_CompletedStatus(t *testing.T) {
-	resetFeedFlags()
-	noColor = true
-	defer func() { noColor = false }()
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -489,12 +447,7 @@ func TestFeedCommand_CompletedStatus(t *testing.T) {
 	}
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--no-color")
 
 	// Rich diff shows status transition as compact summary
 	if !strings.Contains(output, "status in-progress") || !strings.Contains(output, "completed") {
@@ -506,9 +459,7 @@ func TestFeedCommand_CompletedStatus(t *testing.T) {
 }
 
 func TestFeedCommand_CancelledStatus(t *testing.T) {
-	resetFeedFlags()
-	noColor = true
-	defer func() { noColor = false }()
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -528,12 +479,7 @@ func TestFeedCommand_CancelledStatus(t *testing.T) {
 	}
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--no-color")
 
 	// Rich diff shows status transition as compact summary
 	if !strings.Contains(output, "status in-progress") || !strings.Contains(output, "cancelled") {
@@ -542,8 +488,7 @@ func TestFeedCommand_CancelledStatus(t *testing.T) {
 }
 
 func TestFeedCommand_CompletedStatus_JSON(t *testing.T) {
-	resetFeedFlags()
-	feedFormat = "json"
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -563,12 +508,7 @@ func TestFeedCommand_CompletedStatus_JSON(t *testing.T) {
 	}
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--format", "json")
 
 	var entries []feed.FeedEntry
 	if err := json.Unmarshal([]byte(output), &entries); err != nil {
@@ -611,32 +551,11 @@ func TestBuildGitLogArgs_NoOptionalFlags(t *testing.T) {
 	}
 }
 
-func createWorklogFiles(t *testing.T, tasksDir string) {
-	t.Helper()
-	wlDir := tasksDir + "/cli/.worklogs"
-	if err := os.MkdirAll(wlDir, 0755); err != nil {
-		t.Fatalf("failed to create worklogs dir: %v", err)
-	}
-	content := `## 2026-02-15T10:00:00Z
-
-Started implementation of the search feature.
-
-**Approach:** Full-text search with SQLite.
-
-## 2026-02-15T14:30:00Z
-
-Completed login endpoint.
-`
-	if err := os.WriteFile(wlDir+"/015.md", []byte(content), 0644); err != nil {
-		t.Fatalf("failed to write worklog file: %v", err)
-	}
-}
-
 func TestScanWorklogEntries(t *testing.T) {
-	tmpDir := t.TempDir()
-	createWorklogFiles(t, tmpDir)
+	repo := newTaskRepo(t, nil)
+	seedWorklogFiles(repo)
 
-	entries := feed.ScanWorklogEntries(tmpDir, "cli", "", false)
+	entries := feed.ScanWorklogEntries(repo.Dir, "cli", "", false)
 	if len(entries) != 2 {
 		t.Fatalf("expected 2 worklog entries, got %d", len(entries))
 	}
@@ -657,42 +576,34 @@ func TestScanWorklogEntries(t *testing.T) {
 }
 
 func TestScanWorklogEntries_SinceFilter(t *testing.T) {
-	tmpDir := t.TempDir()
-	createWorklogFiles(t, tmpDir)
+	repo := newTaskRepo(t, nil)
+	seedWorklogFiles(repo)
 
 	// Filter to only entries after 2026-02-15T12:00:00Z
-	entries := feed.ScanWorklogEntries(tmpDir, "cli", "2026-02-15", false)
+	entries := feed.ScanWorklogEntries(repo.Dir, "cli", "2026-02-15", false)
 	if len(entries) != 2 {
 		t.Fatalf("expected 2 entries with since=2026-02-15, got %d", len(entries))
 	}
 
 	// Use a date after the entries
-	entries = feed.ScanWorklogEntries(tmpDir, "cli", "2026-02-16", false)
+	entries = feed.ScanWorklogEntries(repo.Dir, "cli", "2026-02-16", false)
 	if len(entries) != 0 {
 		t.Fatalf("expected 0 entries with since=2026-02-16, got %d", len(entries))
 	}
 }
 
 func TestScanWorklogEntries_MalformedTimestamp(t *testing.T) {
-	tmpDir := t.TempDir()
-	wlDir := tmpDir + "/cli/.worklogs"
-	if err := os.MkdirAll(wlDir, 0755); err != nil {
-		t.Fatalf("failed to create worklogs dir: %v", err)
-	}
-
-	content := `## not-a-timestamp
+	repo := newTaskRepo(t, nil)
+	repo.Write("cli/.worklogs/020.md", `## not-a-timestamp
 
 This entry should be skipped.
 
 ## 2026-03-01T09:00:00Z
 
 Valid entry here.
-`
-	if err := os.WriteFile(wlDir+"/020.md", []byte(content), 0644); err != nil {
-		t.Fatalf("failed to write worklog: %v", err)
-	}
+`)
 
-	entries := feed.ScanWorklogEntries(tmpDir, "cli", "", false)
+	entries := feed.ScanWorklogEntries(repo.Dir, "cli", "", false)
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 entry (malformed skipped), got %d", len(entries))
 	}
@@ -736,17 +647,8 @@ func TestMergeEntries_EmptySlices(t *testing.T) {
 }
 
 func TestFeedCommand_SourceWorklog(t *testing.T) {
-	resetFeedFlags()
-	feedSource = "worklog"
-	noColor = true
-	defer func() { noColor = false }()
-
-	tmpDir := t.TempDir()
-	createWorklogFiles(t, tmpDir)
-
-	oldTaskDir := taskDir
-	taskDir = tmpDir
-	defer func() { taskDir = oldTaskDir }()
+	repo := newTaskRepo(t, nil)
+	seedWorklogFiles(repo)
 
 	// Git log should NOT be called
 	oldGitLog := gitLogFunc
@@ -760,12 +662,7 @@ func TestFeedCommand_SourceWorklog(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--source", "worklog", "--no-color")
 
 	if !strings.Contains(output, "[Worklog]") {
 		t.Error("expected [Worklog] tag in output")
@@ -779,10 +676,7 @@ func TestFeedCommand_SourceWorklog(t *testing.T) {
 }
 
 func TestFeedCommand_SourceGit(t *testing.T) {
-	resetFeedFlags()
-	feedSource = "git"
-	noColor = true
-	defer func() { noColor = false }()
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -794,12 +688,7 @@ func TestFeedCommand_SourceGit(t *testing.T) {
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--source", "git", "--no-color")
 
 	if strings.Contains(output, "[Worklog]") {
 		t.Error("expected no [Worklog] tag with --source git")
@@ -810,8 +699,7 @@ func TestFeedCommand_SourceGit(t *testing.T) {
 }
 
 func TestFeedCommand_InvalidSource(t *testing.T) {
-	resetFeedFlags()
-	feedSource = "invalid"
+	repo := newTaskRepo(t, nil)
 
 	oldGitLog := gitLogFunc
 	gitLogFunc = func(_ string, _ []string) (string, error) {
@@ -819,37 +707,24 @@ func TestFeedCommand_InvalidSource(t *testing.T) {
 	}
 	defer func() { gitLogFunc = oldGitLog }()
 
-	err := runFeed(feedCmd, nil)
-	if err == nil {
+	res := repo.Run("feed", "--source", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid source")
 	}
-	if !strings.Contains(err.Error(), "unsupported source") {
-		t.Errorf("expected 'unsupported source' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported source") {
+		t.Errorf("expected 'unsupported source' error, got: %v", res.Err)
 	}
 }
 
 func TestFeedCommand_WorklogJSON(t *testing.T) {
-	resetFeedFlags()
-	feedFormat = "json"
-	feedSource = "worklog"
-
-	tmpDir := t.TempDir()
-	createWorklogFiles(t, tmpDir)
-
-	oldTaskDir := taskDir
-	taskDir = tmpDir
-	defer func() { taskDir = oldTaskDir }()
+	repo := newTaskRepo(t, nil)
+	seedWorklogFiles(repo)
 
 	oldGitShow := gitShowFunc
 	gitShowFunc = noopGitShow
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--format", "json", "--source", "worklog")
 
 	var entries []feed.FeedEntry
 	if err := json.Unmarshal([]byte(output), &entries); err != nil {
@@ -894,9 +769,7 @@ func TestParseSinceTime(t *testing.T) {
 }
 
 func TestFeedCommand_RichDiff_StatusAndPriority(t *testing.T) {
-	resetFeedFlags()
-	noColor = true
-	defer func() { noColor = false }()
+	repo := newTaskRepo(t, nil)
 
 	gitLog := `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 Alice
@@ -920,12 +793,7 @@ M	tasks/cli/042-add-auth.md
 	}
 	defer func() { gitShowFunc = oldGitShow }()
 
-	output, err := captureFeedOutput(t, func() error {
-		return runFeed(feedCmd, nil)
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := feedStdout(t, repo, "--no-color")
 
 	if !strings.Contains(output, "priority medium") {
 		t.Error("expected priority change in output")
@@ -1020,25 +888,32 @@ func TestFilterEntriesByField_NoMatchesForField(t *testing.T) {
 }
 
 func TestWriteEmptyFeed_SingleTaskMessage(t *testing.T) {
-	resetFeedFlags()
-	output, err := captureFeedOutput(t, func() error { return writeEmptyFeed("042") })
+	oldFormat, oldField := feedFormat, feedField
+	feedFormat, feedField = "text", "status"
+	defer func() { feedFormat, feedField = oldFormat, oldField }()
+
+	var err error
+	stdout, _ := captureOutput(t, func() { err = writeEmptyFeed("042") })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(output, "No status changes found for task 042") {
-		t.Errorf("unexpected message: %q", output)
+	if !strings.Contains(stdout, "No status changes found for task 042") {
+		t.Errorf("unexpected message: %q", stdout)
 	}
 }
 
 func TestWriteEmptyFeed_JSON(t *testing.T) {
-	resetFeedFlags()
+	oldFormat := feedFormat
 	feedFormat = "json"
-	output, err := captureFeedOutput(t, func() error { return writeEmptyFeed("042") })
+	defer func() { feedFormat = oldFormat }()
+
+	var err error
+	stdout, _ := captureOutput(t, func() { err = writeEmptyFeed("042") })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.TrimSpace(output) != "[]" {
-		t.Errorf("expected [] for json, got %q", output)
+	if strings.TrimSpace(stdout) != "[]" {
+		t.Errorf("expected [] for json, got %q", stdout)
 	}
 }
 

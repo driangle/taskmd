@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -86,18 +83,10 @@ func TestWarnDuplicateIDs(t *testing.T) {
 			{ID: "001", FilePath: "tasks/001.md"},
 		}
 
-		oldStderr := os.Stderr
-		r, w, _ := os.Pipe()
-		os.Stderr = w
-
-		dupes := warnDuplicateIDs(tasks)
-
-		w.Close()
-		os.Stderr = oldStderr
-
-		var buf bytes.Buffer
-		buf.ReadFrom(r)
-		output := buf.String()
+		var dupes map[string][]string
+		_, output := captureOutput(t, func() {
+			dupes = warnDuplicateIDs(tasks)
+		})
 
 		if len(dupes) != 1 {
 			t.Fatalf("expected 1 duplicate ID, got %d", len(dupes))
@@ -120,18 +109,10 @@ func TestWarnDuplicateIDs(t *testing.T) {
 			{ID: "002", FilePath: "a/002.md"},
 		}
 
-		oldStderr := os.Stderr
-		r, w, _ := os.Pipe()
-		os.Stderr = w
-
-		dupes := warnDuplicateIDs(tasks)
-
-		w.Close()
-		os.Stderr = oldStderr
-
-		var buf bytes.Buffer
-		buf.ReadFrom(r)
-		output := buf.String()
+		var dupes map[string][]string
+		_, output := captureOutput(t, func() {
+			dupes = warnDuplicateIDs(tasks)
+		})
 
 		if len(dupes) != 0 {
 			t.Fatalf("expected no duplicates, got %d", len(dupes))
@@ -172,21 +153,12 @@ func TestFormatDuplicatePathsWithTitles(t *testing.T) {
 	}
 }
 
-// Helper to create task files with duplicate IDs for integration tests.
-func createDuplicateTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	groupA := filepath.Join(tmpDir, "groupA")
-	groupB := filepath.Join(tmpDir, "groupB")
-	if err := os.MkdirAll(groupA, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(groupB, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	taskA := `---
+// duplicateFiles is the duplicate-ID fixture: two tasks sharing ID 042 in
+// separate group dirs plus one unique task. Kept inline because the duplicate-ID
+// shape is exactly what these integration tests exercise.
+func duplicateFiles() map[string]string {
+	return map[string]string{
+		"groupA/042-task-a.md": `---
 id: "042"
 title: "Task A"
 status: pending
@@ -198,8 +170,8 @@ created: 2026-02-08
 ---
 
 # Task A
-`
-	taskB := `---
+`,
+		"groupB/042-task-b.md": `---
 id: "042"
 title: "Task B"
 status: pending
@@ -211,8 +183,8 @@ created: 2026-02-08
 ---
 
 # Task B
-`
-	uniqueTask := `---
+`,
+		"001-unique.md": `---
 id: "001"
 title: "Unique Task"
 status: pending
@@ -224,19 +196,8 @@ created: 2026-02-08
 ---
 
 # Unique Task
-`
-
-	for name, content := range map[string]string{
-		filepath.Join(groupA, "042-task-a.md"): taskA,
-		filepath.Join(groupB, "042-task-b.md"): taskB,
-		filepath.Join(tmpDir, "001-unique.md"): uniqueTask,
-	} {
-		if err := os.WriteFile(name, []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create %s: %v", name, err)
-		}
+`,
 	}
-
-	return tmpDir
 }
 
 func TestResolveTask_DuplicateIDError(t *testing.T) {
@@ -310,7 +271,7 @@ func TestResolveTask_UniqueID(t *testing.T) {
 }
 
 func TestRunGet_DuplicateIDError(t *testing.T) {
-	repo := &taskRepo{t: t, Dir: createDuplicateTestFiles(t)}
+	repo := newTaskRepo(t, duplicateFiles())
 
 	err := repo.Run("get", "042").Err
 	if err == nil {
@@ -331,7 +292,7 @@ func TestRunGet_DuplicateIDError(t *testing.T) {
 }
 
 func TestRunGet_DuplicateID_UniqueTaskWorks(t *testing.T) {
-	repo := &taskRepo{t: t, Dir: createDuplicateTestFiles(t)}
+	repo := newTaskRepo(t, duplicateFiles())
 
 	output := getStdout(t, repo, "001")
 	if !strings.Contains(output, "Unique Task") {
@@ -340,16 +301,9 @@ func TestRunGet_DuplicateID_UniqueTaskWorks(t *testing.T) {
 }
 
 func TestRunStatus_DuplicateIDError(t *testing.T) {
-	tmpDir := createDuplicateTestFiles(t)
-	statusFormat = "text"
-	statusExact = false
-	statusThreshold = 0.6
-	statusMinimal = false
-	statusStatusline = false
-	statusScope = ""
-	taskDir = tmpDir
+	repo := newTaskRepo(t, duplicateFiles())
 
-	err := runStatusSingle("042")
+	err := repo.Run("status", "042").Err
 	if err == nil {
 		t.Fatal("expected error for duplicate ID, got nil")
 	}
@@ -362,28 +316,9 @@ func TestRunStatus_DuplicateIDError(t *testing.T) {
 }
 
 func TestRunSet_DuplicateIDError(t *testing.T) {
-	tmpDir := createDuplicateTestFiles(t)
+	repo := newTaskRepo(t, duplicateFiles())
 
-	taskDir = tmpDir
-	setTaskID = "042"
-	setStatus = "completed"
-	setPriority = ""
-	setEffort = ""
-	setType = ""
-	setOwner = ""
-	setParent = ""
-	setDone = false
-	setDryRun = false
-	setVerify = false
-	setAddTags = nil
-	setRemoveTags = nil
-	setAddPRs = nil
-	setRemovePRs = nil
-	setAddTouches = nil
-	setRemoveTouches = nil
-	setDependsOn = ""
-
-	err := runSet(setCmd, []string{"042"})
+	err := repo.Run("set", "042", "--status", "completed").Err
 	if err == nil {
 		t.Fatal("expected error for duplicate ID, got nil")
 	}
@@ -396,13 +331,9 @@ func TestRunSet_DuplicateIDError(t *testing.T) {
 }
 
 func TestRunRm_DuplicateIDError(t *testing.T) {
-	tmpDir := createDuplicateTestFiles(t)
+	repo := newTaskRepo(t, duplicateFiles())
 
-	taskDir = tmpDir
-	rmForce = true
-	rmDryRun = false
-
-	err := runRm(rmCmd, []string{"042"})
+	err := repo.Run("rm", "042", "--force").Err
 	if err == nil {
 		t.Fatal("expected error for duplicate ID, got nil")
 	}

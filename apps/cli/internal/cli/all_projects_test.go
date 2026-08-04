@@ -6,10 +6,8 @@ import (
 )
 
 func TestScanAllProjects_MultipleProjects(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	proj1 := createProjectWithTasks(t, "tasks", map[string]string{
 		"001-task-a.md": `---
@@ -71,10 +69,8 @@ created: 2026-01-01
 }
 
 func TestScanAllProjects_QualifiedID(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	proj := createProjectWithTasks(t, "tasks", map[string]string{
 		"042-task.md": `---
@@ -107,10 +103,8 @@ created: 2026-01-01
 }
 
 func TestScanAllProjects_SkipsUnreachable(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	goodProj := createProjectWithTasks(t, "tasks", map[string]string{
 		"001-task.md": `---
@@ -145,10 +139,8 @@ created: 2026-01-01
 }
 
 func TestScanAllProjects_EmptyRegistry(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	t.Setenv("TASKMD_HOME_CONFIG", filepath.Join(t.TempDir(), "nonexistent.yaml"))
 

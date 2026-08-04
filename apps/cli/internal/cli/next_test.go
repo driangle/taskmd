@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,8 +11,13 @@ import (
 	"github.com/driangle/taskmd/sdk/go/next"
 )
 
-// createNextTestTaskFiles creates a set of 10 task files designed to exercise
-// the next command's scoring, filtering, and actionability logic.
+// The next command's fixtures are command-specific scoring/ordering shapes that
+// do not map onto the canonical testdata sets (dependency-chain, phases, etc.),
+// so they are seeded inline with newTaskRepo. Each helper below returns the
+// task files as a map for the harness rather than hand-rolling os.WriteFile.
+
+// nextScoringFiles returns 10 task files designed to exercise the next command's
+// scoring, filtering, and actionability logic.
 //
 // Task graph:
 //
@@ -29,12 +31,8 @@ import (
 //	008 (in-progress, high, small, cli)  - depends on 001 (completed) - actionable
 //	009 (pending, medium, large)         - depends on 006 (pending) → blocked
 //	010 (pending, low, medium)           - depends on 003 → blocked (003 pending)
-func createNextTestTaskFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+func nextScoringFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "Setup infrastructure"
@@ -136,65 +134,53 @@ tags: ["cli", "test"]
 created: 2026-02-10
 ---`,
 	}
-
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-// captureNextOutput runs runNext and captures stdout
-func captureNextOutput(t *testing.T, args []string) (string, error) {
+// nextStdout runs `next <args...>` against repo, fails on error, and returns stdout.
+func nextStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runNext(nextCmd, args)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	res := repo.Run(append([]string{"next"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("next %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
-// resetNextFlags resets all next command flags to defaults
-func resetNextFlags() {
-	nextFormat = "table"
-	nextLimit = 5
-	nextFilters = []string{}
-	nextQuickWins = false
-	nextCritical = false
-	nextScope = ""
-	nextExact = false
-	nextRoot = ""
-	nextPhase = ""
-	nextStrictPhases = false
-	nextStrictPriority = false
-	nextColumns = nextDefaultColumns
-	nextStatus = ""
-	nextPriority = ""
-	nextExplain = false
+// recIDs extracts the recommendation IDs from JSON next output.
+func recIDs(t *testing.T, output string) []string {
+	t.Helper()
+	var recs []Recommendation
+	if err := json.Unmarshal([]byte(output), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+	ids := make([]string, len(recs))
+	for i, r := range recs {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+// setPhaseOrder configures the phase ordering in viper (as .taskmd.yaml would).
+func setPhaseOrder(phases []string) {
+	items := make([]any, len(phases))
+	for i, p := range phases {
+		items[i] = map[string]any{"id": p}
+	}
+	viper.Set("phases", items)
+}
+
+// runNextWithPhases runs `next` with a phase order configured in viper — the
+// same effect a repo-local .taskmd.yaml would have under the real command. The
+// order is seeded through RunWith so it survives the harness's hermetic reset.
+func runNextWithPhases(t *testing.T, repo *taskRepo, phases []string, args ...string) cliResult {
+	t.Helper()
+	return repo.RunWith(func() { setPhaseOrder(phases) }, append([]string{"next"}, args...)...)
 }
 
 func TestNext_BasicRanking(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -228,16 +214,9 @@ func TestNext_BasicRanking(t *testing.T) {
 }
 
 func TestNext_BlockedTasksExcluded(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 20
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "20")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -258,10 +237,7 @@ func TestNext_BlockedTasksExcluded(t *testing.T) {
 }
 
 func TestNext_CancelledTasksExcluded(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create test tasks including cancelled ones
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001-active.md": `---
 id: "001"
 title: "Active pending task"
@@ -302,23 +278,9 @@ dependencies: []
 tags: ["active"]
 created: 2026-02-12
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 20
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "20")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -349,16 +311,9 @@ created: 2026-02-12
 }
 
 func TestNext_LimitFlag(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 2
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "2")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -371,16 +326,9 @@ func TestNext_LimitFlag(t *testing.T) {
 }
 
 func TestNext_LimitExceedsAvailable(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 100
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "100")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -394,17 +342,9 @@ func TestNext_LimitExceedsAvailable(t *testing.T) {
 }
 
 func TestNext_FilterByTag(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextFilters = []string{"tag=cli"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--filter", "tag=cli")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -428,17 +368,9 @@ func TestNext_FilterByTag(t *testing.T) {
 }
 
 func TestNext_FilterByPriority(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextFilters = []string{"priority=high"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--filter", "priority=high")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -462,17 +394,9 @@ func TestNext_FilterByPriority(t *testing.T) {
 }
 
 func TestNext_MultipleFilters(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextFilters = []string{"tag=cli", "priority=high"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--filter", "tag=cli", "--filter", "priority=high")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -486,49 +410,35 @@ func TestNext_MultipleFilters(t *testing.T) {
 }
 
 func TestNext_InvalidFilterFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextFilters = []string{"invalid"}
-
-	_, err := captureNextOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("next", "--format", "json", "--filter", "invalid")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid filter format")
 	}
 
-	if !strings.Contains(err.Error(), "invalid filter format") {
-		t.Errorf("Expected 'invalid filter format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid filter format") {
+		t.Errorf("Expected 'invalid filter format' error, got: %v", res.Err)
 	}
 }
 
 func TestNext_UnsupportedFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "csv"
-
-	_, err := captureNextOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("next", "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("Expected error for unsupported format")
 	}
 
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestNext_JSONFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 2
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "2")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -559,16 +469,9 @@ func TestNext_JSONFormat(t *testing.T) {
 }
 
 func TestNext_YAMLFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "yaml"
-	nextLimit = 2
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "yaml", "--limit", "2")
 
 	// Basic YAML structure check
 	if !strings.Contains(output, "rank:") {
@@ -583,16 +486,9 @@ func TestNext_YAMLFormat(t *testing.T) {
 }
 
 func TestNext_TableFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--limit", "3")
 
 	if !strings.Contains(output, "Recommended tasks:") {
 		t.Error("Expected table header 'Recommended tasks:'")
@@ -606,17 +502,9 @@ func TestNext_TableFormat(t *testing.T) {
 }
 
 func TestNext_Explain_TableFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextExplain = true
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--explain", "--limit", "3")
 
 	if !strings.Contains(output, "Recommended tasks:") {
 		t.Error("Expected label 'Recommended tasks:'")
@@ -634,17 +522,9 @@ func TestNext_Explain_TableFormat(t *testing.T) {
 }
 
 func TestNext_Explain_ScaledBonusShowsMultiplier(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextExplain = true
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--explain", "--limit", "10")
 
 	// The fixture has critical-path / downstream tasks, so at least one scaled
 	// bonus (rendered as "base × mult)") must appear.
@@ -654,16 +534,9 @@ func TestNext_Explain_ScaledBonusShowsMultiplier(t *testing.T) {
 }
 
 func TestNext_Explain_JSONBreakdownSumsToScore(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -689,16 +562,9 @@ func TestNext_Explain_JSONBreakdownSumsToScore(t *testing.T) {
 }
 
 func TestNext_TableWithoutExplain_HasNoBreakdown(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--limit", "3")
 
 	// Default table shows the compact columns, not the itemized breakdown.
 	if !strings.Contains(output, "Effort") {
@@ -710,10 +576,8 @@ func TestNext_TableWithoutExplain_HasNoBreakdown(t *testing.T) {
 }
 
 func TestNext_NoActionableTasks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create only completed tasks
-	tasks := map[string]string{
+	// Only completed tasks
+	repo := newTaskRepo(t, map[string]string{
 		"001.md": `---
 id: "001"
 title: "Done task"
@@ -722,22 +586,9 @@ priority: high
 dependencies: []
 created: 2026-02-01
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
-	}
-
-	resetNextFlags()
-	nextFormat = "table"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table")
 
 	if !strings.Contains(output, "No actionable tasks found") {
 		t.Errorf("Expected 'No actionable tasks found' message, got: %s", output)
@@ -745,16 +596,9 @@ created: 2026-02-01
 }
 
 func TestNext_InProgressTasksIncluded(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -777,16 +621,9 @@ func TestNext_InProgressTasksIncluded(t *testing.T) {
 }
 
 func TestNext_ReasonStrings(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -836,16 +673,9 @@ func TestNext_ReasonStrings(t *testing.T) {
 }
 
 func TestNext_ScoringOrder(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -871,10 +701,8 @@ func TestNext_ScoringOrder(t *testing.T) {
 }
 
 func TestNext_TiedScoresBreakByID(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create two identical-scoring tasks with different IDs
-	tasks := map[string]string{
+	// Two identical-scoring tasks with different IDs
+	repo := newTaskRepo(t, map[string]string{
 		"bbb.md": `---
 id: "BBB"
 title: "Task BBB"
@@ -893,23 +721,9 @@ effort: medium
 dependencies: []
 created: 2026-02-01
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
-	}
-
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1116,17 +930,9 @@ func TestScoreTask(t *testing.T) {
 
 func TestNext_DownstreamCountUsesFullGraph(t *testing.T) {
 	// Verify that downstream counts reflect the full graph, not just filtered results
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextFilters = []string{"tag=api"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--filter", "tag=api")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1148,17 +954,9 @@ func TestNext_DownstreamCountUsesFullGraph(t *testing.T) {
 }
 
 func TestNext_QuickWins_HappyPath(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextQuickWins = true
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--quick-wins", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1191,18 +989,9 @@ func TestNext_QuickWins_HappyPath(t *testing.T) {
 }
 
 func TestNext_QuickWins_WithFilter(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextQuickWins = true
-	nextFilters = []string{"tag=cli"}
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--quick-wins", "--filter", "tag=cli", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1228,17 +1017,9 @@ func TestNext_QuickWins_WithFilter(t *testing.T) {
 }
 
 func TestNext_QuickWins_WithLimit(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextQuickWins = true
-	nextLimit = 1
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--quick-wins", "--limit", "1")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1255,10 +1036,8 @@ func TestNext_QuickWins_WithLimit(t *testing.T) {
 }
 
 func TestNext_QuickWins_NoQuickWinsAvailable(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create only medium/large effort tasks
-	tasks := map[string]string{
+	// Only medium/large effort tasks
+	repo := newTaskRepo(t, map[string]string{
 		"001.md": `---
 id: "001"
 title: "Large task"
@@ -1277,23 +1056,9 @@ effort: medium
 dependencies: []
 created: 2026-02-02
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
-	}
-
-	resetNextFlags()
-	nextFormat = "table"
-	nextQuickWins = true
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--quick-wins")
 
 	if !strings.Contains(output, "No quick wins available") {
 		t.Errorf("Expected 'No quick wins available' message, got: %s", output)
@@ -1301,17 +1066,9 @@ created: 2026-02-02
 }
 
 func TestNext_QuickWins_TableFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextQuickWins = true
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--quick-wins", "--limit", "3")
 
 	if !strings.Contains(output, "Recommended quick wins:") {
 		t.Error("Expected table header 'Recommended quick wins:'")
@@ -1319,17 +1076,9 @@ func TestNext_QuickWins_TableFormat(t *testing.T) {
 }
 
 func TestNext_QuickWins_YAMLFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "yaml"
-	nextQuickWins = true
-	nextLimit = 2
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "yaml", "--quick-wins", "--limit", "2")
 
 	// Verify it's valid YAML with effort field
 	if !strings.Contains(output, "effort: small") {
@@ -1338,17 +1087,9 @@ func TestNext_QuickWins_YAMLFormat(t *testing.T) {
 }
 
 func TestNext_Critical_HappyPath(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextCritical = true
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--critical", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1378,18 +1119,9 @@ func TestNext_Critical_HappyPath(t *testing.T) {
 }
 
 func TestNext_Critical_WithFilter(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextCritical = true
-	nextFilters = []string{"tag=cli"}
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--critical", "--filter", "tag=cli", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1405,17 +1137,9 @@ func TestNext_Critical_WithFilter(t *testing.T) {
 }
 
 func TestNext_Critical_WithLimit(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextCritical = true
-	nextLimit = 1
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--critical", "--limit", "1")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1432,15 +1156,13 @@ func TestNext_Critical_WithLimit(t *testing.T) {
 }
 
 func TestNext_Critical_NoCriticalTasksAvailable(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create a scenario where --critical + tag filter yields no results.
+	// A scenario where --critical + tag filter yields no results.
 	// Critical path: 001 → 002 (both pending, tagged "api")
 	// Non-critical: 003 (pending, no deps, shorter path, tagged "docs")
 	//
 	// Filtering by tag=docs + --critical should find no tasks because
 	// 003 is the only docs-tagged task and it's not on the critical path.
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001.md": `---
 id: "001"
 title: "API foundation"
@@ -1471,24 +1193,9 @@ dependencies: []
 tags: ["docs"]
 created: 2026-02-03
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
-	}
-
-	resetNextFlags()
-	nextFormat = "table"
-	nextCritical = true
-	nextFilters = []string{"tag=docs"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--critical", "--filter", "tag=docs")
 
 	// 003 is actionable and docs-tagged but NOT on critical path (shorter chain)
 	// So --critical + tag=docs should show no results
@@ -1498,14 +1205,12 @@ created: 2026-02-03
 }
 
 func TestNext_Critical_CompletedDepsIgnored(t *testing.T) {
-	tmpDir := t.TempDir()
-
 	// Completed dependency chains should NOT inflate critical path depth.
 	// 001 (completed) → 003 (completed) → 004 (completed): all done, irrelevant
 	// 002 (pending, depends on completed 001): only remaining task
 	//
 	// 002 should BE the critical path since it's the only remaining work.
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001.md": `---
 id: "001"
 title: "Root task"
@@ -1542,24 +1247,9 @@ effort: large
 dependencies: ["003"]
 created: 2026-02-04
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
-	}
-
-	resetNextFlags()
-	nextFormat = "json"
-	nextCritical = true
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--critical", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1579,17 +1269,9 @@ created: 2026-02-04
 }
 
 func TestNext_Critical_TableFormat(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextCritical = true
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--critical", "--limit", "3")
 
 	if !strings.Contains(output, "Recommended critical path tasks:") {
 		t.Error("Expected table header 'Recommended critical path tasks:'")
@@ -1597,17 +1279,9 @@ func TestNext_Critical_TableFormat(t *testing.T) {
 }
 
 func TestNext_QuickWins_Ranking(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextQuickWins = true
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--quick-wins", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1639,10 +1313,9 @@ func TestNext_QuickWins_Ranking(t *testing.T) {
 }
 
 func TestNext_ArchivedDependencySatisfied(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create an active task that depends on an archived completed task
-	activeTask := `---
+	// Active task 002 depends on archived completed task 001.
+	repo := newTaskRepo(t, map[string]string{
+		"002.md": `---
 id: "002"
 title: "Feature that depends on archived"
 status: pending
@@ -1650,36 +1323,18 @@ priority: high
 effort: small
 dependencies: ["001"]
 created: 2026-02-01
----`
-	if err := os.WriteFile(filepath.Join(tmpDir, "002.md"), []byte(activeTask), 0644); err != nil {
-		t.Fatalf("Failed to write active task: %v", err)
-	}
-
-	// Create archive directory with completed dependency
-	archiveDir := filepath.Join(tmpDir, "archive")
-	if err := os.MkdirAll(archiveDir, 0755); err != nil {
-		t.Fatalf("Failed to create archive dir: %v", err)
-	}
-	archivedTask := `---
+---`,
+		"archive/001.md": `---
 id: "001"
 title: "Completed archived task"
 status: completed
 priority: high
 effort: medium
 created: 2026-01-01
----`
-	if err := os.WriteFile(filepath.Join(archiveDir, "001.md"), []byte(archivedTask), 0644); err != nil {
-		t.Fatalf("Failed to write archived task: %v", err)
-	}
+---`,
+	})
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1695,12 +1350,9 @@ created: 2026-01-01
 	}
 }
 
-// createScopeTestTaskFiles creates task files with touches fields for scope tests.
-func createScopeTestTaskFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// scopeFiles returns task files with touches fields for scope tests.
+func scopeFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "Web dashboard"
@@ -1737,27 +1389,12 @@ effort: small
 created: 2026-02-04
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
 }
 
 func TestNext_Scope_FiltersCorrectly(t *testing.T) {
-	tmpDir := createScopeTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextScope = "web"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--scope", "web")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1782,16 +1419,9 @@ func TestNext_Scope_FiltersCorrectly(t *testing.T) {
 }
 
 func TestNext_Scope_NoMatches(t *testing.T) {
-	tmpDir := createScopeTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextScope = "nonexistent"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--scope", "nonexistent")
 
 	if !strings.Contains(output, `No actionable tasks found for scope "nonexistent"`) {
 		t.Errorf("Expected scope-specific no-results message, got: %s", output)
@@ -1799,18 +1429,9 @@ func TestNext_Scope_NoMatches(t *testing.T) {
 }
 
 func TestNext_Scope_CombinedWithFilter(t *testing.T) {
-	tmpDir := createScopeTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextScope = "web"
-	nextFilters = []string{"priority=high"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--scope", "web", "--filter", "priority=high")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1827,18 +1448,9 @@ func TestNext_Scope_CombinedWithFilter(t *testing.T) {
 }
 
 func TestNext_Scope_CombinedWithQuickWins(t *testing.T) {
-	tmpDir := createScopeTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextScope = "web"
-	nextQuickWins = true
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--scope", "web", "--quick-wins")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1856,16 +1468,9 @@ func TestNext_Scope_CombinedWithQuickWins(t *testing.T) {
 }
 
 func TestNext_Scope_TableFormat(t *testing.T) {
-	tmpDir := createScopeTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeFiles())
 
-	resetNextFlags()
-	nextFormat = "table"
-	nextScope = "web"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "table", "--scope", "web")
 
 	if !strings.Contains(output, "Recommended tasks (scope: web):") {
 		t.Errorf("Expected scope label in table output, got: %s", output)
@@ -1873,16 +1478,9 @@ func TestNext_Scope_TableFormat(t *testing.T) {
 }
 
 func TestNext_Scope_WithoutScopeUnchanged(t *testing.T) {
-	tmpDir := createScopeTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1895,12 +1493,9 @@ func TestNext_Scope_WithoutScopeUnchanged(t *testing.T) {
 	}
 }
 
-// createScopeDepTestTaskFiles creates tasks where a scoped task depends on an unscoped task.
-func createScopeDepTestTaskFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// scopeDepFiles returns tasks where a scoped task depends on an unscoped task.
+func scopeDepFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "Setup database"
@@ -1938,27 +1533,12 @@ touches: ["web"]
 created: 2026-02-04
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
 }
 
 func TestNext_Scope_ExpandsDependencies(t *testing.T) {
-	tmpDir := createScopeDepTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeDepFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextScope = "web"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--scope", "web")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -1985,18 +1565,9 @@ func TestNext_Scope_ExpandsDependencies(t *testing.T) {
 }
 
 func TestNext_Scope_ExactSkipsExpansion(t *testing.T) {
-	tmpDir := createScopeDepTestTaskFiles(t)
+	repo := newTaskRepo(t, scopeDepFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextScope = "web"
-	nextExact = true
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--scope", "web", "--exact")
 
 	var recs []Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -2020,11 +1591,9 @@ func TestNext_Scope_ExactSkipsExpansion(t *testing.T) {
 	}
 }
 
-func createNextPhaseTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// phaseFiles returns tasks tagged with distinct phases for --phase filter tests.
+func phaseFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "V0.2 task"
@@ -2046,26 +1615,12 @@ status: pending
 priority: medium
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
 }
 
 func TestNext_PhaseFilter(t *testing.T) {
-	tmpDir := createNextPhaseTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextPhase = "v0.2"
+	repo := newTaskRepo(t, phaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--phase", "v0.2")
 
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -2081,16 +1636,9 @@ func TestNext_PhaseFilter(t *testing.T) {
 }
 
 func TestNext_PhaseFilterNoMatch(t *testing.T) {
-	tmpDir := createNextPhaseTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextPhase = "v9.9"
+	repo := newTaskRepo(t, phaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--phase", "v9.9")
 
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -2160,20 +1708,17 @@ func TestLoadPhaseOrder_NilPhases(t *testing.T) {
 	}
 }
 
-// createStrictPhasesTestFiles creates tasks with different phases and priorities
-// to test --strict-phases behavior.
+// strictPhaseFiles returns tasks with different phases and priorities to test
+// --strict-phases behavior.
 //
 // Task layout:
 //
-//	001: phase=v0.2, priority=low     - actionable
+//	001: phase=v0.2, priority=low      - actionable
 //	002: phase=v0.3, priority=critical - actionable (would normally outrank 001)
 //	003: phase=v0.2, priority=medium   - actionable
 //	004: no phase,   priority=high     - actionable
-func createStrictPhasesTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+func strictPhaseFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "Low priority v0.2 task"
@@ -2202,40 +1747,19 @@ status: pending
 priority: high
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
-}
-
-func setPhaseOrder(phases []string) {
-	items := make([]any, len(phases))
-	for i, p := range phases {
-		items[i] = map[string]any{"id": p}
-	}
-	viper.Set("phases", items)
 }
 
 func TestNext_StrictPhasesOff_DefaultBehavior(t *testing.T) {
-	tmpDir := createStrictPhasesTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPhases = false
-	setPhaseOrder([]string{"v0.2", "v0.3"})
-	defer viper.Set("phases", nil)
+	repo := newTaskRepo(t, strictPhaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10")
+	if res.Err != nil {
+		t.Fatalf("runNext failed: %v", res.Err)
 	}
 
 	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	if len(recs) == 0 {
@@ -2249,22 +1773,16 @@ func TestNext_StrictPhasesOff_DefaultBehavior(t *testing.T) {
 }
 
 func TestNext_StrictPhasesOn_EarlierPhaseFirst(t *testing.T) {
-	tmpDir := createStrictPhasesTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPhases = true
-	setPhaseOrder([]string{"v0.2", "v0.3"})
-	defer viper.Set("phases", nil)
+	repo := newTaskRepo(t, strictPhaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases")
+	if res.Err != nil {
+		t.Fatalf("runNext failed: %v", res.Err)
 	}
 
 	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	if len(recs) != 4 {
@@ -2285,22 +1803,16 @@ func TestNext_StrictPhasesOn_EarlierPhaseFirst(t *testing.T) {
 }
 
 func TestNext_StrictPhases_SamePhaseUsesScore(t *testing.T) {
-	tmpDir := createStrictPhasesTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPhases = true
-	setPhaseOrder([]string{"v0.2", "v0.3"})
-	defer viper.Set("phases", nil)
+	repo := newTaskRepo(t, strictPhaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases")
+	if res.Err != nil {
+		t.Fatalf("runNext failed: %v", res.Err)
 	}
 
 	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	// Find the two v0.2 tasks (001=low, 003=medium)
@@ -2320,22 +1832,16 @@ func TestNext_StrictPhases_SamePhaseUsesScore(t *testing.T) {
 }
 
 func TestNext_StrictPhases_NoPhaseSortedLast(t *testing.T) {
-	tmpDir := createStrictPhasesTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPhases = true
-	setPhaseOrder([]string{"v0.2", "v0.3"})
-	defer viper.Set("phases", nil)
+	repo := newTaskRepo(t, strictPhaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases")
+	if res.Err != nil {
+		t.Fatalf("runNext failed: %v", res.Err)
 	}
 
 	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	if len(recs) != 4 {
@@ -2349,23 +1855,16 @@ func TestNext_StrictPhases_NoPhaseSortedLast(t *testing.T) {
 }
 
 func TestNext_StrictPhases_WithPhaseFilter(t *testing.T) {
-	tmpDir := createStrictPhasesTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPhases = true
-	nextPhase = "v0.2"
-	setPhaseOrder([]string{"v0.2", "v0.3"})
-	defer viper.Set("phases", nil)
+	repo := newTaskRepo(t, strictPhaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases", "--phase", "v0.2")
+	if res.Err != nil {
+		t.Fatalf("runNext failed: %v", res.Err)
 	}
 
 	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	// --phase v0.2 filters to only v0.2 tasks; --strict-phases still applies ordering
@@ -2378,9 +1877,9 @@ func TestNext_StrictPhases_WithPhaseFilter(t *testing.T) {
 	}
 }
 
-// createStrictPriorityTestFiles creates tasks where a bonus-laden lower-priority
-// task normally outranks a bonus-less higher-priority one, to test
-// --strict-priority behavior.
+// strictPriorityFiles returns tasks where a bonus-laden lower-priority task
+// normally outranks a bonus-less higher-priority one, to test --strict-priority
+// behavior.
 //
 // Task layout:
 //
@@ -2388,11 +1887,8 @@ func TestNext_StrictPhases_WithPhaseFilter(t *testing.T) {
 //	med:  priority=medium, effort=small   - actionable, on critical path with a
 //	                                         high-priority downstream (score > 40)
 //	dep:  priority=high, depends on med    - blocked (boosts med's score only)
-func createStrictPriorityTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+func strictPriorityFiles() map[string]string {
+	return map[string]string{
 		"crit.md": `---
 id: "crit"
 title: "Critical task"
@@ -2414,26 +1910,12 @@ priority: high
 dependencies: ["med"]
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
 }
 
 func TestNext_StrictPriorityOff_ScoreDominates(t *testing.T) {
-	tmpDir := createStrictPriorityTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPriority = false
+	repo := newTaskRepo(t, strictPriorityFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10")
 
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -2447,16 +1929,9 @@ func TestNext_StrictPriorityOff_ScoreDominates(t *testing.T) {
 }
 
 func TestNext_StrictPriorityOn_HigherPriorityFirst(t *testing.T) {
-	tmpDir := createStrictPriorityTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPriority = true
+	repo := newTaskRepo(t, strictPriorityFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--strict-priority")
 
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -2476,26 +1951,12 @@ func TestNext_StrictPriorityOn_HigherPriorityFirst(t *testing.T) {
 }
 
 func TestNext_StrictPriority_ScoreBreaksTieWithinTier(t *testing.T) {
-	tmpDir := t.TempDir()
-	files := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"plain.md": "---\nid: \"plain\"\ntitle: \"Plain medium\"\nstatus: pending\npriority: medium\n---",
 		"quick.md": "---\nid: \"quick\"\ntitle: \"Quick medium\"\nstatus: pending\npriority: medium\neffort: small\n---",
-	}
-	for name, content := range files {
-		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", name, err)
-		}
-	}
+	})
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPriority = true
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--strict-priority")
 
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(output), &recs); err != nil {
@@ -2509,23 +1970,16 @@ func TestNext_StrictPriority_ScoreBreaksTieWithinTier(t *testing.T) {
 }
 
 func TestNext_StrictPhasesAndPriority_PhasePrimary(t *testing.T) {
-	tmpDir := createStrictPhasesTestFiles(t)
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextStrictPhases = true
-	nextStrictPriority = true
-	setPhaseOrder([]string{"v0.2", "v0.3"})
-	defer viper.Set("phases", nil)
+	repo := newTaskRepo(t, strictPhaseFiles())
 
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases", "--strict-priority")
+	if res.Err != nil {
+		t.Fatalf("runNext failed: %v", res.Err)
 	}
 
 	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	if len(recs) != 4 {
@@ -2548,15 +2002,9 @@ func TestNext_StrictPhasesAndPriority_PhasePrimary(t *testing.T) {
 }
 
 func TestNext_Columns_DefaultMatchesLegacy(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--limit", "3")
 
 	// Default columns should produce headers: #, ID, Title, Priority, Effort, File, Reason
 	for _, col := range []string{"#", "ID", "Title", "Priority", "Effort", "File", "Reason"} {
@@ -2567,16 +2015,9 @@ func TestNext_Columns_DefaultMatchesLegacy(t *testing.T) {
 }
 
 func TestNext_Columns_CustomSelection(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextColumns = "id,title,reason"
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--columns", "id,title,reason", "--limit", "3")
 
 	lower := strings.ToLower(output)
 	// Selected columns should be present
@@ -2602,16 +2043,9 @@ func TestNext_Columns_CustomSelection(t *testing.T) {
 }
 
 func TestNext_Columns_ScoreColumn(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextColumns = "rank,id,score"
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--columns", "rank,id,score", "--limit", "3")
 
 	if !strings.Contains(strings.ToLower(output), "score") {
 		t.Error("Output should contain 'score' column")
@@ -2619,33 +2053,21 @@ func TestNext_Columns_ScoreColumn(t *testing.T) {
 }
 
 func TestNext_Columns_InvalidColumn(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextColumns = "id,title,bogus"
-	nextLimit = 3
-
-	_, err := captureNextOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("next", "--columns", "id,title,bogus", "--limit", "3")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid column name, got nil")
 	}
-	if !strings.Contains(err.Error(), "bogus") {
-		t.Errorf("Error should mention invalid column name 'bogus', got: %v", err)
+	if !strings.Contains(res.Err.Error(), "bogus") {
+		t.Errorf("Error should mention invalid column name 'bogus', got: %v", res.Err)
 	}
 }
 
 func TestNext_Columns_JSONUnaffected(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextColumns = "id,title"
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--columns", "id,title", "--limit", "3")
 
 	// JSON output should contain all fields regardless of --columns
 	var recs []Recommendation
@@ -2664,16 +2086,9 @@ func TestNext_Columns_JSONUnaffected(t *testing.T) {
 }
 
 func TestNext_Columns_CaseInsensitive(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextColumns = "ID, Title, Reason"
-	nextLimit = 3
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--columns", "ID, Title, Reason", "--limit", "3")
 
 	lower := strings.ToLower(output)
 	for _, col := range []string{"id", "title", "reason"} {
@@ -2739,19 +2154,15 @@ func TestParseNextColumns(t *testing.T) {
 	}
 }
 
-// createNextParentTestFiles creates a small task set with a parent/child
-// hierarchy for exercising --root against a parent task.
+// parentFiles returns a small task set with a parent/child hierarchy for
+// exercising --root against a parent task.
 //
 //	P (pending, high)           - parent, blocked by incomplete children
 //	C1 (pending, medium, →P)    - actionable subtask
 //	C2 (pending, high, →P)      - actionable subtask
 //	U (pending, high)           - unrelated, not reachable from P
-func createNextParentTestFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+func parentFiles() map[string]string {
+	return map[string]string{
 		"P.md": `---
 id: "P"
 title: "Parent task"
@@ -2779,44 +2190,14 @@ status: pending
 priority: high
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
-}
-
-// recIDs extracts the recommendation IDs from JSON next output.
-func recIDs(t *testing.T, output string) []string {
-	t.Helper()
-	var recs []Recommendation
-	if err := json.Unmarshal([]byte(output), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
-	}
-	ids := make([]string, len(recs))
-	for i, r := range recs {
-		ids[i] = r.ID
-	}
-	return ids
 }
 
 func TestNext_RootLeafReturnsUpstreamOnly(t *testing.T) {
 	// 009 depends on 006 depends on 007. Only 007 is actionable in that chain.
 	// --root 009 should return just 007, excluding other actionable tasks.
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextRoot = "009"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--root", "009")
 
 	ids := recIDs(t, output)
 	if len(ids) != 1 || ids[0] != "007" {
@@ -2827,17 +2208,9 @@ func TestNext_RootLeafReturnsUpstreamOnly(t *testing.T) {
 func TestNext_RootActionableRootItself(t *testing.T) {
 	// 004 depends on 002 (completed), so 004 itself is actionable.
 	// --root 004 should return 004.
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextRoot = "004"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--root", "004")
 
 	ids := recIDs(t, output)
 	if len(ids) != 1 || ids[0] != "004" {
@@ -2846,17 +2219,9 @@ func TestNext_RootActionableRootItself(t *testing.T) {
 }
 
 func TestNext_RootParentReturnsSubtasks(t *testing.T) {
-	tmpDir := createNextParentTestFiles(t)
+	repo := newTaskRepo(t, parentFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextRoot = "P"
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--root", "P")
 
 	ids := recIDs(t, output)
 	got := map[string]bool{}
@@ -2869,50 +2234,28 @@ func TestNext_RootParentReturnsSubtasks(t *testing.T) {
 }
 
 func TestNext_RootUnknownIDErrors(t *testing.T) {
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextRoot = "999"
-
-	_, err := captureNextOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("next", "--format", "json", "--root", "999")
+	if res.Err == nil {
 		t.Fatal("Expected error for unknown root ID, got nil")
 	}
-	if !strings.Contains(err.Error(), "root task 999 not found") {
-		t.Errorf("Expected 'root task 999 not found', got %q", err.Error())
+	if !strings.Contains(res.Err.Error(), "root task 999 not found") {
+		t.Errorf("Expected 'root task 999 not found', got %q", res.Err.Error())
 	}
 }
 
 func TestNext_RootCombinedWithFilter(t *testing.T) {
 	// --root 009 reaches actionable task 007 (tag api). A matching filter
 	// keeps it; a non-matching filter narrows the result to empty.
-	tmpDir := createNextTestTaskFiles(t)
+	repo := newTaskRepo(t, nextScoringFiles())
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextRoot = "009"
-	nextFilters = []string{"tag=api"}
-
-	output, err := captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output := nextStdout(t, repo, "--format", "json", "--limit", "10", "--root", "009", "--filter", "tag=api")
 	if ids := recIDs(t, output); len(ids) != 1 || ids[0] != "007" {
 		t.Fatalf("Expected 007 with matching filter, got %v", ids)
 	}
 
-	resetNextFlags()
-	nextFormat = "json"
-	nextLimit = 10
-	nextRoot = "009"
-	nextFilters = []string{"tag=cli"}
-
-	output, err = captureNextOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runNext failed: %v", err)
-	}
+	output = nextStdout(t, repo, "--format", "json", "--limit", "10", "--root", "009", "--filter", "tag=cli")
 	if ids := recIDs(t, output); len(ids) != 0 {
 		t.Fatalf("Expected no results with non-matching filter, got %v", ids)
 	}

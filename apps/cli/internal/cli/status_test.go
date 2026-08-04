@@ -1,36 +1,19 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func createStatusTestFiles(t *testing.T) string {
+// newStatusRepo seeds the dependency-chain fixture and overlays the two fields
+// the status tests assert on: owner: alice on task 002 and parent: "001" on task
+// 003. The rest of the shape is identical to dependency-chain.
+func newStatusRepo(t *testing.T) *taskRepo {
 	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
-		"001-setup.md": `---
-id: "001"
-title: "Setup project"
-status: completed
-priority: high
-effort: small
-dependencies: []
-tags: ["infra", "setup"]
-created: 2026-02-08
----
-
-# Setup project
-
-Initial project setup with build tooling.
-`,
-		"002-auth.md": `---
+	repo := newTaskRepoFromFixture(t, "dependency-chain")
+	repo.Write("002-auth.md", `---
 id: "002"
 title: "Implement authentication"
 status: in-progress
@@ -45,8 +28,8 @@ created: 2026-02-08
 # Implement authentication
 
 Add JWT-based auth with refresh tokens.
-`,
-		"003-ui.md": `---
+`)
+	repo.Write("003-ui.md", `---
 id: "003"
 title: "Build UI components"
 status: pending
@@ -61,248 +44,17 @@ created: 2026-02-08
 # Build UI components
 
 Create reusable component library.
-`,
-	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
+`)
+	return repo
 }
 
-func resetStatusFlags() {
-	statusFormat = "text"
-	statusExact = false
-	statusThreshold = 0.6
-	statusMinimal = false
-	statusStatusline = false
-	statusScope = ""
-	taskDir = "."
-}
-
-func captureStatusOutput(t *testing.T, query string) string {
+// newStatusChildrenRepo builds a parent/child/grandchild tree: 010 (in-progress)
+// with children 011 (pending) and 012 (completed), and grandchild 013 under 011.
+// Kept inline because the specific in-progress parent and the grandchild depth are
+// the subject of these tests and differ from the shared parent-children fixture.
+func newStatusChildrenRepo(t *testing.T) *taskRepo {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runStatus(statusCmd, []string{query})
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("runStatus failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
-}
-
-func TestStatus_ExactMatchByID(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-
-	output := captureStatusOutput(t, "001")
-
-	if !strings.Contains(output, "Task: 001") {
-		t.Error("Expected output to contain 'Task: 001'")
-	}
-	if !strings.Contains(output, "Title: Setup project") {
-		t.Error("Expected output to contain task title")
-	}
-}
-
-func TestStatus_TextFormat(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-
-	output := captureStatusOutput(t, "002")
-
-	expected := []string{
-		"Task: 002",
-		"Title: Implement authentication",
-		"Status: in-progress",
-		"Priority: critical",
-		"Effort: large",
-		"Tags: backend, security",
-		"Owner: alice",
-		"Created: 2026-02-08",
-		"Dependencies: 001",
-		"File:",
-	}
-
-	for _, exp := range expected {
-		if !strings.Contains(output, exp) {
-			t.Errorf("Expected output to contain %q", exp)
-		}
-	}
-
-	// Verify no body content is present
-	if strings.Contains(output, "Description:") {
-		t.Error("Status output should not contain Description section")
-	}
-	if strings.Contains(output, "Add JWT-based auth") {
-		t.Error("Status output should not contain body content")
-	}
-}
-
-func TestStatus_TextFormat_ParentField(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-
-	output := captureStatusOutput(t, "003")
-
-	if !strings.Contains(output, "Parent: 001") {
-		t.Error("Expected output to contain 'Parent: 001'")
-	}
-}
-
-func TestStatus_JSONFormat(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
-
-	output := captureStatusOutput(t, "002")
-
-	var result statusOutput
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
-	}
-
-	if result.ID != "002" {
-		t.Errorf("Expected ID '002', got %q", result.ID)
-	}
-	if result.Title != "Implement authentication" {
-		t.Errorf("Expected title 'Implement authentication', got %q", result.Title)
-	}
-	if result.Status != "in-progress" {
-		t.Errorf("Expected status 'in-progress', got %q", result.Status)
-	}
-	if result.Priority != "critical" {
-		t.Errorf("Expected priority 'critical', got %q", result.Priority)
-	}
-	if result.Effort != "large" {
-		t.Errorf("Expected effort 'large', got %q", result.Effort)
-	}
-	if result.Owner != "alice" {
-		t.Errorf("Expected owner 'alice', got %q", result.Owner)
-	}
-	if len(result.Dependencies) != 1 || result.Dependencies[0] != "001" {
-		t.Errorf("Expected dependencies [001], got %v", result.Dependencies)
-	}
-
-	// Verify no content/body field in JSON
-	var raw map[string]any
-	if err := json.Unmarshal([]byte(output), &raw); err != nil {
-		t.Fatalf("Failed to parse raw JSON: %v", err)
-	}
-	if _, ok := raw["content"]; ok {
-		t.Error("JSON output should not contain 'content' key")
-	}
-	if _, ok := raw["body"]; ok {
-		t.Error("JSON output should not contain 'body' key")
-	}
-}
-
-func TestStatus_YAMLFormat(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "yaml"
-
-	output := captureStatusOutput(t, "001")
-
-	expected := []string{"id: \"001\"", "title: Setup project", "status: completed"}
-	for _, exp := range expected {
-		if !strings.Contains(output, exp) {
-			t.Errorf("Expected YAML output to contain %q", exp)
-		}
-	}
-
-	// Verify no content field
-	if strings.Contains(output, "content:") {
-		t.Error("YAML output should not contain 'content' field")
-	}
-}
-
-func TestStatus_UnsupportedFormat(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "csv"
-
-	err := runStatus(statusCmd, []string{"001"})
-	if err == nil {
-		t.Fatal("Expected error for unsupported format")
-	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", err)
-	}
-}
-
-func TestStatus_TaskNotFound_ExactMode(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusExact = true
-
-	err := runStatus(statusCmd, []string{"nonexistent"})
-	if err == nil {
-		t.Fatal("Expected error for non-matching query in exact mode")
-	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
-	}
-}
-
-func TestStatus_FuzzyMatch(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-
-	// "auth" is a substring of "Implement authentication"
-	statusStdinReader = strings.NewReader("1\n")
-	defer func() { statusStdinReader = os.Stdin }()
-
-	output := captureStatusOutput(t, "auth")
-
-	if !strings.Contains(output, "Task: 002") {
-		t.Error("Expected fuzzy match to find task 002")
-	}
-}
-
-func TestStatus_EmptyDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetStatusFlags()
-	taskDir = tmpDir
-
-	err := runStatus(statusCmd, []string{"anything"})
-	if err == nil {
-		t.Fatal("Expected error for empty directory")
-	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("Expected 'task not found' error, got: %v", err)
-	}
-}
-
-func createStatusTestFilesWithChildren(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	return newTaskRepo(t, map[string]string{
 		"010-parent.md": `---
 id: "010"
 title: "Parent task"
@@ -346,24 +98,224 @@ dependencies: []
 
 # Grandchild
 `,
+	})
+}
+
+// newStatusMultipleInProgressRepo builds two in-progress tasks plus one pending.
+func newStatusMultipleInProgressRepo(t *testing.T) *taskRepo {
+	t.Helper()
+	return newTaskRepo(t, map[string]string{
+		"001.md": `---
+id: "001"
+title: "First task"
+status: in-progress
+tags: []
+dependencies: []
+---
+`,
+		"002.md": `---
+id: "002"
+title: "Second task"
+status: in-progress
+tags: []
+dependencies: []
+---
+`,
+		"003.md": `---
+id: "003"
+title: "Pending task"
+status: pending
+tags: []
+dependencies: []
+---
+`,
+	})
+}
+
+// statusStdout runs `status <args...>` against repo, fails on error, and returns
+// stdout.
+func statusStdout(t *testing.T, repo *taskRepo, args ...string) string {
+	t.Helper()
+	res := repo.Run(append([]string{"status"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("status %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
+}
+
+func TestStatus_ExactMatchByID(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	output := statusStdout(t, repo, "001")
+
+	if !strings.Contains(output, "Task: 001") {
+		t.Error("Expected output to contain 'Task: 001'")
+	}
+	if !strings.Contains(output, "Title: Setup project") {
+		t.Error("Expected output to contain task title")
+	}
+}
+
+func TestStatus_TextFormat(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	output := statusStdout(t, repo, "002")
+
+	expected := []string{
+		"Task: 002",
+		"Title: Implement authentication",
+		"Status: in-progress",
+		"Priority: critical",
+		"Effort: large",
+		"Tags: backend, security",
+		"Owner: alice",
+		"Created: 2026-02-08",
+		"Dependencies: 001",
+		"File:",
 	}
 
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected output to contain %q", exp)
 		}
 	}
 
-	return tmpDir
+	// Verify no body content is present
+	if strings.Contains(output, "Description:") {
+		t.Error("Status output should not contain Description section")
+	}
+	if strings.Contains(output, "Add JWT-based auth") {
+		t.Error("Status output should not contain body content")
+	}
+}
+
+func TestStatus_TextFormat_ParentField(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	output := statusStdout(t, repo, "003")
+
+	if !strings.Contains(output, "Parent: 001") {
+		t.Error("Expected output to contain 'Parent: 001'")
+	}
+}
+
+func TestStatus_JSONFormat(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	output := statusStdout(t, repo, "002", "--format", "json")
+
+	var result statusOutput
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+
+	if result.ID != "002" {
+		t.Errorf("Expected ID '002', got %q", result.ID)
+	}
+	if result.Title != "Implement authentication" {
+		t.Errorf("Expected title 'Implement authentication', got %q", result.Title)
+	}
+	if result.Status != "in-progress" {
+		t.Errorf("Expected status 'in-progress', got %q", result.Status)
+	}
+	if result.Priority != "critical" {
+		t.Errorf("Expected priority 'critical', got %q", result.Priority)
+	}
+	if result.Effort != "large" {
+		t.Errorf("Expected effort 'large', got %q", result.Effort)
+	}
+	if result.Owner != "alice" {
+		t.Errorf("Expected owner 'alice', got %q", result.Owner)
+	}
+	if len(result.Dependencies) != 1 || result.Dependencies[0] != "001" {
+		t.Errorf("Expected dependencies [001], got %v", result.Dependencies)
+	}
+
+	// Verify no content/body field in JSON
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(output), &raw); err != nil {
+		t.Fatalf("Failed to parse raw JSON: %v", err)
+	}
+	if _, ok := raw["content"]; ok {
+		t.Error("JSON output should not contain 'content' key")
+	}
+	if _, ok := raw["body"]; ok {
+		t.Error("JSON output should not contain 'body' key")
+	}
+}
+
+func TestStatus_YAMLFormat(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	output := statusStdout(t, repo, "001", "--format", "yaml")
+
+	expected := []string{"id: \"001\"", "title: Setup project", "status: completed"}
+	for _, exp := range expected {
+		if !strings.Contains(output, exp) {
+			t.Errorf("Expected YAML output to contain %q", exp)
+		}
+	}
+
+	// Verify no content field
+	if strings.Contains(output, "content:") {
+		t.Error("YAML output should not contain 'content' field")
+	}
+}
+
+func TestStatus_UnsupportedFormat(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	res := repo.Run("status", "001", "--format", "csv")
+	if res.Err == nil {
+		t.Fatal("Expected error for unsupported format")
+	}
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
+	}
+}
+
+func TestStatus_TaskNotFound_ExactMode(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	res := repo.Run("status", "nonexistent", "--exact")
+	if res.Err == nil {
+		t.Fatal("Expected error for non-matching query in exact mode")
+	}
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
+	}
+}
+
+func TestStatus_FuzzyMatch(t *testing.T) {
+	repo := newStatusRepo(t)
+
+	// "auth" is a substring of "Implement authentication"
+	statusStdinReader = strings.NewReader("1\n")
+	defer func() { statusStdinReader = os.Stdin }()
+
+	output := statusStdout(t, repo, "auth")
+
+	if !strings.Contains(output, "Task: 002") {
+		t.Error("Expected fuzzy match to find task 002")
+	}
+}
+
+func TestStatus_EmptyDirectory(t *testing.T) {
+	repo := newTaskRepo(t, nil)
+
+	res := repo.Run("status", "anything")
+	if res.Err == nil {
+		t.Fatal("Expected error for empty directory")
+	}
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("Expected 'task not found' error, got: %v", res.Err)
+	}
 }
 
 func TestStatus_ChildrenTree(t *testing.T) {
-	tmpDir := createStatusTestFilesWithChildren(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusChildrenRepo(t)
 
-	output := captureStatusOutput(t, "010")
+	output := statusStdout(t, repo, "010")
 
 	if !strings.Contains(output, "Children:") {
 		t.Error("Expected output to contain 'Children:' section")
@@ -389,12 +341,9 @@ func TestStatus_ChildrenTree(t *testing.T) {
 }
 
 func TestStatus_ChildrenTree_JSON(t *testing.T) {
-	tmpDir := createStatusTestFilesWithChildren(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
+	repo := newStatusChildrenRepo(t)
 
-	output := captureStatusOutput(t, "010")
+	output := statusStdout(t, repo, "010", "--format", "json")
 
 	var result statusOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -422,9 +371,7 @@ func TestStatus_ChildrenTree_JSON(t *testing.T) {
 }
 
 func TestStatus_ChildrenTree_Circular(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"020-a.md": `---
 id: "020"
 title: "Task A"
@@ -443,20 +390,10 @@ tags: []
 dependencies: []
 ---
 `,
-	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	resetStatusFlags()
-	taskDir = tmpDir
+	})
 
 	// Should not hang or panic
-	output := captureStatusOutput(t, "020")
+	output := statusStdout(t, repo, "020")
 
 	if !strings.Contains(output, "Task: 020") {
 		t.Error("Expected output to contain 'Task: 020'")
@@ -464,12 +401,9 @@ dependencies: []
 }
 
 func TestStatus_MinimalFlag(t *testing.T) {
-	tmpDir := createStatusTestFilesWithChildren(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusMinimal = true
+	repo := newStatusChildrenRepo(t)
 
-	output := captureStatusOutput(t, "010")
+	output := statusStdout(t, repo, "010", "--minimal")
 
 	if strings.Contains(output, "Children:") {
 		t.Error("--minimal should suppress children section")
@@ -477,13 +411,9 @@ func TestStatus_MinimalFlag(t *testing.T) {
 }
 
 func TestStatus_MinimalFlag_JSON(t *testing.T) {
-	tmpDir := createStatusTestFilesWithChildren(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusMinimal = true
-	statusFormat = "json"
+	repo := newStatusChildrenRepo(t)
 
-	output := captureStatusOutput(t, "010")
+	output := statusStdout(t, repo, "010", "--minimal", "--format", "json")
 
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(output), &raw); err != nil {
@@ -495,12 +425,10 @@ func TestStatus_MinimalFlag_JSON(t *testing.T) {
 }
 
 func TestStatus_NoChildren(t *testing.T) {
-	tmpDir := createStatusTestFilesWithChildren(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusChildrenRepo(t)
 
 	// Task 012 has no children
-	output := captureStatusOutput(t, "012")
+	output := statusStdout(t, repo, "012")
 
 	if strings.Contains(output, "Children:") {
 		t.Error("Task with no children should not show 'Children:' section")
@@ -508,21 +436,16 @@ func TestStatus_NoChildren(t *testing.T) {
 }
 
 func TestStatus_NoBodyInOutput(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusRepo(t)
 
 	// Text format
-	output := captureStatusOutput(t, "001")
+	output := statusStdout(t, repo, "001")
 	if strings.Contains(output, "Initial project setup") {
 		t.Error("Text output should not contain task body")
 	}
 
 	// JSON format
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
-	output = captureStatusOutput(t, "001")
+	output = statusStdout(t, repo, "001", "--format", "json")
 
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(output), &raw); err != nil {
@@ -533,137 +456,76 @@ func TestStatus_NoBodyInOutput(t *testing.T) {
 	}
 }
 
-// captureStatusNoArgsOutput runs status with no arguments and captures stdout.
-func captureStatusNoArgsOutput(t *testing.T) (string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runStatus(statusCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
-}
-
-func captureStatusNoArgsOutputWithStderr(t *testing.T) (string, string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	rOut, wOut, _ := os.Pipe()
-	os.Stdout = wOut
-
-	oldStderr := os.Stderr
-	rErr, wErr, _ := os.Pipe()
-	os.Stderr = wErr
-
-	err := runStatus(statusCmd, []string{})
-
-	wOut.Close()
-	os.Stdout = oldStdout
-	wErr.Close()
-	os.Stderr = oldStderr
-
-	var bufOut, bufErr bytes.Buffer
-	bufOut.ReadFrom(rOut)
-	bufErr.ReadFrom(rErr)
-	return bufOut.String(), bufErr.String(), err
-}
-
 func TestStatus_NoArgs_ZeroInProgress(t *testing.T) {
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(`---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Done task"
 status: completed
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetStatusFlags()
-	taskDir = tmpDir
-
-	stdout, stderr, err := captureStatusNoArgsOutputWithStderr(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("status")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
-	if stdout != "" {
-		t.Errorf("expected empty stdout, got: %q", stdout)
+	if res.Stdout != "" {
+		t.Errorf("expected empty stdout, got: %q", res.Stdout)
 	}
-	if !strings.Contains(stderr, "No tasks currently in progress") {
-		t.Errorf("expected informational message on stderr, got: %q", stderr)
+	if !strings.Contains(res.Stderr, "No tasks currently in progress") {
+		t.Errorf("expected informational message on stderr, got: %q", res.Stderr)
 	}
 }
 
 func TestStatus_NoArgs_ZeroInProgress_JSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(`---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Done task"
 status: completed
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
-
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("status", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
-	if strings.TrimSpace(output) != "[]" {
-		t.Errorf("expected empty JSON array, got: %q", output)
+	if strings.TrimSpace(res.Stdout) != "[]" {
+		t.Errorf("expected empty JSON array, got: %q", res.Stdout)
 	}
 }
 
 func TestStatus_NoArgs_ZeroInProgress_YAML(t *testing.T) {
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(`---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Done task"
 status: completed
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "yaml"
-
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("status", "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
-	if strings.TrimSpace(output) != "[]" {
-		t.Errorf("expected empty YAML array, got: %q", output)
+	if strings.TrimSpace(res.Stdout) != "[]" {
+		t.Errorf("expected empty YAML array, got: %q", res.Stdout)
 	}
 }
 
 func TestStatus_NoArgs_OneInProgress(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusRepo(t)
 
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo)
 
 	if !strings.Contains(output, "Task: 002") {
 		t.Error("Expected output to contain 'Task: 002'")
@@ -673,56 +535,10 @@ func TestStatus_NoArgs_OneInProgress(t *testing.T) {
 	}
 }
 
-func createStatusTestFilesMultipleInProgress(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
-		"001.md": `---
-id: "001"
-title: "First task"
-status: in-progress
-tags: []
-dependencies: []
----
-`,
-		"002.md": `---
-id: "002"
-title: "Second task"
-status: in-progress
-tags: []
-dependencies: []
----
-`,
-		"003.md": `---
-id: "003"
-title: "Pending task"
-status: pending
-tags: []
-dependencies: []
----
-`,
-	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
-}
-
 func TestStatus_NoArgs_MultipleInProgress(t *testing.T) {
-	tmpDir := createStatusTestFilesMultipleInProgress(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusMultipleInProgressRepo(t)
 
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo)
 
 	if !strings.Contains(output, "First task") {
 		t.Error("Expected output to contain 'First task'")
@@ -736,15 +552,9 @@ func TestStatus_NoArgs_MultipleInProgress(t *testing.T) {
 }
 
 func TestStatus_Statusline_OneTask(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusStatusline = true
+	repo := newStatusRepo(t)
 
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--statusline")
 
 	expected := "#002 Implement authentication\n"
 	if output != expected {
@@ -753,15 +563,9 @@ func TestStatus_Statusline_OneTask(t *testing.T) {
 }
 
 func TestStatus_Statusline_MultipleTasks(t *testing.T) {
-	tmpDir := createStatusTestFilesMultipleInProgress(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusStatusline = true
+	repo := newStatusMultipleInProgressRepo(t)
 
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--statusline")
 
 	if !strings.Contains(output, "(+1 more)") {
 		t.Errorf("expected '(+1 more)' in output, got: %q", output)
@@ -769,53 +573,37 @@ func TestStatus_Statusline_MultipleTasks(t *testing.T) {
 }
 
 func TestStatus_Statusline_NoTasks(t *testing.T) {
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(`---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Done"
 status: completed
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusStatusline = true
-
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--statusline")
 	if output != "" {
 		t.Errorf("expected empty output, got: %q", output)
 	}
 }
 
 func TestStatus_Statusline_LongTitle(t *testing.T) {
-	tmpDir := t.TempDir()
 	longTitle := "This is a very long task title that exceeds thirty characters"
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(`---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
-title: "`+longTitle+`"
+title: "` + longTitle + `"
 status: in-progress
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusStatusline = true
-
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--statusline")
 
 	expected := "#001 " + longTitle + "\n"
 	if output != expected {
@@ -824,47 +612,26 @@ dependencies: []
 }
 
 func TestStatus_NoArgs_Scope(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create subdirectories with tasks
-	cliDir := filepath.Join(tmpDir, "cli")
-	webDir := filepath.Join(tmpDir, "web")
-	if err := os.MkdirAll(cliDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(webDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.WriteFile(filepath.Join(cliDir, "001.md"), []byte(`---
+	repo := newTaskRepo(t, map[string]string{
+		"cli/001.md": `---
 id: "001"
 title: "CLI task"
 status: in-progress
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(webDir, "002.md"), []byte(`---
+`,
+		"web/002.md": `---
 id: "002"
 title: "Web task"
 status: in-progress
 tags: []
 dependencies: []
 ---
-`), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusScope = "cli"
-
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--scope", "cli")
 
 	if !strings.Contains(output, "CLI task") {
 		t.Error("Expected output to contain 'CLI task'")
@@ -875,15 +642,9 @@ dependencies: []
 }
 
 func TestStatus_NoArgs_JSON(t *testing.T) {
-	tmpDir := createStatusTestFilesMultipleInProgress(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
+	repo := newStatusMultipleInProgressRepo(t)
 
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--format", "json")
 
 	var results []statusOutput
 	if err := json.Unmarshal([]byte(output), &results); err != nil {
@@ -896,12 +657,10 @@ func TestStatus_NoArgs_JSON(t *testing.T) {
 }
 
 func TestStatus_Blocked(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusRepo(t)
 
 	// Task 003 depends on 002 which is in-progress (not completed)
-	output := captureStatusOutput(t, "003")
+	output := statusStdout(t, repo, "003")
 
 	if !strings.Contains(output, "Blocked: Yes (blocked by: 002)") {
 		t.Errorf("Expected blocked indicator with 002, got:\n%s", output)
@@ -909,12 +668,10 @@ func TestStatus_Blocked(t *testing.T) {
 }
 
 func TestStatus_Unblocked(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusRepo(t)
 
 	// Task 002 depends on 001 which is completed
-	output := captureStatusOutput(t, "002")
+	output := statusStdout(t, repo, "002")
 
 	if !strings.Contains(output, "Blocked: No") {
 		t.Errorf("Expected 'Blocked: No', got:\n%s", output)
@@ -922,12 +679,10 @@ func TestStatus_Unblocked(t *testing.T) {
 }
 
 func TestStatus_NoDependencies_NoBlockedIndicator(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
+	repo := newStatusRepo(t)
 
 	// Task 001 has no dependencies
-	output := captureStatusOutput(t, "001")
+	output := statusStdout(t, repo, "001")
 
 	if strings.Contains(output, "Blocked:") {
 		t.Errorf("Expected no blocked indicator for task without dependencies, got:\n%s", output)
@@ -935,13 +690,10 @@ func TestStatus_NoDependencies_NoBlockedIndicator(t *testing.T) {
 }
 
 func TestStatus_Blocked_JSON(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
+	repo := newStatusRepo(t)
 
 	// Task 003 is blocked (depends on 002 which is in-progress)
-	output := captureStatusOutput(t, "003")
+	output := statusStdout(t, repo, "003", "--format", "json")
 
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(output), &raw); err != nil {
@@ -967,13 +719,10 @@ func TestStatus_Blocked_JSON(t *testing.T) {
 }
 
 func TestStatus_Unblocked_JSON(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
+	repo := newStatusRepo(t)
 
 	// Task 002 depends on 001 (completed) → unblocked
-	output := captureStatusOutput(t, "002")
+	output := statusStdout(t, repo, "002", "--format", "json")
 
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(output), &raw); err != nil {
@@ -994,13 +743,10 @@ func TestStatus_Unblocked_JSON(t *testing.T) {
 }
 
 func TestStatus_NoDependencies_JSON(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "json"
+	repo := newStatusRepo(t)
 
 	// Task 001 has no dependencies
-	output := captureStatusOutput(t, "001")
+	output := statusStdout(t, repo, "001", "--format", "json")
 
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(output), &raw); err != nil {
@@ -1016,15 +762,9 @@ func TestStatus_NoDependencies_JSON(t *testing.T) {
 }
 
 func TestStatus_NoArgs_YAML(t *testing.T) {
-	tmpDir := createStatusTestFiles(t)
-	resetStatusFlags()
-	taskDir = tmpDir
-	statusFormat = "yaml"
+	repo := newStatusRepo(t)
 
-	output, err := captureStatusNoArgsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := statusStdout(t, repo, "--format", "yaml")
 
 	if !strings.Contains(output, "id: \"002\"") {
 		t.Errorf("Expected YAML output to contain in-progress task, got: %s", output)

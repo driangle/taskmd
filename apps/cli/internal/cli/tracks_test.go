@@ -1,17 +1,16 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/sdk/go/tracks"
 )
 
-// createTracksTestTaskFiles creates task files with touches fields for testing.
+// tracksFiles is the tracks-specific task set exercising touches/scope overlap.
+// Kept inline because the touches and dependency shapes are the subject of the
+// tests below.
 //
 // Task graph:
 //
@@ -22,11 +21,8 @@ import (
 //	005 (pending, low, no touches)       - no deps -> actionable, flexible
 //	006 (pending, medium)                - depends on 007 (pending) -> blocked
 //	007 (pending, low, scope-b)          - no deps -> actionable
-func createTracksTestTaskFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+func tracksFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "Setup infrastructure"
@@ -96,49 +92,23 @@ touches: ["scope-b"]
 created: 2026-02-07
 ---`,
 	}
-
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
 }
 
-func captureTracksOutput(t *testing.T, args []string) (string, error) {
+// tracksStdout runs `tracks <args...>` against repo, fails on error, and returns
+// stdout.
+func tracksStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTracks(tracksCmd, args)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
-}
-
-func resetTracksFlags() {
-	tracksFormat = "table"
-	tracksFilters = []string{}
-	tracksLimit = 0
-	tracksScope = ""
+	res := repo.Run(append([]string{"tracks"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("tracks %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 func TestTracks_JSONFormat(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -164,14 +134,9 @@ func TestTracks_JSONFormat(t *testing.T) {
 }
 
 func TestTracks_YAMLFormat(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "yaml"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "yaml")
 
 	if !strings.Contains(output, "tracks:") {
 		t.Error("Expected YAML output to contain 'tracks:'")
@@ -185,14 +150,9 @@ func TestTracks_YAMLFormat(t *testing.T) {
 }
 
 func TestTracks_TableFormat(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "table"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "table")
 
 	if !strings.Contains(output, "Track") {
 		t.Error("Expected table output to contain 'Track'")
@@ -203,14 +163,9 @@ func TestTracks_TableFormat(t *testing.T) {
 }
 
 func TestTracks_OverlapSameTrack(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -243,14 +198,9 @@ func TestTracks_OverlapSameTrack(t *testing.T) {
 }
 
 func TestTracks_NonOverlappingShareTrack(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -274,14 +224,9 @@ func TestTracks_NonOverlappingShareTrack(t *testing.T) {
 }
 
 func TestTracks_BlockedExcluded(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -304,14 +249,9 @@ func TestTracks_BlockedExcluded(t *testing.T) {
 }
 
 func TestTracks_FlexibleTasks(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -331,9 +271,8 @@ func TestTracks_FlexibleTasks(t *testing.T) {
 }
 
 func TestTracks_NoActionableTasks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	task := `---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Done task"
 status: completed
@@ -341,18 +280,10 @@ priority: high
 dependencies: []
 touches: ["scope-a"]
 created: 2026-02-01
----`
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(task), 0644); err != nil {
-		t.Fatal(err)
-	}
+---`,
+	})
 
-	resetTracksFlags()
-	tracksFormat = "table"
-
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "table")
 
 	if !strings.Contains(output, "No actionable tasks found") {
 		t.Errorf("Expected 'No actionable tasks found', got: %s", output)
@@ -360,29 +291,21 @@ created: 2026-02-01
 }
 
 func TestTracks_UnsupportedFormat(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "csv"
+	repo := newTaskRepo(t, tracksFiles())
 
-	_, err := captureTracksOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("tracks", "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("Expected error for unsupported format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestTracks_FilterFlag(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
-	tracksFilters = []string{"tag=cli"}
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json", "--filter", "tag=cli")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -409,9 +332,6 @@ func TestTracks_FilterFlag(t *testing.T) {
 }
 
 func TestTracks_TableHeaderWithScopes(t *testing.T) {
-	resetTracksFlags()
-	tracksFormat = "table"
-
 	result := &tracks.Result{
 		Tracks: []tracks.Track{
 			{
@@ -427,18 +347,10 @@ func TestTracks_TableHeaderWithScopes(t *testing.T) {
 		},
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputTracksTable(result)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	var err error
+	output, _ := captureOutput(t, func() {
+		err = outputTracksTable(result)
+	})
 
 	if err != nil {
 		t.Fatalf("outputTracksTable failed: %v", err)
@@ -456,15 +368,9 @@ func TestTracks_TableHeaderWithScopes(t *testing.T) {
 }
 
 func TestTracks_ScopeFlag_JSON(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
-	tracksScope = "scope-a"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json", "--scope", "scope-a")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -490,15 +396,9 @@ func TestTracks_ScopeFlag_JSON(t *testing.T) {
 }
 
 func TestTracks_ScopeFlag_Table(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "table"
-	tracksScope = "scope-a"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "table", "--scope", "scope-a")
 
 	if !strings.Contains(output, "Track") {
 		t.Error("Expected table output to contain 'Track'")
@@ -510,15 +410,9 @@ func TestTracks_ScopeFlag_Table(t *testing.T) {
 }
 
 func TestTracks_ScopeFlag_NoMatch(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "table"
-	tracksScope = "nonexistent-scope"
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "table", "--scope", "nonexistent-scope")
 
 	if !strings.Contains(output, "No actionable tasks found") {
 		t.Errorf("Expected 'No actionable tasks found' for non-matching scope, got: %s", output)
@@ -526,15 +420,9 @@ func TestTracks_ScopeFlag_NoMatch(t *testing.T) {
 }
 
 func TestTracks_LimitFlag(t *testing.T) {
-	tmpDir := createTracksTestTaskFiles(t)
-	resetTracksFlags()
-	tracksFormat = "json"
-	tracksLimit = 1
+	repo := newTaskRepo(t, tracksFiles())
 
-	output, err := captureTracksOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runTracks failed: %v", err)
-	}
+	output := tracksStdout(t, repo, "--format", "json", "--limit", "1")
 
 	var result tracks.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {

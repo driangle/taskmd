@@ -22,10 +22,8 @@ func setupProjectFlagRegistry(t *testing.T, projectsYAML string) {
 }
 
 func TestResolveProjectDir_ValidProject(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	projectDir := t.TempDir()
 	tasksDir := filepath.Join(projectDir, "tasks")
@@ -46,10 +44,8 @@ func TestResolveProjectDir_ValidProject(t *testing.T) {
 }
 
 func TestResolveProjectDir_NotFound(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	setupProjectFlagRegistry(t, "  - id: other\n    path: /tmp\n")
 
@@ -65,10 +61,8 @@ func TestResolveProjectDir_NotFound(t *testing.T) {
 }
 
 func TestResolveProjectDir_PathNotExist(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	badPath := filepath.Join(t.TempDir(), "does-not-exist")
 	setupProjectFlagRegistry(t, "  - id: badproj\n    name: Bad\n    path: "+badPath+"\n")
@@ -85,10 +79,8 @@ func TestResolveProjectDir_PathNotExist(t *testing.T) {
 }
 
 func TestResolveProjectDir_DefaultDir(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	projectDir := t.TempDir()
 	os.WriteFile(filepath.Join(projectDir, ".taskmd.yaml"), []byte("verbose: true\n"), 0644)
@@ -106,10 +98,8 @@ func TestResolveProjectDir_DefaultDir(t *testing.T) {
 }
 
 func TestResolveProjectDir_EmptyRegistry(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	t.Setenv("TASKMD_HOME_CONFIG", filepath.Join(t.TempDir(), "nonexistent.yaml"))
 
@@ -120,10 +110,8 @@ func TestResolveProjectDir_EmptyRegistry(t *testing.T) {
 }
 
 func TestResolveProjectDir_TaskDirKey(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	projectDir := t.TempDir()
 	os.MkdirAll(filepath.Join(projectDir, "my-tasks"), 0755)
@@ -143,10 +131,8 @@ func TestResolveProjectDir_TaskDirKey(t *testing.T) {
 }
 
 func TestResolveTaskDir_ProjectFlagTakesPrecedence(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	projectDir := t.TempDir()
 	os.MkdirAll(filepath.Join(projectDir, "tasks"), 0755)

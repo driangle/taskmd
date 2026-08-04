@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,11 +12,12 @@ import (
 	"github.com/driangle/taskmd/sdk/go/verify"
 )
 
-func createVerifyTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// verifyFiles is the verify-specific task set covering verify-block permutations
+// (passing, failing, assert, mixed, no-verify, unknown-type, custom-dir,
+// fail-fast). Kept inline because these one-off verify shapes are the subject of
+// the tests below.
+func verifyFiles() map[string]string {
+	return map[string]string{
 		"001-pass.md": `---
 id: "001"
 title: "Task with passing checks"
@@ -124,67 +123,21 @@ verify:
 # Task for fail-fast testing
 `,
 	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-func resetVerifyFlags() {
-	verifyTaskID = ""
-	verifyFormat = "table"
-	verifyDryRun = false
-	verifyTimeout = 60
-	verifyAll = false
-	taskDir = "."
-}
-
-type verifyOutput struct {
-	stdout string
-	stderr string
-}
-
-func captureVerifyOutputSeparate(t *testing.T) (verifyOutput, error) {
+// verifyCombined runs `verify <args...>` against repo and returns combined
+// stdout+stderr plus the command error, mirroring the pre-migration capture
+// helper (verify prints results to both streams).
+func verifyCombined(t *testing.T, repo *taskRepo, args ...string) (string, error) {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	rOut, wOut, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
-	os.Stdout = wOut
-	os.Stderr = wErr
-
-	err := runVerify(verifyCmd, nil)
-
-	wOut.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	var bufOut, bufErr bytes.Buffer
-	bufOut.ReadFrom(rOut)
-	bufErr.ReadFrom(rErr)
-	return verifyOutput{stdout: bufOut.String(), stderr: bufErr.String()}, err
-}
-
-func captureVerifyOutput(t *testing.T) (string, error) {
-	t.Helper()
-	out, err := captureVerifyOutputSeparate(t)
-	return out.stdout + out.stderr, err
+	res := repo.Run(append([]string{"verify"}, args...)...)
+	return res.Stdout + res.Stderr, res.Err
 }
 
 func TestVerify_AllPass(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "001"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,12 +151,9 @@ func TestVerify_AllPass(t *testing.T) {
 }
 
 func TestVerify_Fail(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "002"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "002")
 	if err == nil {
 		t.Fatal("expected error for failing check")
 	}
@@ -220,12 +170,9 @@ func TestVerify_Fail(t *testing.T) {
 }
 
 func TestVerify_Assert(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "003"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "003")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -239,13 +186,10 @@ func TestVerify_Assert(t *testing.T) {
 }
 
 func TestVerify_Mixed(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "004"
-	verifyAll = true // run all steps despite failures
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	// --all runs all steps despite failures
+	output, err := verifyCombined(t, repo, "004", "--all")
 	if err == nil {
 		t.Fatal("expected error for mixed checks with failures")
 	}
@@ -265,12 +209,9 @@ func TestVerify_Mixed(t *testing.T) {
 }
 
 func TestVerify_NoField(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "005"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "005")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -281,12 +222,9 @@ func TestVerify_NoField(t *testing.T) {
 }
 
 func TestVerify_TaskNotFound(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "999"
+	repo := newTaskRepo(t, verifyFiles())
 
-	_, err := captureVerifyOutput(t)
+	_, err := verifyCombined(t, repo, "999")
 	if err == nil {
 		t.Fatal("expected error for non-existent task")
 	}
@@ -296,12 +234,9 @@ func TestVerify_TaskNotFound(t *testing.T) {
 }
 
 func TestVerify_UnknownType(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "006"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "006")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -315,13 +250,9 @@ func TestVerify_UnknownType(t *testing.T) {
 }
 
 func TestVerify_DryRun(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "001"
-	verifyDryRun = true
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "001", "--dry-run")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -336,20 +267,16 @@ func TestVerify_DryRun(t *testing.T) {
 }
 
 func TestVerify_JSON(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "001"
-	verifyFormat = "json"
+	repo := newTaskRepo(t, verifyFiles())
 
-	out, err := captureVerifyOutputSeparate(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("verify", "001", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	var result verify.Result
-	if err := json.Unmarshal([]byte(out.stdout), &result); err != nil {
-		t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, out.stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &result); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, res.Stdout)
 	}
 
 	if result.Passed != 2 {
@@ -361,12 +288,9 @@ func TestVerify_JSON(t *testing.T) {
 }
 
 func TestVerify_CustomDir(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "007"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "007")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -377,12 +301,9 @@ func TestVerify_CustomDir(t *testing.T) {
 }
 
 func TestVerify_FailFast(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "008"
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "008")
 	if err == nil {
 		t.Fatal("expected error for failing check")
 	}
@@ -409,13 +330,9 @@ func TestVerify_FailFast(t *testing.T) {
 }
 
 func TestVerify_All(t *testing.T) {
-	tmpDir := createVerifyTestFiles(t)
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "008"
-	verifyAll = true
+	repo := newTaskRepo(t, verifyFiles())
 
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "008", "--all")
 	if err == nil {
 		t.Fatal("expected error for failing check")
 	}
@@ -468,9 +385,8 @@ func TestResolveProjectRoot_MatchesConfigDir(t *testing.T) {
 }
 
 func TestVerify_Timeout(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"010-slow.md": `---
 id: "010"
 title: "Task with slow check"
 status: pending
@@ -481,18 +397,10 @@ verify:
 ---
 
 # Task with slow check
-`
-	path := filepath.Join(tmpDir, "010-slow.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetVerifyFlags()
-	taskDir = tmpDir
-	verifyTaskID = "010"
-	verifyTimeout = 1
-
-	output, err := captureVerifyOutput(t)
+	output, err := verifyCombined(t, repo, "010", "--timeout", "1")
 	if err == nil {
 		t.Fatal("expected error for timeout")
 	}

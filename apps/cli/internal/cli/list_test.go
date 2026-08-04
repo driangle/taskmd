@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -9,6 +8,38 @@ import (
 
 	"github.com/driangle/taskmd/sdk/go/model"
 )
+
+// listStdout runs `list <args...>`, fails on error, and returns stdout.
+func listStdout(t *testing.T, repo *taskRepo, args ...string) string {
+	t.Helper()
+	res := repo.Run(append([]string{"list"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("list %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
+}
+
+// listTableStdout renders tasks through outputTable and returns captured stdout.
+func listTableStdout(t *testing.T, tasks []*model.Task, columns string) string {
+	t.Helper()
+	var err error
+	stdout, _ := captureOutput(t, func() { err = outputTable(tasks, columns) })
+	if err != nil {
+		t.Fatalf("outputTable failed: %v", err)
+	}
+	return stdout
+}
+
+// outputJSONStdout renders tasks through outputJSON and returns captured stdout.
+func outputJSONStdout(t *testing.T, tasks []*model.Task) string {
+	t.Helper()
+	var err error
+	stdout, _ := captureOutput(t, func() { err = outputJSON(tasks) })
+	if err != nil {
+		t.Fatalf("outputJSON failed: %v", err)
+	}
+	return stdout
+}
 
 func TestSortTasks(t *testing.T) {
 	now := time.Now()
@@ -86,7 +117,7 @@ func TestApplyListFiltersAndSort_Reverse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetListFlags()
+			resetCLIState()
 			listSort = tt.sort
 			listReverse = true
 
@@ -105,7 +136,7 @@ func TestApplyListFiltersAndSort_Reverse(t *testing.T) {
 // TestApplyListFiltersAndSort_ReverseNoSort verifies --reverse with no --sort
 // flips the incoming (file-scan) order.
 func TestApplyListFiltersAndSort_ReverseNoSort(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
 	listReverse = true
 
 	got, err := applyListFiltersAndSort(reverseTestTasks())
@@ -122,7 +153,7 @@ func TestApplyListFiltersAndSort_ReverseNoSort(t *testing.T) {
 // TestApplyListFiltersAndSort_ReverseWithLimit verifies --limit keeps the top N
 // of the reversed ordering.
 func TestApplyListFiltersAndSort_ReverseWithLimit(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
 	listSort = "priority"
 	listReverse = true
 	listLimit = 2
@@ -181,45 +212,8 @@ func TestGetColumnValue(t *testing.T) {
 	}
 }
 
-// resetListFlags resets list command flags to defaults before each test.
-func resetListFlags() {
-	listFilters = []string{}
-	listSort = ""
-	listReverse = false
-	listColumns = "id,title,status,priority,file"
-	listLimit = 0
-	listScope = ""
-	listPhase = ""
-	listStatus = ""
-	listPriority = ""
-	noColor = true
-}
-
-// captureListTableOutput runs outputTable and captures stdout.
-func captureListTableOutput(t *testing.T, tasks []*model.Task, columns string) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputTable(tasks, columns)
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("outputTable failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
-}
-
 func TestListCommand_TableColorEnabled(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
 	noColor = false
 	forceColor = true
 	defer func() { forceColor = false }()
@@ -229,7 +223,7 @@ func TestListCommand_TableColorEnabled(t *testing.T) {
 		{ID: "001", Title: "Test Task", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "test.md"},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+	output := listTableStdout(t, tasks, "id,title,status,priority")
 
 	// With colors enabled, output should contain ANSI escape codes
 	if !strings.Contains(output, "\x1b[") {
@@ -246,15 +240,15 @@ func TestListCommand_TableColorEnabled(t *testing.T) {
 }
 
 func TestListCommand_TableNoColorFlag(t *testing.T) {
-	resetListFlags()
-	// noColor is already true from resetListFlags
+	resetCLIState()
+	noColor = true
 	os.Unsetenv("NO_COLOR")
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "Test Task", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "test.md"},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+	output := listTableStdout(t, tasks, "id,title,status,priority")
 
 	// With no-color, output should NOT contain ANSI escape codes
 	if strings.Contains(output, "\x1b[") {
@@ -271,7 +265,7 @@ func TestListCommand_TableNoColorFlag(t *testing.T) {
 }
 
 func TestListCommand_TableNoColorEnvVar(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
 	noColor = false // enable via flag, but env var should override
 	forceColor = true
 	defer func() { forceColor = false }()
@@ -283,7 +277,7 @@ func TestListCommand_TableNoColorEnvVar(t *testing.T) {
 		{ID: "001", Title: "Test Task", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "test.md"},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+	output := listTableStdout(t, tasks, "id,title,status,priority")
 
 	// NO_COLOR env var should disable colors
 	if strings.Contains(output, "\x1b[") {
@@ -292,7 +286,7 @@ func TestListCommand_TableNoColorEnvVar(t *testing.T) {
 }
 
 func TestListCommand_TableColorColumns(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
 	noColor = false
 	forceColor = true
 	defer func() { forceColor = false }()
@@ -303,7 +297,7 @@ func TestListCommand_TableColorColumns(t *testing.T) {
 		{ID: "002", Title: "Another", Status: model.StatusInProgress, Priority: model.PriorityLow, FilePath: "test2.md"},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,status,priority")
+	output := listTableStdout(t, tasks, "id,title,status,priority")
 
 	// Verify colored output contains task data
 	if !strings.Contains(output, "001") {
@@ -338,14 +332,15 @@ func TestGetColumnValue_Parent(t *testing.T) {
 }
 
 func TestListCommand_ParentColumn(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
+	noColor = true
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "Parent", Status: model.StatusPending},
 		{ID: "002", Title: "Child", Status: model.StatusPending, Parent: "001"},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,parent")
+	output := listTableStdout(t, tasks, "id,title,parent")
 
 	if !strings.Contains(output, "parent") {
 		t.Error("Expected 'parent' column header in output")
@@ -356,7 +351,8 @@ func TestListCommand_ParentColumn(t *testing.T) {
 }
 
 func TestListCommand_TypeColumn(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
+	noColor = true
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "Feature", Status: model.StatusPending, Type: model.TypeFeature},
@@ -364,7 +360,7 @@ func TestListCommand_TypeColumn(t *testing.T) {
 		{ID: "003", Title: "No type", Status: model.StatusPending},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,type")
+	output := listTableStdout(t, tasks, "id,title,type")
 
 	if !strings.Contains(output, "type") {
 		t.Error("Expected 'type' column header in output")
@@ -378,14 +374,15 @@ func TestListCommand_TypeColumn(t *testing.T) {
 }
 
 func TestListCommand_SeparatorAlignment(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
+	noColor = true
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "A very long task title here", Status: model.StatusInProgress, Priority: model.PriorityHigh, FilePath: "tasks/cli/001.md"},
 		{ID: "002", Title: "Short", Status: model.StatusPending, Priority: model.PriorityCritical, FilePath: "tasks/002.md"},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,status,priority,file")
+	output := listTableStdout(t, tasks, "id,title,status,priority,file")
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 
 	if len(lines) < 3 {
@@ -443,17 +440,17 @@ func TestListCommand_ColorAlignmentMatchesPlain(t *testing.T) {
 	}
 
 	// Capture with no color
-	resetListFlags()
+	resetCLIState()
 	noColor = true
-	plainOutput := captureListTableOutput(t, tasks, "id,title,status,priority,file")
+	plainOutput := listTableStdout(t, tasks, "id,title,status,priority,file")
 
 	// Capture with color
-	resetListFlags()
+	resetCLIState()
 	noColor = false
 	forceColor = true
 	defer func() { forceColor = false }()
 	os.Unsetenv("NO_COLOR")
-	colorOutput := captureListTableOutput(t, tasks, "id,title,status,priority,file")
+	colorOutput := listTableStdout(t, tasks, "id,title,status,priority,file")
 
 	plainLines := strings.Split(strings.TrimRight(plainOutput, "\n"), "\n")
 	colorLines := strings.Split(strings.TrimRight(colorOutput, "\n"), "\n")
@@ -507,7 +504,7 @@ func TestListCommand_LimitFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetListFlags()
+			resetCLIState()
 			listLimit = tt.limit
 
 			tasksCopy := make([]*model.Task, len(tasks))
@@ -534,7 +531,8 @@ func TestListCommand_LimitFlag(t *testing.T) {
 }
 
 func TestListCommand_LimitTableOutput(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
+	noColor = true
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "First", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "a.md"},
@@ -545,7 +543,7 @@ func TestListCommand_LimitTableOutput(t *testing.T) {
 	// Apply limit before outputting
 	limited := tasks[:2]
 
-	output := captureListTableOutput(t, limited, "id,title,status")
+	output := listTableStdout(t, limited, "id,title,status")
 
 	if !strings.Contains(output, "001") {
 		t.Error("Expected task 001 in output")
@@ -559,7 +557,7 @@ func TestListCommand_LimitTableOutput(t *testing.T) {
 }
 
 func TestListCommand_LimitJSONOutput(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "First", Status: model.StatusPending},
@@ -569,23 +567,7 @@ func TestListCommand_LimitJSONOutput(t *testing.T) {
 
 	limited := tasks[:2]
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputJSON(limited)
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("outputJSON failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := outputJSONStdout(t, limited)
 
 	if !strings.Contains(output, "001") {
 		t.Error("Expected task 001 in JSON output")
@@ -634,56 +616,23 @@ func TestFilterTasksByScope(t *testing.T) {
 	}
 }
 
-// createScopedListTaskFiles creates test task files with touches fields for list tests.
-func createScopedListTaskFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	taskFiles := map[string]string{
+// scopedListFixtures returns task files with touches: fields for scope-filter
+// tests. Kept inline because the touches field and this specific web/cli/api
+// mix are the subject of these tests.
+func scopedListFixtures() map[string]string {
+	return map[string]string{
 		"001-web.md":     "---\nid: \"001\"\ntitle: \"Web feature\"\nstatus: pending\npriority: high\ntouches: [\"web\", \"api\"]\ncreated: 2026-01-01\n---\n# Web feature\n",
 		"002-cli.md":     "---\nid: \"002\"\ntitle: \"CLI feature\"\nstatus: pending\npriority: medium\ntouches: [\"cli\"]\ncreated: 2026-01-01\n---\n# CLI feature\n",
 		"003-web.md":     "---\nid: \"003\"\ntitle: \"Web styling\"\nstatus: pending\npriority: low\ntouches: [\"web\"]\ncreated: 2026-01-01\n---\n# Web styling\n",
 		"004-noscope.md": "---\nid: \"004\"\ntitle: \"No scope task\"\nstatus: pending\npriority: medium\ncreated: 2026-01-01\n---\n# No scope task\n",
 	}
-
-	for name, content := range taskFiles {
-		if err := os.WriteFile(tmpDir+"/"+name, []byte(content), 0o644); err != nil {
-			t.Fatalf("failed to write %s: %v", name, err)
-		}
-	}
-	return tmpDir
-}
-
-// captureRunList runs runList and captures stdout.
-func captureRunList(t *testing.T, args []string) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runList(listCmd, args)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
 }
 
 func TestListCommand_ScopeFilter(t *testing.T) {
-	tmpDir := createScopedListTaskFiles(t)
+	repo := newTaskRepo(t, scopedListFixtures())
 
 	t.Run("scope filters to matching tasks", func(t *testing.T) {
-		resetListFlags()
-		listFormat = "json"
-		listScope = "web"
-
-		output := captureRunList(t, []string{tmpDir})
+		output := listStdout(t, repo, "--format", "json", "--scope", "web")
 
 		if !strings.Contains(output, "001") {
 			t.Error("Expected task 001 (touches web)")
@@ -697,11 +646,7 @@ func TestListCommand_ScopeFilter(t *testing.T) {
 	})
 
 	t.Run("scope with wildcard", func(t *testing.T) {
-		resetListFlags()
-		listFormat = "json"
-		listScope = "w*"
-
-		output := captureRunList(t, []string{tmpDir})
+		output := listStdout(t, repo, "--format", "json", "--scope", "w*")
 
 		if !strings.Contains(output, "001") || !strings.Contains(output, "003") {
 			t.Error("Expected tasks 001 and 003 to match w* wildcard")
@@ -709,11 +654,7 @@ func TestListCommand_ScopeFilter(t *testing.T) {
 	})
 
 	t.Run("scope with no matches", func(t *testing.T) {
-		resetListFlags()
-		listFormat = "table"
-		listScope = "nonexistent"
-
-		output := captureRunList(t, []string{tmpDir})
+		output := listStdout(t, repo, "--format", "table", "--scope", "nonexistent")
 
 		if !strings.Contains(output, "No tasks found") {
 			t.Error("Expected 'No tasks found' message for non-matching scope")
@@ -721,12 +662,7 @@ func TestListCommand_ScopeFilter(t *testing.T) {
 	})
 
 	t.Run("scope combined with filter", func(t *testing.T) {
-		resetListFlags()
-		listFormat = "json"
-		listScope = "web"
-		listFilters = []string{"priority=high"}
-
-		output := captureRunList(t, []string{tmpDir})
+		output := listStdout(t, repo, "--format", "json", "--scope", "web", "--filter", "priority=high")
 
 		if !strings.Contains(output, "001") {
 			t.Error("Expected task 001 (web + high priority)")
@@ -738,23 +674,7 @@ func TestListCommand_ScopeFilter(t *testing.T) {
 }
 
 func TestOutputJSON_NilTasks_ReturnsEmptyArray(t *testing.T) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputJSON(nil)
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("outputJSON failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := strings.TrimSpace(buf.String())
+	output := strings.TrimSpace(outputJSONStdout(t, nil))
 
 	if output != "[]" {
 		t.Errorf("expected empty JSON array '[]', got %q", output)
@@ -782,7 +702,8 @@ func TestGetColumnValue_Phase(t *testing.T) {
 }
 
 func TestListCommand_PhaseColumn(t *testing.T) {
-	resetListFlags()
+	resetCLIState()
+	noColor = true
 
 	tasks := []*model.Task{
 		{ID: "001", Title: "Feature A", Status: model.StatusPending, Phase: "v0.2"},
@@ -790,7 +711,7 @@ func TestListCommand_PhaseColumn(t *testing.T) {
 		{ID: "003", Title: "Feature C", Status: model.StatusPending},
 	}
 
-	output := captureListTableOutput(t, tasks, "id,title,phase")
+	output := listTableStdout(t, tasks, "id,title,phase")
 
 	if !strings.Contains(output, "phase") {
 		t.Error("Expected 'phase' column header in output")

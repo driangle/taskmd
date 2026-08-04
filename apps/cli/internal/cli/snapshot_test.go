@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,21 +10,12 @@ import (
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-// resetSnapshotFlags resets all snapshot command flags to defaults.
-func resetSnapshotFlags() {
-	snapshotFormat = "json"
-	snapshotCore = false
-	snapshotDerived = false
-	snapshotGroupBy = ""
-	snapshotOut = ""
-}
-
-// createSnapshotTestFiles creates test task files with dependencies for snapshot tests.
-func createSnapshotTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// snapshotFiles is the snapshot-specific task set: a 001 -> 002 -> 003 chain
+// (with effort/group fields the derived-field tests depend on) plus an
+// independent task 004. Kept inline because these exact dependency and derived
+// shapes are the subject of the command-level snapshot tests.
+func snapshotFiles() map[string]string {
+	return map[string]string{
 		"001-root.md": `---
 id: "001"
 title: "Root Task"
@@ -80,32 +70,17 @@ created: 2026-02-08
 No dependencies.
 `,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-// captureSnapshotOutput runs the snapshot command and captures stdout.
-func captureSnapshotOutput(t *testing.T, args []string) (string, error) {
+// snapshotStdout runs `snapshot <args...>` against repo, fails on error, and
+// returns stdout.
+func snapshotStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runSnapshot(snapshotCmd, args)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	res := repo.Run(append([]string{"snapshot"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("snapshot %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 // --- Analysis function tests (pure, no I/O) ---
@@ -356,13 +331,9 @@ func TestTaskToSnapshot_WithDerived(t *testing.T) {
 // --- Command-level tests ---
 
 func TestRunSnapshot_JSONOutput(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo)
 
 	var result SnapshotOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -375,14 +346,9 @@ func TestRunSnapshot_JSONOutput(t *testing.T) {
 }
 
 func TestRunSnapshot_YAMLOutput(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotFormat = "yaml"
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo, "--format", "yaml")
 
 	if !strings.Contains(output, "id:") || !strings.Contains(output, "title:") {
 		t.Errorf("YAML output missing expected fields:\n%s", output)
@@ -390,14 +356,9 @@ func TestRunSnapshot_YAMLOutput(t *testing.T) {
 }
 
 func TestRunSnapshot_MarkdownOutput(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotFormat = "md"
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo, "--format", "md")
 
 	if !strings.Contains(output, "###") {
 		t.Errorf("markdown output missing headings:\n%s", output)
@@ -405,14 +366,9 @@ func TestRunSnapshot_MarkdownOutput(t *testing.T) {
 }
 
 func TestRunSnapshot_CoreFlag(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotCore = true
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo, "--core")
 
 	var result SnapshotOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -430,14 +386,9 @@ func TestRunSnapshot_CoreFlag(t *testing.T) {
 }
 
 func TestRunSnapshot_DerivedFlag(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotDerived = true
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo, "--derived")
 
 	var result SnapshotOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -458,14 +409,9 @@ func TestRunSnapshot_DerivedFlag(t *testing.T) {
 }
 
 func TestRunSnapshot_GroupBy(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotGroupBy = "status"
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo, "--group-by", "status")
 
 	var result SnapshotOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -478,16 +424,11 @@ func TestRunSnapshot_GroupBy(t *testing.T) {
 }
 
 func TestRunSnapshot_FileOutput(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
+	repo := newTaskRepo(t, snapshotFiles())
 
-	outFile := filepath.Join(t.TempDir(), "snapshot.json")
-	snapshotOut = outFile
+	outFile := repo.Path("snapshot.json")
 
-	_, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	snapshotStdout(t, repo, "--out", outFile)
 
 	data, err := os.ReadFile(outFile)
 	if err != nil {
@@ -504,29 +445,21 @@ func TestRunSnapshot_FileOutput(t *testing.T) {
 }
 
 func TestRunSnapshot_InvalidFormat(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotFormat = "invalid"
+	repo := newTaskRepo(t, snapshotFiles())
 
-	_, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("snapshot", "--format", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format, got nil")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestRunSnapshot_MarkdownGroupedByStatus(t *testing.T) {
-	tmpDir := createSnapshotTestFiles(t)
-	resetSnapshotFlags()
-	snapshotFormat = "md"
-	snapshotGroupBy = "status"
+	repo := newTaskRepo(t, snapshotFiles())
 
-	output, err := captureSnapshotOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runSnapshot failed: %v", err)
-	}
+	output := snapshotStdout(t, repo, "--format", "md", "--group-by", "status")
 
 	// Should have group headings (capitalized status values)
 	if !strings.Contains(output, "## Completed") {

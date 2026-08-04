@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,20 +10,12 @@ import (
 	"github.com/driangle/taskmd/sdk/go/search"
 )
 
-func resetSearchFlags() {
-	searchFormat = "table"
-	searchFilters = []string{}
-	searchSort = ""
-	searchLimit = 0
-	taskDir = "."
-	noColor = true
-}
-
-func createSearchTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	files := map[string]string{
+// searchTestFiles is the canonical search-integration fixture: three tasks whose
+// titles/bodies mention "authentication" in different places. Kept inline (not a
+// shared fixture) because the body prose is what the search matcher is tested
+// against.
+func searchTestFiles() map[string]string {
+	return map[string]string{
 		"001-auth.md": `---
 id: "001"
 title: "Implement authentication system"
@@ -71,53 +61,36 @@ created: 2026-01-03
 Document all REST endpoints including request and response schemas.
 `,
 	}
-
-	for name, content := range files {
-		err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("failed to create test file %s: %v", name, err)
-		}
-	}
-
-	return tmpDir
 }
 
-func captureSearchOutput(t *testing.T, tasks []*model.Task, query, format string) (string, error) {
+// searchOutput searches tasks and renders results in the given format directly
+// through the formatter, returning stdout. Color is disabled for determinism.
+func searchOutput(t *testing.T, tasks []*model.Task, query, format string) (string, error) {
 	t.Helper()
-
+	noColor = true
 	results := search.Search(tasks, query)
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	var runErr error
-	switch format {
-	case "json":
-		if len(results) > 0 {
-			runErr = WriteJSON(os.Stdout, results)
+	stdout, _ := captureOutput(t, func() {
+		switch format {
+		case "json":
+			if len(results) > 0 {
+				runErr = WriteJSON(os.Stdout, results)
+			}
+		case "yaml":
+			if len(results) > 0 {
+				runErr = WriteYAML(os.Stdout, results)
+			}
+		case "table":
+			if len(results) > 0 {
+				runErr = outputSearchTable(results, query)
+			}
 		}
-	case "yaml":
-		if len(results) > 0 {
-			runErr = WriteYAML(os.Stdout, results)
-		}
-	case "table":
-		if len(results) > 0 {
-			runErr = outputSearchTable(results, query)
-		}
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), runErr
+	})
+	return stdout, runErr
 }
 
 func TestSearch_MatchInTitle(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Implement authentication system", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "Some body text"},
 		{ID: "002", Title: "Set up deployment", Status: model.StatusInProgress, Priority: model.PriorityMedium, Body: "Other content"},
@@ -137,8 +110,6 @@ func TestSearch_MatchInTitle(t *testing.T) {
 }
 
 func TestSearch_MatchInBody(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Task one", Status: model.StatusPending, Priority: model.PriorityMedium, Body: "Contains the keyword deployment here"},
 		{ID: "002", Title: "Task two", Status: model.StatusPending, Priority: model.PriorityLow, Body: "Nothing relevant"},
@@ -158,8 +129,6 @@ func TestSearch_MatchInBody(t *testing.T) {
 }
 
 func TestSearch_CaseInsensitive(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "AUTHENTICATION Module", Status: model.StatusPending, Priority: model.PriorityHigh},
 	}
@@ -175,8 +144,6 @@ func TestSearch_CaseInsensitive(t *testing.T) {
 }
 
 func TestSearch_MultipleResults(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Add authentication", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "JWT auth"},
 		{ID: "002", Title: "Deploy service", Status: model.StatusInProgress, Priority: model.PriorityMedium, Body: "Deploy the authentication service"},
@@ -191,8 +158,6 @@ func TestSearch_MultipleResults(t *testing.T) {
 }
 
 func TestSearch_MatchInTitleAndBody(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Authentication system", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "Implement authentication with JWT"},
 	}
@@ -208,8 +173,6 @@ func TestSearch_MatchInTitleAndBody(t *testing.T) {
 }
 
 func TestSearch_NoResults(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Some task", Status: model.StatusPending, Priority: model.PriorityMedium, Body: "Nothing here"},
 	}
@@ -222,13 +185,11 @@ func TestSearch_NoResults(t *testing.T) {
 }
 
 func TestSearch_JSONFormat(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth system", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "tasks/001.md", Body: "JWT authentication"},
 	}
 
-	output, err := captureSearchOutput(t, tasks, "authentication", "json")
+	output, err := searchOutput(t, tasks, "authentication", "json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -256,13 +217,11 @@ func TestSearch_JSONFormat(t *testing.T) {
 }
 
 func TestSearch_YAMLFormat(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth system", Status: model.StatusPending, Priority: model.PriorityMedium, FilePath: "tasks/001.md", Body: "JWT authentication logic"},
 	}
 
-	output, err := captureSearchOutput(t, tasks, "authentication", "yaml")
+	output, err := searchOutput(t, tasks, "authentication", "yaml")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -282,8 +241,6 @@ func TestSearch_YAMLFormat(t *testing.T) {
 }
 
 func TestSearch_UnsupportedFormat(t *testing.T) {
-	resetSearchFlags()
-
 	err := ValidateFormat("xml", []string{"table", "json", "yaml"})
 	if err == nil {
 		t.Fatal("expected error for unsupported format")
@@ -294,8 +251,6 @@ func TestSearch_UnsupportedFormat(t *testing.T) {
 }
 
 func TestSearch_EmptyTaskList(t *testing.T) {
-	resetSearchFlags()
-
 	results := search.Search([]*model.Task{}, "anything")
 
 	if len(results) != 0 {
@@ -304,13 +259,11 @@ func TestSearch_EmptyTaskList(t *testing.T) {
 }
 
 func TestSearch_TableOutput(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth system", Status: model.StatusPending, Priority: model.PriorityHigh, FilePath: "tasks/001.md", Body: "Implement authentication"},
 	}
 
-	output, err := captureSearchOutput(t, tasks, "authentication", "table")
+	output, err := searchOutput(t, tasks, "authentication", "table")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -384,16 +337,13 @@ func TestHighlightMatch(t *testing.T) {
 }
 
 func TestSearch_FilterByPriority(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth system", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "JWT authentication"},
 		{ID: "002", Title: "Auth docs", Status: model.StatusPending, Priority: model.PriorityLow, Body: "Document authentication endpoints"},
 	}
 
 	// Both match "authentication", but only 001 is high priority
-	searchFilters = []string{"priority=high"}
-	filtered, err := applyFilters(tasks, searchFilters)
+	filtered, err := applyFilters(tasks, []string{"priority=high"})
 	if err != nil {
 		t.Fatalf("unexpected filter error: %v", err)
 	}
@@ -408,8 +358,6 @@ func TestSearch_FilterByPriority(t *testing.T) {
 }
 
 func TestSearch_FilterByStatus(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth login", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "Login endpoint"},
 		{ID: "002", Title: "Auth logout", Status: model.StatusCompleted, Priority: model.PriorityMedium, Body: "Logout endpoint"},
@@ -430,8 +378,6 @@ func TestSearch_FilterByStatus(t *testing.T) {
 }
 
 func TestSearch_MultipleFilters(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth high pending", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "security feature"},
 		{ID: "002", Title: "Auth high done", Status: model.StatusCompleted, Priority: model.PriorityHigh, Body: "security fix"},
@@ -453,8 +399,6 @@ func TestSearch_MultipleFilters(t *testing.T) {
 }
 
 func TestSearch_SortByPriority(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Deploy low", Status: model.StatusPending, Priority: model.PriorityLow, Body: "deploy staging"},
 		{ID: "002", Title: "Deploy critical", Status: model.StatusPending, Priority: model.PriorityCritical, Body: "deploy production"},
@@ -482,8 +426,6 @@ func TestSearch_SortByPriority(t *testing.T) {
 }
 
 func TestSearch_LimitResults(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "API endpoint one", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "first endpoint"},
 		{ID: "002", Title: "API endpoint two", Status: model.StatusPending, Priority: model.PriorityMedium, Body: "second endpoint"},
@@ -508,8 +450,6 @@ func TestSearch_LimitResults(t *testing.T) {
 }
 
 func TestSearch_AllFlagsCombined(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Bug fix auth", Status: model.StatusPending, Priority: model.PriorityLow, Body: "fix login bug"},
 		{ID: "002", Title: "Bug fix deploy", Status: model.StatusPending, Priority: model.PriorityHigh, Body: "fix deploy bug"},
@@ -549,8 +489,6 @@ func TestSearch_AllFlagsCombined(t *testing.T) {
 }
 
 func TestSearch_FilterNoMatchingTasks(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Auth system", Status: model.StatusCompleted, Priority: model.PriorityHigh, Body: "JWT authentication"},
 	}
@@ -568,8 +506,6 @@ func TestSearch_FilterNoMatchingTasks(t *testing.T) {
 }
 
 func TestSearch_InvalidFilter(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Test", Status: model.StatusPending, Priority: model.PriorityMedium},
 	}
@@ -581,8 +517,6 @@ func TestSearch_InvalidFilter(t *testing.T) {
 }
 
 func TestSearch_InvalidSort(t *testing.T) {
-	resetSearchFlags()
-
 	tasks := []*model.Task{
 		{ID: "001", Title: "Test", Status: model.StatusPending, Priority: model.PriorityMedium},
 	}
@@ -594,41 +528,16 @@ func TestSearch_InvalidSort(t *testing.T) {
 }
 
 func TestSearch_IntegrationWithFiles(t *testing.T) {
-	resetSearchFlags()
+	repo := newTaskRepo(t, searchTestFiles())
 
-	tmpDir := createSearchTestFiles(t)
-	taskDir = tmpDir
-
-	// Capture stderr for "no results" case
-	oldStderr := os.Stderr
-	stderrR, stderrW, _ := os.Pipe()
-	os.Stderr = stderrW
-
-	oldStdout := os.Stdout
-	stdoutR, stdoutW, _ := os.Pipe()
-	os.Stdout = stdoutW
-
-	searchFormat = "json"
-	err := runSearch(searchCmd, []string{"authentication"})
-
-	stdoutW.Close()
-	stderrW.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("search", "authentication", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	var stdoutBuf bytes.Buffer
-	stdoutBuf.ReadFrom(stdoutR)
-
-	var stderrBuf bytes.Buffer
-	stderrBuf.ReadFrom(stderrR)
-
-	output := stdoutBuf.String()
+	output := res.Stdout
 	if output == "" {
-		t.Fatalf("expected JSON output, got empty. stderr: %s", stderrBuf.String())
+		t.Fatalf("expected JSON output, got empty. stderr: %s", res.Stderr)
 	}
 
 	var parsed []search.Result

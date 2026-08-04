@@ -1,42 +1,43 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 )
 
-func resetPhasesFlags() {
-	phasesFormat = "table"
-}
-
-func setupPhasesConfig(t *testing.T, phases []map[string]any) {
-	t.Helper()
+// setPhaseConfig seeds phase config into viper as a repo .taskmd.yaml would.
+// Passing nil clears it. The harness runs commands' RunE directly and skips
+// cobra's config discovery, so phase config must be injected (via RunWith) to
+// survive the hermetic reset.
+func setPhaseConfig(phases []map[string]any) {
 	if phases == nil {
 		viper.Set("phases", nil)
-	} else {
-		// Convert to []any so viper.Get returns a type that parsePhasesConfig can assert.
-		items := make([]any, len(phases))
-		for i, p := range phases {
-			items[i] = p
-		}
-		viper.Set("phases", items)
+		return
 	}
-	t.Cleanup(func() {
-		viper.Set("phases", nil)
-	})
+	// Convert to []any so viper.Get returns a type parsePhasesConfig can assert.
+	items := make([]any, len(phases))
+	for i, p := range phases {
+		items[i] = p
+	}
+	viper.Set("phases", items)
 }
 
-func createPhasesTestFiles(t *testing.T) string {
+// runPhasesWith runs `phases <args...>` against repo with phase config seeded
+// through RunWith so it survives the harness reset.
+func runPhasesWith(t *testing.T, repo *taskRepo, phases []map[string]any, args ...string) cliResult {
 	t.Helper()
-	tmpDir := t.TempDir()
+	return repo.RunWith(func() { setPhaseConfig(phases) }, append([]string{"phases"}, args...)...)
+}
 
-	tasks := map[string]string{
+// phasesTestFiles is the canonical phases-command fixture: three mvp tasks (one
+// each pending/completed/in-progress), one v2 task, and one un-phased task.
+// Kept inline because this specific status/phase mix is the subject of these
+// tests.
+func phasesTestFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "MVP task A"
@@ -72,51 +73,19 @@ status: pending
 priority: low
 ---`,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create test file %s: %v", filename, err)
-		}
-	}
-	return tmpDir
-}
-
-func capturePhasesOutput(t *testing.T, args []string) (string, string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	rOut, wOut, _ := os.Pipe()
-	os.Stdout = wOut
-
-	oldStderr := os.Stderr
-	rErr, wErr, _ := os.Pipe()
-	os.Stderr = wErr
-
-	err := runPhases(phasesCmd, args)
-
-	wOut.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	var bufOut, bufErr bytes.Buffer
-	bufOut.ReadFrom(rOut)
-	bufErr.ReadFrom(rErr)
-	return bufOut.String(), bufErr.String(), err
 }
 
 func TestPhases_TableOutput(t *testing.T) {
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	setupPhasesConfig(t, []map[string]any{
+	repo := newTaskRepo(t, phasesTestFiles())
+
+	res := runPhasesWith(t, repo, []map[string]any{
 		{"id": "mvp", "name": "MVP", "due": "2026-06-01"},
 		{"id": "v2", "name": "Version 2"},
 	})
-
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
+	stdout := res.Stdout
 
 	for _, expected := range []string{"ID", "Name", "Tasks", "Done", "Progress", "Due"} {
 		if !strings.Contains(stdout, expected) {
@@ -138,18 +107,16 @@ func TestPhases_TableOutput(t *testing.T) {
 }
 
 func TestPhases_JSONOutput(t *testing.T) {
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	phasesFormat = "json"
-	setupPhasesConfig(t, []map[string]any{
+	repo := newTaskRepo(t, phasesTestFiles())
+
+	res := runPhasesWith(t, repo, []map[string]any{
 		{"id": "mvp", "name": "MVP", "due": "2026-06-01"},
 		{"id": "v2", "name": "Version 2"},
-	})
-
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
+	stdout := res.Stdout
 
 	var summaries []PhaseSummary
 	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
@@ -208,17 +175,15 @@ func TestPhases_JSONOutput(t *testing.T) {
 }
 
 func TestPhases_YAMLOutput(t *testing.T) {
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	phasesFormat = "yaml"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
+	repo := newTaskRepo(t, phasesTestFiles())
 
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	}, "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
+	stdout := res.Stdout
 
 	if !strings.Contains(stdout, "id: mvp") {
 		t.Errorf("YAML output missing 'id: mvp':\n%s", stdout)
@@ -229,73 +194,62 @@ func TestPhases_YAMLOutput(t *testing.T) {
 }
 
 func TestPhases_NoPhasesConfigured(t *testing.T) {
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	viper.Set("phases", nil)
-	t.Cleanup(func() { viper.Set("phases", nil) })
+	repo := newTaskRepo(t, phasesTestFiles())
 
-	_, stderr, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases should not error when no phases configured: %v", err)
+	res := runPhasesWith(t, repo, nil)
+	if res.Err != nil {
+		t.Fatalf("runPhases should not error when no phases configured: %v", res.Err)
 	}
 
-	if !strings.Contains(stderr, "No phases configured") {
-		t.Errorf("expected helpful message about no phases, got stderr:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "No phases configured") {
+		t.Errorf("expected helpful message about no phases, got stderr:\n%s", res.Stderr)
 	}
 }
 
 func TestPhases_OrphanedPhaseValues(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
-
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Orphaned phase task"
 status: pending
 phase: unknown-phase
----`
-	if err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
+---`,
+	})
+
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	})
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
-	_, stderr, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	if !strings.Contains(res.Stderr, "undefined phase") {
+		t.Errorf("expected warning about undefined phase, got stderr:\n%s", res.Stderr)
 	}
-
-	if !strings.Contains(stderr, "undefined phase") {
-		t.Errorf("expected warning about undefined phase, got stderr:\n%s", stderr)
-	}
-	if !strings.Contains(stderr, "unknown-phase") {
-		t.Errorf("expected orphaned phase name in warning, got stderr:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "unknown-phase") {
+		t.Errorf("expected orphaned phase name in warning, got stderr:\n%s", res.Stderr)
 	}
 }
 
 func TestPhases_OrphanedPhaseWarningsSortedDeterministically(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
-
-	// Create tasks referencing multiple undefined phases.
+	// Tasks referencing multiple undefined phases.
+	files := map[string]string{}
 	for i, phase := range []string{"zebra", "alpha", "middle"} {
-		content := "---\nid: \"00" + string(rune('1'+i)) + "\"\ntitle: \"Task\"\nstatus: pending\nphase: " + phase + "\n---"
-		if err := os.WriteFile(filepath.Join(tmpDir, "00"+string(rune('1'+i))+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		id := "00" + string(rune('1'+i))
+		files[id+".md"] = "---\nid: \"" + id + "\"\ntitle: \"Task\"\nstatus: pending\nphase: " + phase + "\n---"
 	}
+	repo := newTaskRepo(t, files)
+
+	phases := []map[string]any{{"id": "mvp", "name": "MVP"}}
 
 	// Run multiple times and verify consistent ordering.
 	var firstStderr string
 	for i := 0; i < 5; i++ {
-		_, stderr, err := capturePhasesOutput(t, []string{tmpDir})
-		if err != nil {
-			t.Fatalf("runPhases failed: %v", err)
+		res := runPhasesWith(t, repo, phases)
+		if res.Err != nil {
+			t.Fatalf("runPhases failed: %v", res.Err)
 		}
+		stderr := res.Stderr
 		if i == 0 {
 			firstStderr = stderr
 			// Verify alphabetical order: alpha, middle, zebra.
@@ -315,13 +269,6 @@ func TestPhases_OrphanedPhaseWarningsSortedDeterministically(t *testing.T) {
 }
 
 func TestPhases_CancelledTasksExcludedFromProgress(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
-
 	// 10 tasks total: 3 completed, 2 cancelled, 5 pending
 	// Expected: 8 active tasks (10 - 2 cancelled), 3 done → 38% progress
 	tasks := []struct {
@@ -339,21 +286,22 @@ func TestPhases_CancelledTasksExcludedFromProgress(t *testing.T) {
 		{"009", "pending"},
 		{"010", "pending"},
 	}
+	files := map[string]string{}
 	for _, task := range tasks {
-		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task " + task.id + "\"\nstatus: " + task.status + "\nphase: mvp\n---"
-		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		files[task.id+".md"] = "---\nid: \"" + task.id + "\"\ntitle: \"Task " + task.id + "\"\nstatus: " + task.status + "\nphase: mvp\n---"
 	}
+	repo := newTaskRepo(t, files)
 
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
 	var summaries []PhaseSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if len(summaries) != 1 {
@@ -386,38 +334,32 @@ func TestPhases_CancelledTasksExcludedFromProgress(t *testing.T) {
 }
 
 func TestPhases_InvalidFormat(t *testing.T) {
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	phasesFormat = "invalid"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
+	repo := newTaskRepo(t, phasesTestFiles())
 
-	_, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err == nil {
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	}, "--format", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format, got nil")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestPhases_EmptyPhaseHasZeroProgress(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "future", "name": "Future Work"},
-	})
+	repo := newTaskRepo(t, nil)
 
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "future", "name": "Future Work"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
 	var summaries []PhaseSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if len(summaries) != 1 {
@@ -432,18 +374,7 @@ func TestPhases_EmptyPhaseHasZeroProgress(t *testing.T) {
 }
 
 func TestPhases_MissingIDWarnsAndExcludes(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-
-	// Configure phases WITHOUT id fields — only names.
-	setupPhasesConfig(t, []map[string]any{
-		{"name": "Core CLI"},
-		{"name": "Web Dashboard"},
-		{"name": "Documentation"},
-	})
-
-	// Create tasks: 1 completed + 2 pending (would be 33% if all phases matched the same tasks).
+	// Create tasks: 1 completed + 2 pending.
 	tasks := []struct {
 		id     string
 		status string
@@ -452,17 +383,22 @@ func TestPhases_MissingIDWarnsAndExcludes(t *testing.T) {
 		{"002", "pending"},
 		{"003", "pending"},
 	}
+	files := map[string]string{}
 	for _, task := range tasks {
-		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task " + task.id + "\"\nstatus: " + task.status + "\n---"
-		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		files[task.id+".md"] = "---\nid: \"" + task.id + "\"\ntitle: \"Task " + task.id + "\"\nstatus: " + task.status + "\n---"
 	}
+	repo := newTaskRepo(t, files)
 
-	_, stderr, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	// Configure phases WITHOUT id fields — only names.
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"name": "Core CLI"},
+		{"name": "Web Dashboard"},
+		{"name": "Documentation"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
+	stderr := res.Stderr
 
 	// Phases without id should produce warnings.
 	for _, name := range []string{"Core CLI", "Web Dashboard", "Documentation"} {
@@ -490,18 +426,17 @@ func findSummary(summaries []PhaseSummary, id string) (PhaseSummary, bool) {
 }
 
 func TestPhases_UnassignedRowShownInTable(t *testing.T) {
-	// createPhasesTestFiles includes task 005 with no phase.
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	setupPhasesConfig(t, []map[string]any{
+	// phasesTestFiles includes task 005 with no phase.
+	repo := newTaskRepo(t, phasesTestFiles())
+
+	res := runPhasesWith(t, repo, []map[string]any{
 		{"id": "mvp", "name": "MVP"},
 		{"id": "v2", "name": "Version 2"},
 	})
-
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
+	stdout := res.Stdout
 
 	if !strings.Contains(stdout, "unassigned") {
 		t.Errorf("table output missing unassigned row:\n%s", stdout)
@@ -512,47 +447,34 @@ func TestPhases_UnassignedRowShownInTable(t *testing.T) {
 }
 
 func TestPhases_UnassignedRowOmittedWhenAllAssigned(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
-
 	// Every task is assigned to a phase.
+	files := map[string]string{}
 	for _, task := range []struct{ id, status string }{
 		{"001", "completed"},
 		{"002", "pending"},
 	} {
-		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\nphase: mvp\n---"
-		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		files[task.id+".md"] = "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\nphase: mvp\n---"
 	}
+	repo := newTaskRepo(t, files)
 
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
 	var summaries []PhaseSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if _, ok := findSummary(summaries, unassignedPhaseID); ok {
-		t.Errorf("expected no unassigned row when all tasks assigned, got:\n%s", stdout)
+		t.Errorf("expected no unassigned row when all tasks assigned, got:\n%s", res.Stdout)
 	}
 }
 
 func TestPhases_UnassignedProgressAndCounts(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
-
 	// Unassigned (no phase): 4 active tasks (1 completed, 3 pending), 1 cancelled.
 	// Expected: Tasks=4, Done=1, Progress=25%, cancelled excluded from count.
 	tasks := []struct {
@@ -565,30 +487,32 @@ func TestPhases_UnassignedProgressAndCounts(t *testing.T) {
 		{"013", "pending", ""},
 		{"014", "cancelled", ""},
 	}
+	files := map[string]string{}
 	for _, task := range tasks {
 		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\n"
 		if task.phase != "" {
 			content += "phase: " + task.phase + "\n"
 		}
 		content += "---"
-		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		files[task.id+".md"] = content
 	}
+	repo := newTaskRepo(t, files)
 
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
 	var summaries []PhaseSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	unassigned, ok := findSummary(summaries, unassignedPhaseID)
 	if !ok {
-		t.Fatalf("expected unassigned summary, got:\n%s", stdout)
+		t.Fatalf("expected unassigned summary, got:\n%s", res.Stdout)
 	}
 	if unassigned.Name != "(unassigned)" {
 		t.Errorf("unassigned name = %q, want (unassigned)", unassigned.Name)
@@ -613,14 +537,8 @@ func TestPhases_UnassignedProgressAndCounts(t *testing.T) {
 }
 
 func TestPhases_UnassignedOmittedWhenOnlyCancelled(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-	})
-
 	// One assigned task keeps the phase list non-empty; unassigned tasks are all cancelled.
+	files := map[string]string{}
 	for _, task := range []struct{ id, status, phase string }{
 		{"001", "pending", "mvp"},
 		{"010", "cancelled", ""},
@@ -631,58 +549,46 @@ func TestPhases_UnassignedOmittedWhenOnlyCancelled(t *testing.T) {
 			content += "phase: " + task.phase + "\n"
 		}
 		content += "---"
-		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		files[task.id+".md"] = content
 	}
+	repo := newTaskRepo(t, files)
 
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
 	var summaries []PhaseSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if _, ok := findSummary(summaries, unassignedPhaseID); ok {
-		t.Errorf("expected no unassigned row when only cancelled unassigned tasks exist, got:\n%s", stdout)
+		t.Errorf("expected no unassigned row when only cancelled unassigned tasks exist, got:\n%s", res.Stdout)
 	}
 }
 
 func TestPhases_UnassignedInYAMLOutput(t *testing.T) {
-	tmpDir := createPhasesTestFiles(t)
-	resetPhasesFlags()
-	phasesFormat = "yaml"
-	setupPhasesConfig(t, []map[string]any{
+	repo := newTaskRepo(t, phasesTestFiles())
+
+	res := runPhasesWith(t, repo, []map[string]any{
 		{"id": "mvp", "name": "MVP"},
 		{"id": "v2", "name": "Version 2"},
-	})
-
-	stdout, _, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	}, "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
-	if !strings.Contains(stdout, "id: unassigned") {
-		t.Errorf("YAML output missing 'id: unassigned':\n%s", stdout)
+	if !strings.Contains(res.Stdout, "id: unassigned") {
+		t.Errorf("YAML output missing 'id: unassigned':\n%s", res.Stdout)
 	}
 }
 
 func TestPhases_MixedMissingAndValidIDs(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetPhasesFlags()
-	phasesFormat = "json"
-
-	// One valid phase with id, two without.
-	setupPhasesConfig(t, []map[string]any{
-		{"id": "mvp", "name": "MVP"},
-		{"name": "No ID Phase"},
-		{"id": "v2", "name": "Version 2"},
-	})
-
 	// Create tasks assigned to the valid phases.
+	files := map[string]string{}
 	for _, task := range []struct {
 		id, status, phase string
 	}{
@@ -690,26 +596,29 @@ func TestPhases_MixedMissingAndValidIDs(t *testing.T) {
 		{"002", "pending", "mvp"},
 		{"003", "pending", "v2"},
 	} {
-		content := "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\nphase: " + task.phase + "\n---"
-		if err := os.WriteFile(filepath.Join(tmpDir, task.id+".md"), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
+		files[task.id+".md"] = "---\nid: \"" + task.id + "\"\ntitle: \"Task\"\nstatus: " + task.status + "\nphase: " + task.phase + "\n---"
 	}
+	repo := newTaskRepo(t, files)
 
-	stdout, stderr, err := capturePhasesOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runPhases failed: %v", err)
+	// One valid phase with id, two without.
+	res := runPhasesWith(t, repo, []map[string]any{
+		{"id": "mvp", "name": "MVP"},
+		{"name": "No ID Phase"},
+		{"id": "v2", "name": "Version 2"},
+	}, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runPhases failed: %v", res.Err)
 	}
 
 	// Warning about the phase without id.
-	if !strings.Contains(stderr, "No ID Phase") {
-		t.Errorf("expected warning about phase without id, got stderr:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "No ID Phase") {
+		t.Errorf("expected warning about phase without id, got stderr:\n%s", res.Stderr)
 	}
 
 	// Only valid phases should appear in output.
 	var summaries []PhaseSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if len(summaries) != 2 {

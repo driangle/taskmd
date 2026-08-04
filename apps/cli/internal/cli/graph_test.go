@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,13 +8,12 @@ import (
 	"testing"
 )
 
-// createTestTaskFiles creates test task files in a temp directory
-func createTestTaskFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// graphTaskFiles returns the canonical graph-command dependency shape: a 5-task
+// set (001..005) with a mix of completed/pending statuses and priorities used to
+// exercise dependency traversal, exclusion, and cleanup. Kept inline (not a
+// shared testdata set) because this specific 5-node shape is graph-only.
+func graphTaskFiles() map[string]string {
+	return map[string]string{
 		"001-root-task.md": `---
 id: "001"
 title: "Root Task"
@@ -92,53 +90,55 @@ created: 2026-02-08
 A pending task with no dependencies.
 `,
 	}
+}
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
+// graphStdout runs `graph <args...>` against repo, fails on error, and returns stdout.
+func graphStdout(t *testing.T, repo *taskRepo, args ...string) string {
+	t.Helper()
+	res := repo.Run(append([]string{"graph"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("graph %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
+}
+
+// parseGraphJSON parses JSON graph output and returns the result map.
+func parseGraphJSON(t *testing.T, output string) map[string]any {
+	t.Helper()
+
+	var result map[string]any
+	err := json.Unmarshal([]byte(output), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	}
+	return result
+}
+
+// graphNodeIDs extracts node IDs from parsed graph JSON.
+func graphNodeIDs(t *testing.T, result map[string]any) []string {
+	t.Helper()
+
+	nodes, ok := result["nodes"].([]any)
+	if !ok {
+		t.Fatal("Expected 'nodes' to be an array")
 	}
 
-	return tmpDir
+	ids := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		nodeMap := node.(map[string]any)
+		ids = append(ids, nodeMap["id"].(string))
+	}
+	return ids
 }
 
 func TestGraphCommand_JSON_Format(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json", "--all")
 
 	// Parse JSON
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -165,41 +165,13 @@ func TestGraphCommand_JSON_Format(t *testing.T) {
 }
 
 func TestGraphCommand_ExcludeStatus_BugFix(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{"completed"}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json", "--exclude-status", "completed")
 
 	// Parse JSON
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -241,37 +213,9 @@ func TestGraphCommand_ExcludeStatus_BugFix(t *testing.T) {
 }
 
 func TestGraphCommand_ASCII_Format(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "ascii"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "ascii", "--all")
 
 	// Verify output contains task IDs
 	if !strings.Contains(output, "[001]") {
@@ -289,37 +233,9 @@ func TestGraphCommand_ASCII_Format(t *testing.T) {
 }
 
 func TestGraphCommand_ASCII_ExcludeCompleted(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "ascii"
-	graphExcludeStatus = []string{"completed"}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "ascii", "--exclude-status", "completed")
 
 	// Verify completed tasks are not in output
 	if strings.Contains(output, "[001]") {
@@ -353,37 +269,9 @@ func TestGraphCommand_ASCII_ExcludeCompleted(t *testing.T) {
 }
 
 func TestGraphCommand_Mermaid_Format(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "mermaid"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "mermaid", "--all")
 
 	// Verify mermaid syntax
 	if !strings.Contains(output, "graph TD") {
@@ -407,36 +295,9 @@ func TestGraphCommand_Mermaid_Format(t *testing.T) {
 }
 
 func TestGraphCommand_Mermaid_WithFocus(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "mermaid"
-	graphExcludeStatus = []string{}
-	graphRoot = ""
-	graphFocus = "003"
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "mermaid", "--all", "--focus", "003")
 
 	// Verify focus style is applied
 	if !strings.Contains(output, ":::focus") {
@@ -445,37 +306,9 @@ func TestGraphCommand_Mermaid_WithFocus(t *testing.T) {
 }
 
 func TestGraphCommand_DOT_Format(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "dot"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "dot", "--all")
 
 	// Verify DOT syntax
 	if !strings.Contains(output, "digraph tasks") {
@@ -499,40 +332,13 @@ func TestGraphCommand_DOT_Format(t *testing.T) {
 }
 
 func TestGraphCommand_RootDownstream(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = "001"
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = true
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json", "--all", "--root", "001", "--downstream")
 
 	// Parse JSON
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -559,40 +365,13 @@ func TestGraphCommand_RootDownstream(t *testing.T) {
 }
 
 func TestGraphCommand_RootUpstream(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = "003"
-	graphFocus = ""
-	graphUpstream = true
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json", "--all", "--root", "003", "--upstream")
 
 	// Parse JSON
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -626,22 +405,12 @@ func TestGraphCommand_RootUpstream(t *testing.T) {
 }
 
 func TestGraphCommand_OutputToFile(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 	outFile := filepath.Join(t.TempDir(), "graph.json")
 
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = outFile
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
+	res := repo.Run("graph", "--format", "json", "--all", "--out", outFile)
+	if res.Err != nil {
+		t.Fatalf("runGraph failed: %v", res.Err)
 	}
 
 	// Verify file was created
@@ -667,133 +436,69 @@ func TestGraphCommand_OutputToFile(t *testing.T) {
 }
 
 func TestGraphCommand_ErrorInvalidRoot(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
-
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = "999" // Non-existent task
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// Run command and expect error
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("graph", "--format", "json", "--all", "--root", "999")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid root task")
 	}
 
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("Expected 'not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "not found") {
+		t.Errorf("Expected 'not found' error, got: %v", res.Err)
 	}
 }
 
 func TestGraphCommand_ErrorInvalidFocus(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
-
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = ""
-	graphFocus = "999" // Non-existent task
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// Run command and expect error
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("graph", "--format", "json", "--all", "--focus", "999")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid focus task")
 	}
 
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("Expected 'not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "not found") {
+		t.Errorf("Expected 'not found' error, got: %v", res.Err)
 	}
 }
 
 func TestGraphCommand_ErrorUpstreamDownstreamWithoutRoot(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
-
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = true
-	graphDownstream = false
-	graphOut = ""
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// Run command and expect error
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("graph", "--format", "json", "--all", "--upstream")
+	if res.Err == nil {
 		t.Fatal("Expected error when using --upstream without --root")
 	}
 
-	if !strings.Contains(err.Error(), "require --root") {
-		t.Errorf("Expected 'require --root' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "require --root") {
+		t.Errorf("Expected 'require --root' error, got: %v", res.Err)
 	}
 }
 
 func TestGraphCommand_ErrorBothUpstreamAndDownstream(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
-
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphRoot = "001"
-	graphFocus = ""
-	graphUpstream = true
-	graphDownstream = true
-	graphOut = ""
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// Run command and expect error
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("graph", "--format", "json", "--all", "--root", "001", "--upstream", "--downstream")
+	if res.Err == nil {
 		t.Fatal("Expected error when using both --upstream and --downstream")
 	}
 
-	if !strings.Contains(err.Error(), "cannot use both") {
-		t.Errorf("Expected 'cannot use both' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "cannot use both") {
+		t.Errorf("Expected 'cannot use both' error, got: %v", res.Err)
 	}
 }
 
 func TestGraphCommand_ExcludeMultipleStatuses(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{"completed", "pending"}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json", "--exclude-status", "completed", "--exclude-status", "pending")
 
 	// Parse JSON
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -811,9 +516,7 @@ func TestGraphCommand_ExcludeMultipleStatuses(t *testing.T) {
 
 func TestGraphCommand_DependencyCleanup_Complex(t *testing.T) {
 	// Create a more complex scenario for dependency cleanup
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001-completed.md": `---
 id: "001"
 title: "Completed Task"
@@ -835,48 +538,13 @@ status: pending
 dependencies: ["001", "002"]
 created: 2026-02-08
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file: %v", err)
-		}
-	}
-
-	// Reset flags
-	graphFormat = "json"
-	graphExcludeStatus = []string{"completed"}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Run command
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	// Restore stdout
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read output
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json", "--exclude-status", "completed")
 
 	// Parse JSON
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -902,37 +570,13 @@ created: 2026-02-08
 }
 
 func TestGraphCommand_DefaultExcludesCompleted(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// Use the default exclude-status (completed) by not overriding it
-	graphFormat = "json"
-	graphExcludeStatus = []string{"completed"} // simulates default
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := graphStdout(t, repo, "--format", "json")
 
 	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -953,34 +597,10 @@ func TestGraphCommand_DefaultExcludesCompleted(t *testing.T) {
 }
 
 func TestGraphCommand_DefaultFormat_IsASCII(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Reset flags to defaults — notably, do NOT set graphFormat
-	graphFormat = graphCmd.Flag("format").DefValue
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	// Run with default format (do NOT pass --format) but include all statuses.
+	output := graphStdout(t, repo, "--all")
 
 	// Verify the default value is "ascii"
 	defVal := graphCmd.Flag("format").DefValue
@@ -1000,107 +620,14 @@ func TestGraphCommand_DefaultFormat_IsASCII(t *testing.T) {
 	}
 }
 
-// resetGraphFlags resets all graph command flags to defaults before each test.
-func resetGraphFlags() {
-	graphFormat = "json"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-	graphFilters = []string{}
-	graphScope = ""
-	graphStatus = ""
-	graphPriority = ""
-	graphPhase = ""
-}
+func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
+	repo := newTaskRepo(t, graphTaskFiles())
 
-// captureGraphOutput runs runGraph and captures stdout, returning the output string.
-func captureGraphOutput(t *testing.T, args []string) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runGraph(graphCmd, args)
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
-}
-
-// parseGraphJSON parses JSON graph output and returns the result map.
-func parseGraphJSON(t *testing.T, output string) map[string]any {
-	t.Helper()
+	// --all should override the default exclude
+	output := graphStdout(t, repo, "--format", "json", "--all")
 
 	var result map[string]any
 	err := json.Unmarshal([]byte(output), &result)
-	if err != nil {
-		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
-	}
-	return result
-}
-
-// graphNodeIDs extracts node IDs from parsed graph JSON.
-func graphNodeIDs(t *testing.T, result map[string]any) []string {
-	t.Helper()
-
-	nodes, ok := result["nodes"].([]any)
-	if !ok {
-		t.Fatal("Expected 'nodes' to be an array")
-	}
-
-	ids := make([]string, 0, len(nodes))
-	for _, node := range nodes {
-		nodeMap := node.(map[string]any)
-		ids = append(ids, nodeMap["id"].(string))
-	}
-	return ids
-}
-
-func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
-
-	// --all should override the default exclude
-	graphFormat = "json"
-	graphExcludeStatus = []string{"completed"} // default value
-	graphAll = true                            // --all overrides
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runGraph failed: %v", err)
-	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	var result map[string]any
-	err = json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		t.Fatalf("Failed to parse JSON output: %v", err)
 	}
@@ -1113,12 +640,9 @@ func TestGraphCommand_AllFlag_IncludesCompleted(t *testing.T) {
 }
 
 func TestGraphCommand_Filter_ByPriority(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	resetGraphFlags()
-	graphFilters = []string{"priority=high"}
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--filter", "priority=high")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1138,9 +662,7 @@ func TestGraphCommand_Filter_ByPriority(t *testing.T) {
 
 func TestGraphCommand_Filter_ByTag(t *testing.T) {
 	// Create tasks with different tags
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001-cli.md": `---
 id: "001"
 title: "CLI Task"
@@ -1165,19 +687,9 @@ priority: low
 tags: ["cli", "api"]
 created: 2026-02-08
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	resetGraphFlags()
-	graphFilters = []string{"tag=cli"}
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--filter", "tag=cli")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1196,13 +708,10 @@ created: 2026-02-08
 }
 
 func TestGraphCommand_Filter_Combined(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	resetGraphFlags()
 	// AND: priority=high AND status=pending => only 003
-	graphFilters = []string{"priority=high", "status=pending"}
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--filter", "priority=high", "--filter", "status=pending")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1215,14 +724,10 @@ func TestGraphCommand_Filter_Combined(t *testing.T) {
 }
 
 func TestGraphCommand_Filter_WithExcludeStatus(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	resetGraphFlags()
 	// Filter to high priority, then also exclude completed
-	graphFilters = []string{"priority=high"}
-	graphExcludeStatus = []string{"completed"}
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--filter", "priority=high", "--exclude-status", "completed")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1245,42 +750,29 @@ func TestGraphCommand_Filter_WithExcludeStatus(t *testing.T) {
 }
 
 func TestGraphCommand_Filter_InvalidFormat(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	resetGraphFlags()
-	graphFilters = []string{"invalid-no-equals"}
-
-	err := runGraph(graphCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("graph", "--format", "json", "--all", "--filter", "invalid-no-equals")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid filter format")
 	}
 
-	if !strings.Contains(err.Error(), "invalid filter format") {
-		t.Errorf("Expected 'invalid filter format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid filter format") {
+		t.Errorf("Expected 'invalid filter format' error, got: %v", res.Err)
 	}
 }
 
 func TestGraphCommand_ASCII_WithColors(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	// Enable colors
-	graphFormat = "ascii"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-	graphFilters = []string{}
-	noColor = false
+	// Enable colors. forceColor is a plain global (not a flag), so it survives the
+	// harness reset; noColor defaults to false after reset.
 	forceColor = true
 	defer func() {
 		forceColor = false
-		noColor = false
 	}()
 
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--all", "--format", "ascii")
 
 	// ANSI escape codes should be present when colors are enabled
 	if !strings.Contains(output, "\033[") {
@@ -1297,24 +789,9 @@ func TestGraphCommand_ASCII_WithColors(t *testing.T) {
 }
 
 func TestGraphCommand_ASCII_NoColor_Flag(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
-	graphFormat = "ascii"
-	graphExcludeStatus = []string{}
-	graphAll = false
-	graphRoot = ""
-	graphFocus = ""
-	graphUpstream = false
-	graphDownstream = false
-	graphOut = ""
-	graphFilters = []string{}
-	noColor = true
-	forceColor = false
-	defer func() {
-		noColor = false
-	}()
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--all", "--format", "ascii", "--no-color")
 
 	// No ANSI escape codes when --no-color is set
 	if strings.Contains(output, "\033[") {
@@ -1330,13 +807,11 @@ func TestGraphCommand_ASCII_NoColor_Flag(t *testing.T) {
 	}
 }
 
-// createScopedTestTaskFiles creates test task files with touches fields.
-func createScopedTestTaskFiles(t *testing.T) string {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// scopedTaskFiles returns a graph-specific task set with `touches` (scope)
+// fields. Kept inline because this scope-annotated shape is graph-only and does
+// not match a shared testdata set.
+func scopedTaskFiles() map[string]string {
+	return map[string]string{
 		"001-web.md": `---
 id: "001"
 title: "Web feature"
@@ -1378,24 +853,12 @@ created: 2026-02-08
 # No scope task
 `,
 	}
-
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
 func TestGraphCommand_Scope_FiltersToMatchingTasks(t *testing.T) {
-	tmpDir := createScopedTestTaskFiles(t)
+	repo := newTaskRepo(t, scopedTaskFiles())
 
-	resetGraphFlags()
-	graphScope = "web"
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--scope", "web")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1414,12 +877,9 @@ func TestGraphCommand_Scope_FiltersToMatchingTasks(t *testing.T) {
 }
 
 func TestGraphCommand_Scope_RemovesDanglingDeps(t *testing.T) {
-	tmpDir := createScopedTestTaskFiles(t)
+	repo := newTaskRepo(t, scopedTaskFiles())
 
-	resetGraphFlags()
-	graphScope = "cli"
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--scope", "cli")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1442,12 +902,9 @@ func TestGraphCommand_Scope_RemovesDanglingDeps(t *testing.T) {
 }
 
 func TestGraphCommand_Scope_Wildcard(t *testing.T) {
-	tmpDir := createScopedTestTaskFiles(t)
+	repo := newTaskRepo(t, scopedTaskFiles())
 
-	resetGraphFlags()
-	graphScope = "w*"
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--scope", "w*")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1462,13 +919,10 @@ func TestGraphCommand_Scope_Wildcard(t *testing.T) {
 }
 
 func TestGraphCommand_StatusShortcut(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// --status pending should match --filter status=pending
-	resetGraphFlags()
-	graphStatus = "pending"
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--status", "pending")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1486,10 +940,7 @@ func TestGraphCommand_StatusShortcut(t *testing.T) {
 	}
 
 	// Compare with --filter status=pending
-	resetGraphFlags()
-	graphFilters = []string{"status=pending"}
-
-	filterOutput := captureGraphOutput(t, []string{tmpDir})
+	filterOutput := graphStdout(t, repo, "--format", "json", "--all", "--filter", "status=pending")
 	filterResult := parseGraphJSON(t, filterOutput)
 	filterIDs := graphNodeIDs(t, filterResult)
 
@@ -1499,13 +950,10 @@ func TestGraphCommand_StatusShortcut(t *testing.T) {
 }
 
 func TestGraphCommand_PriorityShortcut(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// --priority high should match --filter priority=high
-	resetGraphFlags()
-	graphPriority = "high"
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--priority", "high")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1523,10 +971,7 @@ func TestGraphCommand_PriorityShortcut(t *testing.T) {
 	}
 
 	// Compare with --filter priority=high
-	resetGraphFlags()
-	graphFilters = []string{"priority=high"}
-
-	filterOutput := captureGraphOutput(t, []string{tmpDir})
+	filterOutput := graphStdout(t, repo, "--format", "json", "--all", "--filter", "priority=high")
 	filterResult := parseGraphJSON(t, filterOutput)
 	filterIDs := graphNodeIDs(t, filterResult)
 
@@ -1536,9 +981,7 @@ func TestGraphCommand_PriorityShortcut(t *testing.T) {
 }
 
 func TestGraphCommand_PhaseShortcut(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	repo := newTaskRepo(t, map[string]string{
 		"001-phase-a.md": `---
 id: "001"
 title: "Phase A Task"
@@ -1562,19 +1005,9 @@ status: pending
 priority: low
 created: 2026-02-08
 ---`,
-	}
+	})
 
-	for filename, content := range tasks {
-		err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644)
-		if err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	resetGraphFlags()
-	graphPhase = "alpha"
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--phase", "alpha")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1587,15 +1020,10 @@ created: 2026-02-08
 }
 
 func TestGraphCommand_ShortcutComposesWithRoot(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// --status pending --root 003 --downstream
-	resetGraphFlags()
-	graphStatus = "pending"
-	graphRoot = "003"
-	graphDownstream = true
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--all", "--status", "pending", "--root", "003", "--downstream")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 
@@ -1609,14 +1037,10 @@ func TestGraphCommand_ShortcutComposesWithRoot(t *testing.T) {
 }
 
 func TestGraphCommand_ShortcutComposesWithExcludeStatus(t *testing.T) {
-	tmpDir := createTestTaskFiles(t)
+	repo := newTaskRepo(t, graphTaskFiles())
 
 	// --priority high --exclude-status completed should only show pending high-priority tasks
-	resetGraphFlags()
-	graphPriority = "high"
-	graphExcludeStatus = []string{"completed"}
-
-	output := captureGraphOutput(t, []string{tmpDir})
+	output := graphStdout(t, repo, "--format", "json", "--priority", "high", "--exclude-status", "completed")
 	result := parseGraphJSON(t, output)
 	ids := graphNodeIDs(t, result)
 

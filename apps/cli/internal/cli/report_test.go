@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,14 +8,13 @@ import (
 	"testing"
 )
 
-// createReportTestFiles creates test task files covering all statuses, priorities,
-// efforts, and a 3-level dependency chain for critical path testing.
-func createReportTestFiles(t *testing.T) string {
+// newReportRepo seeds a report-specific repo covering all statuses, priorities,
+// efforts, types, and a 3-level dependency chain for critical-path testing. Kept
+// inline (not a shared fixture) because the type field and the exact 001→002→004→005
+// chain are the subject of these tests.
+func newReportRepo(t *testing.T) *taskRepo {
 	t.Helper()
-
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+	return newTaskRepo(t, map[string]string{
 		"001-setup.md": `---
 id: "001"
 title: "Setup project"
@@ -101,55 +99,26 @@ created: 2026-02-08
 
 # Write documentation
 `,
-	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
+	})
 }
 
-func resetReportFlags() {
-	reportFormat = "md"
-	reportGroupBy = "status"
-	reportOut = ""
-	reportIncludeGraph = false
-	noColor = true
-}
-
-func captureReportOutput(t *testing.T, dir string) string {
+// reportStdout runs `report <args...>` against repo, fails on error, and returns
+// stdout.
+func reportStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runReport(reportCmd, []string{dir})
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("runReport failed: %v", err)
+	res := repo.Run(append([]string{"report"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("report %v failed: %v", args, res.Err)
 	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
+	return res.Stdout
 }
 
 // --- Markdown tests ---
 
 func TestReportCommand_MarkdownDefault(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if !strings.Contains(output, "# Project Report") {
 		t.Error("Expected '# Project Report' heading")
@@ -169,10 +138,9 @@ func TestReportCommand_MarkdownDefault(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownSummaryMetrics(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if !strings.Contains(output, "| Total Tasks | 6 |") {
 		t.Error("Expected total tasks = 6 in summary table")
@@ -186,10 +154,9 @@ func TestReportCommand_MarkdownSummaryMetrics(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownStatusBreakdown(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if !strings.Contains(output, "### By Status") {
 		t.Error("Expected '### By Status' breakdown")
@@ -206,10 +173,9 @@ func TestReportCommand_MarkdownStatusBreakdown(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownTypeBreakdown(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if !strings.Contains(output, "### By Type") {
 		t.Error("Expected '### By Type' breakdown")
@@ -226,11 +192,9 @@ func TestReportCommand_MarkdownTypeBreakdown(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownTypeBreakdownHiddenWhenEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetReportFlags()
-
 	// Create a task without a type field
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Untyped task"
 status: pending
@@ -238,13 +202,10 @@ dependencies: []
 created: 2026-02-08
 ---
 # Untyped task
-`
-	path := filepath.Join(tmpDir, "001.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
+`,
+	})
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if strings.Contains(output, "### By Type") {
 		t.Error("Expected no '### By Type' section when no tasks have a type set")
@@ -252,10 +213,9 @@ created: 2026-02-08
 }
 
 func TestReportCommand_MarkdownGroups(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// Default group-by is status
 	if !strings.Contains(output, "### pending (4)") {
@@ -267,10 +227,9 @@ func TestReportCommand_MarkdownGroups(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownCriticalPath(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// 001 -> 002 -> 004 -> 005 is the critical path (depth 4)
 	if !strings.Contains(output, "[001]") {
@@ -282,10 +241,9 @@ func TestReportCommand_MarkdownCriticalPath(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownBlockedTasks(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// Tasks 002, 004, 005 have deps and are not completed
 	if !strings.Contains(output, "Waiting on:") {
@@ -294,11 +252,9 @@ func TestReportCommand_MarkdownBlockedTasks(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownIncludeGraph(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportIncludeGraph = true
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--include-graph")
 
 	if !strings.Contains(output, "## Dependency Graph") {
 		t.Error("Expected '## Dependency Graph' section")
@@ -312,10 +268,9 @@ func TestReportCommand_MarkdownIncludeGraph(t *testing.T) {
 }
 
 func TestReportCommand_MarkdownNoGraph(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if strings.Contains(output, "## Dependency Graph") {
 		t.Error("Expected no graph section without --include-graph")
@@ -325,11 +280,9 @@ func TestReportCommand_MarkdownNoGraph(t *testing.T) {
 // --- Group-by variations ---
 
 func TestReportCommand_GroupByPriority(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportGroupBy = "priority"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--group-by", "priority")
 
 	if !strings.Contains(output, "## Tasks by Priority") {
 		t.Error("Expected '## Tasks by Priority' section")
@@ -343,11 +296,9 @@ func TestReportCommand_GroupByPriority(t *testing.T) {
 }
 
 func TestReportCommand_GroupByEffort(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportGroupBy = "effort"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--group-by", "effort")
 
 	if !strings.Contains(output, "## Tasks by Effort") {
 		t.Error("Expected '## Tasks by Effort' section")
@@ -364,11 +315,9 @@ func TestReportCommand_GroupByEffort(t *testing.T) {
 }
 
 func TestReportCommand_GroupByType(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportGroupBy = "type"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--group-by", "type")
 
 	if !strings.Contains(output, "## Tasks by Type") {
 		t.Error("Expected '## Tasks by Type' section")
@@ -382,11 +331,9 @@ func TestReportCommand_GroupByType(t *testing.T) {
 }
 
 func TestReportCommand_GroupByTag(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportGroupBy = "tag"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--group-by", "tag")
 
 	if !strings.Contains(output, "## Tasks by Tag") {
 		t.Error("Expected '## Tasks by Tag' section")
@@ -402,11 +349,9 @@ func TestReportCommand_GroupByTag(t *testing.T) {
 // --- JSON tests ---
 
 func TestReportCommand_JSONStructure(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "json"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "json")
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -431,11 +376,9 @@ func TestReportCommand_JSONStructure(t *testing.T) {
 }
 
 func TestReportCommand_JSONNoGraphByDefault(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "json"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "json")
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -448,12 +391,9 @@ func TestReportCommand_JSONNoGraphByDefault(t *testing.T) {
 }
 
 func TestReportCommand_JSONIncludeGraph(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "json"
-	reportIncludeGraph = true
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "json", "--include-graph")
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -479,12 +419,9 @@ func TestReportCommand_JSONIncludeGraph(t *testing.T) {
 }
 
 func TestReportCommand_JSONGroupByPriority(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "json"
-	reportGroupBy = "priority"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "json", "--group-by", "priority")
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -499,11 +436,9 @@ func TestReportCommand_JSONGroupByPriority(t *testing.T) {
 // --- HTML tests ---
 
 func TestReportCommand_HTMLDoctype(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "html"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "html")
 
 	if !strings.Contains(output, "<!DOCTYPE html>") {
 		t.Error("Expected <!DOCTYPE html> in HTML output")
@@ -511,11 +446,9 @@ func TestReportCommand_HTMLDoctype(t *testing.T) {
 }
 
 func TestReportCommand_HTMLStyle(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "html"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "html")
 
 	if !strings.Contains(output, "<style>") {
 		t.Error("Expected <style> tag in HTML output")
@@ -523,11 +456,9 @@ func TestReportCommand_HTMLStyle(t *testing.T) {
 }
 
 func TestReportCommand_HTMLSections(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "html"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "html")
 
 	sections := []string{
 		"<h1>Project Report</h1>",
@@ -544,11 +475,9 @@ func TestReportCommand_HTMLSections(t *testing.T) {
 }
 
 func TestReportCommand_HTMLTypeBreakdown(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "html"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "html")
 
 	if !strings.Contains(output, "<h3>By Type</h3>") {
 		t.Error("Expected '<h3>By Type</h3>' in HTML output")
@@ -559,12 +488,9 @@ func TestReportCommand_HTMLTypeBreakdown(t *testing.T) {
 }
 
 func TestReportCommand_HTMLMermaid(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "html"
-	reportIncludeGraph = true
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "html", "--include-graph")
 
 	if !strings.Contains(output, "mermaid") {
 		t.Error("Expected mermaid reference in HTML with --include-graph")
@@ -575,11 +501,9 @@ func TestReportCommand_HTMLMermaid(t *testing.T) {
 }
 
 func TestReportCommand_HTMLNoMermaidWithoutFlag(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "html"
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--format", "html")
 
 	if strings.Contains(output, "Dependency Graph") {
 		t.Error("Expected no Dependency Graph section without --include-graph")
@@ -589,15 +513,11 @@ func TestReportCommand_HTMLNoMermaidWithoutFlag(t *testing.T) {
 // --- Output file tests ---
 
 func TestReportCommand_OutputToFile(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
+	repo := newReportRepo(t)
 	outFile := filepath.Join(t.TempDir(), "report.md")
 
-	resetReportFlags()
-	reportOut = outFile
-
-	err := runReport(reportCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runReport failed: %v", err)
+	if res := repo.Run("report", "--out", outFile); res.Err != nil {
+		t.Fatalf("report failed: %v", res.Err)
 	}
 
 	content, err := os.ReadFile(outFile)
@@ -611,16 +531,11 @@ func TestReportCommand_OutputToFile(t *testing.T) {
 }
 
 func TestReportCommand_OutputHTMLToFile(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
+	repo := newReportRepo(t)
 	outFile := filepath.Join(t.TempDir(), "report.html")
 
-	resetReportFlags()
-	reportFormat = "html"
-	reportOut = outFile
-
-	err := runReport(reportCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runReport failed: %v", err)
+	if res := repo.Run("report", "--format", "html", "--out", outFile); res.Err != nil {
+		t.Fatalf("report failed: %v", res.Err)
 	}
 
 	content, err := os.ReadFile(outFile)
@@ -636,10 +551,9 @@ func TestReportCommand_OutputHTMLToFile(t *testing.T) {
 // --- Edge cases ---
 
 func TestReportCommand_EmptyDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetReportFlags()
+	repo := newTaskRepo(t, nil)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if !strings.Contains(output, "# Project Report") {
 		t.Error("Expected report heading even for empty directory")
@@ -650,15 +564,9 @@ func TestReportCommand_EmptyDirectory(t *testing.T) {
 }
 
 func TestReportCommand_NoDependencies(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetReportFlags()
-
 	// Create two independent tasks
-	for _, f := range []struct {
-		name    string
-		content string
-	}{
-		{"001.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Task one"
 status: pending
@@ -666,8 +574,8 @@ dependencies: []
 created: 2026-02-08
 ---
 # Task one
-`},
-		{"002.md", `---
+`,
+		"002.md": `---
 id: "002"
 title: "Task two"
 status: pending
@@ -675,15 +583,10 @@ dependencies: []
 created: 2026-02-08
 ---
 # Task two
-`},
-	} {
-		path := filepath.Join(tmpDir, f.name)
-		if err := os.WriteFile(path, []byte(f.content), 0644); err != nil {
-			t.Fatalf("Failed to create %s: %v", f.name, err)
-		}
-	}
+`,
+	})
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// Independent tasks still appear on the critical path (all at depth 1)
 	if !strings.Contains(output, "## Critical Path") {
@@ -695,10 +598,8 @@ created: 2026-02-08
 }
 
 func TestReportCommand_AllCompleted(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetReportFlags()
-
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Done task"
 status: completed
@@ -706,13 +607,10 @@ dependencies: []
 created: 2026-02-08
 ---
 # Done task
-`
-	path := filepath.Join(tmpDir, "001.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
-	}
+`,
+	})
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if !strings.Contains(output, "completed: 1") {
 		t.Error("Expected completed count of 1")
@@ -723,38 +621,33 @@ created: 2026-02-08
 }
 
 func TestReportCommand_InvalidFormat(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportFormat = "xml"
+	repo := newReportRepo(t)
 
-	err := runReport(reportCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("report", "--format", "xml")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestReportCommand_InvalidGroupBy(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	reportGroupBy = "nonexistent"
+	repo := newReportRepo(t)
 
-	err := runReport(reportCmd, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("report", "--group-by", "nonexistent")
+	if res.Err == nil {
 		t.Fatal("Expected error for invalid group-by field")
 	}
-	if !strings.Contains(err.Error(), "unsupported group-by field") {
-		t.Errorf("Expected 'unsupported group-by field' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported group-by field") {
+		t.Errorf("Expected 'unsupported group-by field' error, got: %v", res.Err)
 	}
 }
 
 func TestReportCommand_CriticalPathOrdering(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
+	repo := newReportRepo(t)
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// Critical path: 001 -> 002 -> 004 -> 005
 	// They should appear in depth order (root first)
@@ -775,15 +668,13 @@ func TestReportCommand_CriticalPathOrdering(t *testing.T) {
 // --- Color tests ---
 
 func TestReportCommand_ColorEnabled(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	noColor = false
+	repo := newReportRepo(t)
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// With colors enabled, output should contain ANSI escape codes
 	if !strings.Contains(output, "\x1b[") {
@@ -800,13 +691,11 @@ func TestReportCommand_ColorEnabled(t *testing.T) {
 }
 
 func TestReportCommand_NoColorFlag(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	noColor = true
+	repo := newReportRepo(t)
 
 	os.Unsetenv("NO_COLOR")
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo, "--no-color")
 
 	// With --no-color flag, output should NOT contain ANSI escape codes
 	if strings.Contains(output, "\x1b[") {
@@ -823,13 +712,11 @@ func TestReportCommand_NoColorFlag(t *testing.T) {
 }
 
 func TestReportCommand_NoColorEnvVar(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	noColor = false
+	repo := newReportRepo(t)
 
 	t.Setenv("NO_COLOR", "1")
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	if strings.Contains(output, "\x1b[") {
 		t.Error("Expected no ANSI codes when NO_COLOR env var is set")
@@ -837,20 +724,16 @@ func TestReportCommand_NoColorEnvVar(t *testing.T) {
 }
 
 func TestReportCommand_FileOutputNoColor(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
+	repo := newReportRepo(t)
 	outFile := filepath.Join(t.TempDir(), "report.md")
 
-	resetReportFlags()
-	reportOut = outFile
-	noColor = false
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 
-	err := runReport(reportCmd, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runReport failed: %v", err)
+	if res := repo.Run("report", "--out", outFile); res.Err != nil {
+		t.Fatalf("report failed: %v", res.Err)
 	}
 
 	content, err := os.ReadFile(outFile)
@@ -870,15 +753,13 @@ func TestReportCommand_FileOutputNoColor(t *testing.T) {
 }
 
 func TestReportCommand_ColoredSections(t *testing.T) {
-	tmpDir := createReportTestFiles(t)
-	resetReportFlags()
-	noColor = false
+	repo := newReportRepo(t)
 	forceColor = true
 	defer func() { forceColor = false }()
 
 	os.Unsetenv("NO_COLOR")
 
-	output := captureReportOutput(t, tmpDir)
+	output := reportStdout(t, repo)
 
 	// Status breakdown should contain colored status labels
 	if !strings.Contains(output, "pending") {

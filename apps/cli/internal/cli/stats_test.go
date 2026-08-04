@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,18 +9,11 @@ import (
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-// resetStatsFlags resets all stats command flags to defaults.
-func resetStatsFlags() {
-	statsFormat = "table"
-	statsGroupBy = ""
-}
-
-// createStatsTestFiles creates test task files with varying status/priority/effort.
-func createStatsTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// statsFiles is the stats-specific fixture: three tasks with varying
+// status/priority/effort. Kept inline because the exact status/priority/effort
+// mix (2 pending, 1 completed) is the subject of these breakdown assertions.
+func statsFiles() map[string]string {
+	return map[string]string{
 		"001-pending-high.md": `---
 id: "001"
 title: "High Priority Pending"
@@ -64,165 +54,13 @@ created: 2026-02-08
 Pending task with dependency.
 `,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
 }
 
-// captureStatsOutput runs the stats command and captures stdout.
-func captureStatsOutput(t *testing.T, args []string) (string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runStats(statsCmd, args)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
-}
-
-func TestRunStats_JSONOutput(t *testing.T) {
-	tmpDir := createStatsTestFiles(t)
-	resetStatsFlags()
-	statsFormat = "json"
-
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
-
-	var m metrics.Metrics
-	if err := json.Unmarshal([]byte(output), &m); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
-	}
-
-	if m.TotalTasks != 3 {
-		t.Errorf("total_tasks = %d, want 3", m.TotalTasks)
-	}
-	if m.TasksByStatus[model.StatusPending] != 2 {
-		t.Errorf("tasks_by_status[pending] = %d, want 2", m.TasksByStatus[model.StatusPending])
-	}
-	if m.TasksByStatus[model.StatusCompleted] != 1 {
-		t.Errorf("tasks_by_status[completed] = %d, want 1", m.TasksByStatus[model.StatusCompleted])
-	}
-}
-
-func TestRunStats_YAMLOutput(t *testing.T) {
-	tmpDir := createStatsTestFiles(t)
-	resetStatsFlags()
-	statsFormat = "yaml"
-
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
-
-	if !strings.Contains(output, "totaltasks:") {
-		t.Errorf("YAML output missing 'totaltasks:':\n%s", output)
-	}
-}
-
-func TestRunStats_TableOutput(t *testing.T) {
-	tmpDir := createStatsTestFiles(t)
-	resetStatsFlags()
-	statsFormat = "table"
-
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
-
-	for _, expected := range []string{"TASK STATISTICS", "BY STATUS:", "BY PRIORITY:", "BY EFFORT:"} {
-		if !strings.Contains(output, expected) {
-			t.Errorf("table output missing %q:\n%s", expected, output)
-		}
-	}
-}
-
-func TestRunStats_InvalidFormat(t *testing.T) {
-	tmpDir := createStatsTestFiles(t)
-	resetStatsFlags()
-	statsFormat = "invalid"
-
-	_, err := captureStatsOutput(t, []string{tmpDir})
-	if err == nil {
-		t.Fatal("expected error for invalid format, got nil")
-	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
-	}
-}
-
-func TestRunStats_EmptyDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetStatsFlags()
-	statsFormat = "json"
-
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
-
-	var m metrics.Metrics
-	if err := json.Unmarshal([]byte(output), &m); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
-	}
-
-	if m.TotalTasks != 0 {
-		t.Errorf("total_tasks = %d, want 0", m.TotalTasks)
-	}
-}
-
-func TestOutputStatsTable_EmptyBreakdowns(t *testing.T) {
-	m := &metrics.Metrics{
-		TotalTasks:      0,
-		TasksByStatus:   map[model.Status]int{},
-		TasksByPriority: map[model.Priority]int{},
-		TasksByEffort:   map[model.Effort]int{},
-		TasksByType:     map[model.TaskType]int{},
-	}
-
-	// Capture output
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputStatsTable(m, "")
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	if err != nil {
-		t.Fatalf("outputStatsTable failed: %v", err)
-	}
-
-	// Each empty breakdown should print "(none)"
-	count := strings.Count(output, "(none)")
-	if count < 3 {
-		t.Errorf("expected at least 3 '(none)' strings (status, priority, effort), got %d\noutput:\n%s", count, output)
-	}
-}
-
-func createStatsPhaseTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// statsPhaseFiles is the phase-grouping fixture: tasks spread across v0.2/v0.3
+// plus one un-phased task. Kept inline because the per-phase counts are what
+// the group-by-phase tests assert on.
+func statsPhaseFiles() map[string]string {
+	return map[string]string{
 		"001.md": `---
 id: "001"
 title: "V0.2 task A"
@@ -251,24 +89,117 @@ status: pending
 priority: medium
 ---`,
 	}
+}
 
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create test file %s: %v", filename, err)
+// statsStdout runs `stats <args...>` against repo, fails on error, returns stdout.
+func statsStdout(t *testing.T, repo *taskRepo, args ...string) string {
+	t.Helper()
+	res := repo.Run(append([]string{"stats"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("stats %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
+}
+
+func TestRunStats_JSONOutput(t *testing.T) {
+	repo := newTaskRepo(t, statsFiles())
+
+	output := statsStdout(t, repo, "--format", "json")
+
+	var m metrics.Metrics
+	if err := json.Unmarshal([]byte(output), &m); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
+	}
+
+	if m.TotalTasks != 3 {
+		t.Errorf("total_tasks = %d, want 3", m.TotalTasks)
+	}
+	if m.TasksByStatus[model.StatusPending] != 2 {
+		t.Errorf("tasks_by_status[pending] = %d, want 2", m.TasksByStatus[model.StatusPending])
+	}
+	if m.TasksByStatus[model.StatusCompleted] != 1 {
+		t.Errorf("tasks_by_status[completed] = %d, want 1", m.TasksByStatus[model.StatusCompleted])
+	}
+}
+
+func TestRunStats_YAMLOutput(t *testing.T) {
+	repo := newTaskRepo(t, statsFiles())
+
+	output := statsStdout(t, repo, "--format", "yaml")
+
+	if !strings.Contains(output, "totaltasks:") {
+		t.Errorf("YAML output missing 'totaltasks:':\n%s", output)
+	}
+}
+
+func TestRunStats_TableOutput(t *testing.T) {
+	repo := newTaskRepo(t, statsFiles())
+
+	output := statsStdout(t, repo, "--format", "table")
+
+	for _, expected := range []string{"TASK STATISTICS", "BY STATUS:", "BY PRIORITY:", "BY EFFORT:"} {
+		if !strings.Contains(output, expected) {
+			t.Errorf("table output missing %q:\n%s", expected, output)
 		}
 	}
-	return tmpDir
+}
+
+func TestRunStats_InvalidFormat(t *testing.T) {
+	repo := newTaskRepo(t, statsFiles())
+
+	res := repo.Run("stats", "--format", "invalid")
+	if res.Err == nil {
+		t.Fatal("expected error for invalid format, got nil")
+	}
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
+	}
+}
+
+func TestRunStats_EmptyDir(t *testing.T) {
+	repo := newTaskRepo(t, nil)
+
+	output := statsStdout(t, repo, "--format", "json")
+
+	var m metrics.Metrics
+	if err := json.Unmarshal([]byte(output), &m); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
+	}
+
+	if m.TotalTasks != 0 {
+		t.Errorf("total_tasks = %d, want 0", m.TotalTasks)
+	}
+}
+
+func TestOutputStatsTable_EmptyBreakdowns(t *testing.T) {
+	m := &metrics.Metrics{
+		TotalTasks:      0,
+		TasksByStatus:   map[model.Status]int{},
+		TasksByPriority: map[model.Priority]int{},
+		TasksByEffort:   map[model.Effort]int{},
+		TasksByType:     map[model.TaskType]int{},
+	}
+
+	var err error
+	output, _ := captureOutput(t, func() {
+		err = outputStatsTable(m, "")
+	})
+
+	if err != nil {
+		t.Fatalf("outputStatsTable failed: %v", err)
+	}
+
+	// Each empty breakdown should print "(none)"
+	count := strings.Count(output, "(none)")
+	if count < 3 {
+		t.Errorf("expected at least 3 '(none)' strings (status, priority, effort), got %d\noutput:\n%s", count, output)
+	}
 }
 
 func TestRunStats_GroupByPhase_Table(t *testing.T) {
-	tmpDir := createStatsPhaseTestFiles(t)
-	resetStatsFlags()
-	statsGroupBy = "phase"
+	repo := newTaskRepo(t, statsPhaseFiles())
 
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
+	output := statsStdout(t, repo, "--group-by", "phase")
 
 	if !strings.Contains(output, "BY PHASE:") {
 		t.Errorf("expected BY PHASE section in output:\n%s", output)
@@ -282,15 +213,9 @@ func TestRunStats_GroupByPhase_Table(t *testing.T) {
 }
 
 func TestRunStats_GroupByPhase_JSON(t *testing.T) {
-	tmpDir := createStatsPhaseTestFiles(t)
-	resetStatsFlags()
-	statsFormat = "json"
-	statsGroupBy = "phase"
+	repo := newTaskRepo(t, statsPhaseFiles())
 
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
+	output := statsStdout(t, repo, "--format", "json", "--group-by", "phase")
 
 	var m metrics.Metrics
 	if err := json.Unmarshal([]byte(output), &m); err != nil {
@@ -306,28 +231,22 @@ func TestRunStats_GroupByPhase_JSON(t *testing.T) {
 }
 
 func TestRunStats_InvalidGroupBy(t *testing.T) {
-	tmpDir := createStatsPhaseTestFiles(t)
-	resetStatsFlags()
-	statsGroupBy = "invalid"
+	repo := newTaskRepo(t, statsPhaseFiles())
 
-	_, err := captureStatsOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("stats", "--group-by", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid group-by, got nil")
 	}
-	if !strings.Contains(err.Error(), "unsupported group-by field") {
-		t.Errorf("expected 'unsupported group-by field' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported group-by field") {
+		t.Errorf("expected 'unsupported group-by field' error, got: %v", res.Err)
 	}
 }
 
 func TestRunStats_PhaseShownWhenPresent(t *testing.T) {
-	tmpDir := createStatsPhaseTestFiles(t)
-	resetStatsFlags()
-	// No --group-by flag, but tasks have phases — section should still appear
+	repo := newTaskRepo(t, statsPhaseFiles())
 
-	output, err := captureStatsOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runStats failed: %v", err)
-	}
+	// No --group-by flag, but tasks have phases — section should still appear
+	output := statsStdout(t, repo)
 
 	if !strings.Contains(output, "BY PHASE:") {
 		t.Errorf("expected BY PHASE section when phases exist:\n%s", output)

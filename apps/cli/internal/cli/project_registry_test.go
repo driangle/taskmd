@@ -9,31 +9,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func resetProjectRegistryFlags() {
-	projectRegisterID = ""
-	projectRegisterPath = ""
-	projectRegisterName = ""
-	projectUnregisterID = ""
-}
-
-// createProjectDir creates a temp directory with a .taskmd.yaml file inside.
-// Returns the symlink-resolved path for reliable comparisons on macOS.
+// createProjectDir creates a temp repo containing a .taskmd.yaml file and
+// returns its symlink-resolved path (e.g. /var -> /private/var on macOS) for
+// reliable path comparisons against the registered entries.
 func createProjectDir(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	// Resolve symlinks (e.g. /var -> /private/var on macOS)
-	resolved, err := filepath.EvalSymlinks(dir)
+	resolved, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatalf("failed to resolve symlinks: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(resolved, configFilename), []byte("dir: .\n"), 0644); err != nil {
-		t.Fatalf("failed to create %s: %v", configFilename, err)
-	}
+	repo := &taskRepo{t: t, Dir: resolved}
+	repo.Write(configFilename, "dir: .\n")
 	return resolved
 }
 
 func TestProjectRegister_CWD(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -69,7 +60,7 @@ func TestProjectRegister_CWD(t *testing.T) {
 }
 
 func TestProjectRegister_ExplicitPath(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -102,7 +93,7 @@ func TestProjectRegister_ExplicitPath(t *testing.T) {
 }
 
 func TestProjectRegister_NoConfig(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	emptyDir := t.TempDir() // no .taskmd.yaml
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -119,7 +110,7 @@ func TestProjectRegister_NoConfig(t *testing.T) {
 }
 
 func TestProjectRegister_DuplicateID(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -148,7 +139,7 @@ func TestProjectRegister_DuplicateID(t *testing.T) {
 }
 
 func TestProjectRegister_CreatesFile(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfgDir := t.TempDir()
 	globalCfg := filepath.Join(globalCfgDir, ".taskmd.yaml")
@@ -182,7 +173,7 @@ func TestProjectRegister_CreatesFile(t *testing.T) {
 }
 
 func TestProjectRegister_PreservesExistingConfig(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -222,7 +213,7 @@ func TestProjectRegister_PreservesExistingConfig(t *testing.T) {
 }
 
 func TestProjectUnregister_ByID(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -236,7 +227,7 @@ func TestProjectUnregister_ByID(t *testing.T) {
 	}
 
 	// Unregister by ID
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projectUnregisterID = "to-remove"
 	err = runProjectUnregister(projectUnregisterCmd, []string{})
 	if err != nil {
@@ -253,7 +244,7 @@ func TestProjectUnregister_ByID(t *testing.T) {
 }
 
 func TestProjectUnregister_ByCWD(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	projDir := createProjectDir(t)
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
@@ -267,7 +258,7 @@ func TestProjectUnregister_ByCWD(t *testing.T) {
 	}
 
 	// Unregister by cwd (no --id flag)
-	resetProjectRegistryFlags()
+	resetCLIState()
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +283,7 @@ func TestProjectUnregister_ByCWD(t *testing.T) {
 }
 
 func TestProjectUnregister_NotFound(t *testing.T) {
-	resetProjectRegistryFlags()
+	resetCLIState()
 	globalCfg := filepath.Join(t.TempDir(), ".taskmd.yaml")
 	t.Setenv("TASKMD_HOME_CONFIG", globalCfg)
 

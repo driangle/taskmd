@@ -1,25 +1,17 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-func createCommitMsgTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasksDir := filepath.Join(tmpDir, "cli")
-	if err := os.MkdirAll(tasksDir, 0755); err != nil {
-		t.Fatalf("failed to create tasks dir: %v", err)
-	}
-
-	files := map[string]string{
+// commitMsgFiles is the recurring commit-msg fixture: tasks with subtasks,
+// groups, and mixed statuses. It is command-specific (not one of the canonical
+// shared sets), so it stays inline.
+func commitMsgFiles() map[string]string {
+	return map[string]string{
 		"cli/042-feature.md": `---
 id: "042"
 title: "Add commit-msg command"
@@ -121,28 +113,27 @@ created: 2026-02-17
 # Add import feature
 `,
 	}
-
-	for name, content := range files {
-		path := filepath.Join(tmpDir, name)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create test file %s: %v", name, err)
-		}
-	}
-
-	return tmpDir
 }
 
-func resetCommitMsgFlags() {
-	commitMsgTaskID = ""
-	commitMsgType = "chore"
-	commitMsgBody = false
-	commitMsgShort = false
-	taskDir = "."
+// newCommitMsgRepo seeds a repo with the shared commit-msg fixture set.
+func newCommitMsgRepo(t *testing.T) *taskRepo {
+	t.Helper()
+	return newTaskRepo(t, commitMsgFiles())
+}
+
+// commitMsgStdout runs `commit-msg <args...>`, fails on error, and returns stdout.
+func commitMsgStdout(t *testing.T, repo *taskRepo, args ...string) string {
+	t.Helper()
+	res := repo.Run(append([]string{"commit-msg"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("commit-msg %v failed: %v", args, res.Err)
+	}
+	return res.Stdout
 }
 
 // mockGitDiffAndRoot sets up gitDiffFunc and gitRootFunc for tests.
 // diffOutput is the fake diff content. gitRoot is the fake git root directory.
-// Returns a cleanup function to restore the originals.
+// Registers a cleanup to restore the originals.
 func mockGitDiffAndRoot(t *testing.T, diffOutput string, gitRoot string) {
 	t.Helper()
 	oldDiff := gitDiffFunc
@@ -155,33 +146,10 @@ func mockGitDiffAndRoot(t *testing.T, diffOutput string, gitRoot string) {
 	})
 }
 
-func captureCommitMsgOutput(t *testing.T) (string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runCommitMsg(commitMsgCmd, nil)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
-}
-
 func TestCommitMsg_SingleTask(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "042")
 
 	if !strings.Contains(output, "chore(cli): add commit-msg command (task 042)") {
 		t.Errorf("expected subject line with task ID, got:\n%s", output)
@@ -189,16 +157,9 @@ func TestCommitMsg_SingleTask(t *testing.T) {
 }
 
 func TestCommitMsg_TypeFlag(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
-	commitMsgType = "feat"
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "042", "--type", "feat")
 
 	if !strings.HasPrefix(output, "feat(cli): add commit-msg command (task 042)") {
 		t.Errorf("expected 'feat' prefix with task ID, got:\n%s", output)
@@ -206,32 +167,21 @@ func TestCommitMsg_TypeFlag(t *testing.T) {
 }
 
 func TestCommitMsg_InvalidType(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
-	commitMsgType = "invalid"
+	repo := newCommitMsgRepo(t)
 
-	_, err := captureCommitMsgOutput(t)
-	if err == nil {
+	res := repo.Run("commit-msg", "--task-id", "042", "--type", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid type")
 	}
-	if !strings.Contains(err.Error(), "invalid commit type") {
-		t.Errorf("expected 'invalid commit type' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid commit type") {
+		t.Errorf("expected 'invalid commit type' error, got: %v", res.Err)
 	}
 }
 
 func TestCommitMsg_BodyFlag(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
-	commitMsgBody = true
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "042", "--body")
 
 	if !strings.Contains(output, "- Create command scaffolding") {
 		t.Errorf("expected completed subtask in body, got:\n%s", output)
@@ -246,8 +196,8 @@ func TestCommitMsg_BodyFlag(t *testing.T) {
 }
 
 func TestCommitMsg_BodyFlagNoSubtasks(t *testing.T) {
-	tmpDir := t.TempDir()
-	content := `---
+	repo := newTaskRepo(t, map[string]string{
+		"099-empty.md": `---
 id: "099"
 title: "Empty task"
 status: pending
@@ -257,20 +207,10 @@ created: 2026-02-16
 # Empty task
 
 No subtasks here.
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "099-empty.md"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
+`,
+	})
 
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "099"
-	commitMsgBody = true
-
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "099", "--body")
 
 	// Should still produce a valid message with subject line only (no body section)
 	lines := strings.Split(strings.TrimSpace(output), "\n")
@@ -283,16 +223,9 @@ No subtasks here.
 }
 
 func TestCommitMsg_ShortFlag(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
-	commitMsgShort = true
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "042", "--short")
 
 	trimmed := strings.TrimSpace(output)
 	if strings.Contains(trimmed, "\n") {
@@ -304,17 +237,9 @@ func TestCommitMsg_ShortFlag(t *testing.T) {
 }
 
 func TestCommitMsg_ShortWithBody(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
-	commitMsgShort = true
-	commitMsgBody = true
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "042", "--short", "--body")
 
 	// --short should override --body: single line only
 	trimmed := strings.TrimSpace(output)
@@ -324,15 +249,9 @@ func TestCommitMsg_ShortWithBody(t *testing.T) {
 }
 
 func TestCommitMsg_NoGroupScope(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "044"
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "044")
 
 	if !strings.HasPrefix(output, "chore: update README (task 044)") {
 		t.Errorf("expected no scope for task without group, got:\n%s", output)
@@ -340,24 +259,19 @@ func TestCommitMsg_NoGroupScope(t *testing.T) {
 }
 
 func TestCommitMsg_TaskNotFound(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "999"
+	repo := newCommitMsgRepo(t)
 
-	_, err := captureCommitMsgOutput(t)
-	if err == nil {
+	res := repo.Run("commit-msg", "--task-id", "999")
+	if res.Err == nil {
 		t.Fatal("expected error for nonexistent task")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("expected 'task not found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("expected 'task not found' error, got: %v", res.Err)
 	}
 }
 
 func TestCommitMsg_MultiTask(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"diff --git a/cli/042-feature.md b/cli/042-feature.md\n"+
@@ -372,12 +286,9 @@ func TestCommitMsg_MultiTask(t *testing.T) {
 			"@@ -4 +4 @@\n"+
 			"-status: pending\n"+
 			"+status: completed\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	if !strings.Contains(output, "chore: complete tasks 042, 043") {
 		t.Errorf("expected multi-task subject, got:\n%s", output)
@@ -385,10 +296,7 @@ func TestCommitMsg_MultiTask(t *testing.T) {
 }
 
 func TestCommitMsg_MultiTaskWithBody(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgBody = true
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"diff --git a/cli/042-feature.md b/cli/042-feature.md\n"+
@@ -397,12 +305,9 @@ func TestCommitMsg_MultiTaskWithBody(t *testing.T) {
 			"diff --git a/cli/043-bugfix.md b/cli/043-bugfix.md\n"+
 			"+++ b/cli/043-bugfix.md\n"+
 			"+status: completed\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--body")
 
 	if !strings.Contains(output, "Add commit-msg command:") {
 		t.Errorf("expected task title section in body, got:\n%s", output)
@@ -416,20 +321,14 @@ func TestCommitMsg_MultiTaskWithBody(t *testing.T) {
 }
 
 func TestCommitMsg_MultiTaskShort(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgShort = true
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"+++ b/cli/042-feature.md\n+status: completed\n"+
 			"+++ b/cli/043-bugfix.md\n+status: completed\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--short")
 
 	trimmed := strings.TrimSpace(output)
 	if strings.Contains(trimmed, "\n") {
@@ -438,9 +337,7 @@ func TestCommitMsg_MultiTaskShort(t *testing.T) {
 }
 
 func TestCommitMsg_AutoInferFromDiff(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"diff --git a/cli/042-feature.md b/cli/042-feature.md\n"+
@@ -448,12 +345,9 @@ func TestCommitMsg_AutoInferFromDiff(t *testing.T) {
 			"@@ -4 +4 @@\n"+
 			"-status: pending\n"+
 			"+status: completed\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	if !strings.Contains(output, "chore(cli): add commit-msg command (task 042)") {
 		t.Errorf("expected auto-detected task message with ID in header, got:\n%s", output)
@@ -461,37 +355,30 @@ func TestCommitMsg_AutoInferFromDiff(t *testing.T) {
 }
 
 func TestCommitMsg_EmptyDiff(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
-	mockGitDiffAndRoot(t, "", tmpDir)
+	mockGitDiffAndRoot(t, "", repo.Dir)
 
-	_, err := captureCommitMsgOutput(t)
-	if err == nil {
+	res := repo.Run("commit-msg")
+	if res.Err == nil {
 		t.Fatal("expected error for empty diff")
 	}
-	if !strings.Contains(err.Error(), "no task changes found") {
-		t.Errorf("expected 'no task changes found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "no task changes found") {
+		t.Errorf("expected 'no task changes found' error, got: %v", res.Err)
 	}
 }
 
 func TestCommitMsg_DiffOnlyInProgress(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	// in-progress status change should now be detected as a "started" task
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
 			"+++ b/cli/042-feature.md\n"+
 			"+status: in-progress\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	if !strings.Contains(output, "start task 042") {
 		t.Errorf("expected 'start task' message, got:\n%s", output)
@@ -665,16 +552,9 @@ func TestCommitMsg_AllowedTypes(t *testing.T) {
 	types := []string{"feat", "fix", "chore", "docs", "test", "refactor"}
 	for _, typ := range types {
 		t.Run(typ, func(t *testing.T) {
-			tmpDir := createCommitMsgTestFiles(t)
-			resetCommitMsgFlags()
-			taskDir = tmpDir
-			commitMsgTaskID = "042"
-			commitMsgType = typ
+			repo := newCommitMsgRepo(t)
 
-			output, err := captureCommitMsgOutput(t)
-			if err != nil {
-				t.Fatalf("unexpected error for type %q: %v", typ, err)
-			}
+			output := commitMsgStdout(t, repo, "--task-id", "042", "--type", typ)
 
 			if !strings.HasPrefix(output, typ+"(cli):") {
 				t.Errorf("expected prefix %q, got:\n%s", typ+"(cli):", output)
@@ -687,17 +567,9 @@ func TestCommitMsg_AllowedTypes(t *testing.T) {
 }
 
 func TestCommitMsg_MessageFormat(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgTaskID = "042"
-	commitMsgType = "feat"
-	commitMsgBody = true
+	repo := newCommitMsgRepo(t)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--task-id", "042", "--type", "feat", "--body")
 
 	// Verify format: subject, blank line, body
 	parts := strings.Split(strings.TrimSpace(output), "\n\n")
@@ -719,9 +591,7 @@ func TestCommitMsg_MessageFormat(t *testing.T) {
 // Tests for new pending task detection
 
 func TestCommitMsg_SingleNewPendingTask(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"diff --git a/cli/045-new-pending.md b/cli/045-new-pending.md\n"+
@@ -734,12 +604,9 @@ func TestCommitMsg_SingleNewPendingTask(t *testing.T) {
 			"+title: \"Add search feature\"\n"+
 			"+status: pending\n"+
 			"+---\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	expected := "chore: added task 045\n"
 	if output != expected {
@@ -748,9 +615,7 @@ func TestCommitMsg_SingleNewPendingTask(t *testing.T) {
 }
 
 func TestCommitMsg_MultipleNewPendingTasks(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"diff --git a/cli/045-new-pending.md b/cli/045-new-pending.md\n"+
@@ -765,12 +630,9 @@ func TestCommitMsg_MultipleNewPendingTasks(t *testing.T) {
 			"+++ b/cli/046-new-pending.md\n"+
 			"@@ -0,0 +1,10 @@\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	expected := "chore: added tasks 045, 046\n"
 	if output != expected {
@@ -779,10 +641,7 @@ func TestCommitMsg_MultipleNewPendingTasks(t *testing.T) {
 }
 
 func TestCommitMsg_NewPendingWithTypeFlag(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgType = "feat"
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"diff --git a/cli/045-new-pending.md b/cli/045-new-pending.md\n"+
@@ -790,12 +649,9 @@ func TestCommitMsg_NewPendingWithTypeFlag(t *testing.T) {
 			"--- /dev/null\n"+
 			"+++ b/cli/045-new-pending.md\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--type", "feat")
 
 	expected := "feat: added task 045\n"
 	if output != expected {
@@ -804,9 +660,7 @@ func TestCommitMsg_NewPendingWithTypeFlag(t *testing.T) {
 }
 
 func TestCommitMsg_MixedCompletedAndNewPending(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	// Diff contains both a completed task and a new pending task
 	mockGitDiffAndRoot(t,
@@ -821,12 +675,9 @@ func TestCommitMsg_MixedCompletedAndNewPending(t *testing.T) {
 			"--- /dev/null\n"+
 			"+++ b/cli/045-new-pending.md\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	// Should produce a combined message with both change types
 	if !strings.Contains(output, "complete task 042") {
@@ -841,9 +692,7 @@ func TestCommitMsg_MixedCompletedAndNewPending(t *testing.T) {
 }
 
 func TestCommitMsg_ModifiedPendingNotDetected(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	// File was modified (not new) with status: pending — should NOT be detected
 	mockGitDiffAndRoot(t,
@@ -852,14 +701,14 @@ func TestCommitMsg_ModifiedPendingNotDetected(t *testing.T) {
 			"+++ b/cli/045-new-pending.md\n"+
 			"@@ -4 +4 @@\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	_, err := captureCommitMsgOutput(t)
-	if err == nil {
+	res := repo.Run("commit-msg")
+	if res.Err == nil {
 		t.Fatal("expected error when only modified (not new) pending file staged")
 	}
-	if !strings.Contains(err.Error(), "no task changes found") {
-		t.Errorf("expected 'no task changes found' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "no task changes found") {
+		t.Errorf("expected 'no task changes found' error, got: %v", res.Err)
 	}
 }
 
@@ -907,9 +756,7 @@ func TestBuildAddedTaskMessage(t *testing.T) {
 // Tests for mixed change type detection
 
 func TestCommitMsg_MixedCompletedAndStarted(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
@@ -918,12 +765,9 @@ func TestCommitMsg_MixedCompletedAndStarted(t *testing.T) {
 			"--- a/cli/047-in-progress.md\n"+
 			"+++ b/cli/047-in-progress.md\n"+
 			"+status: in-progress\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	if !strings.Contains(output, "complete task 042") {
 		t.Errorf("expected 'complete task 042', got:\n%s", output)
@@ -937,9 +781,7 @@ func TestCommitMsg_MixedCompletedAndStarted(t *testing.T) {
 }
 
 func TestCommitMsg_ThreeChangeTypes(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
@@ -951,12 +793,9 @@ func TestCommitMsg_ThreeChangeTypes(t *testing.T) {
 			"--- a/cli/047-in-progress.md\n"+
 			"+++ b/cli/047-in-progress.md\n"+
 			"+status: in-progress\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	expected := "chore: complete task 042; add task 045; start task 047\n"
 	if output != expected {
@@ -965,10 +804,7 @@ func TestCommitMsg_ThreeChangeTypes(t *testing.T) {
 }
 
 func TestCommitMsg_MixedWithShort(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgShort = true
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
@@ -977,12 +813,9 @@ func TestCommitMsg_MixedWithShort(t *testing.T) {
 			"--- /dev/null\n"+
 			"+++ b/cli/045-new-pending.md\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--short")
 
 	trimmed := strings.TrimSpace(output)
 	if strings.Contains(trimmed, "\n") {
@@ -994,10 +827,7 @@ func TestCommitMsg_MixedWithShort(t *testing.T) {
 }
 
 func TestCommitMsg_MixedWithBody(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgBody = true
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
@@ -1006,12 +836,9 @@ func TestCommitMsg_MixedWithBody(t *testing.T) {
 			"--- /dev/null\n"+
 			"+++ b/cli/045-new-pending.md\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--body")
 
 	// Subject line should contain both change types
 	lines := strings.Split(output, "\n")
@@ -1033,10 +860,7 @@ func TestCommitMsg_MixedWithBody(t *testing.T) {
 }
 
 func TestCommitMsg_MixedWithTypeFlag(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
-	commitMsgType = "feat"
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
@@ -1045,12 +869,9 @@ func TestCommitMsg_MixedWithTypeFlag(t *testing.T) {
 			"--- /dev/null\n"+
 			"+++ b/cli/045-new-pending.md\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo, "--type", "feat")
 
 	if !strings.HasPrefix(output, "feat:") {
 		t.Errorf("expected 'feat:' prefix, got:\n%s", output)
@@ -1058,9 +879,7 @@ func TestCommitMsg_MixedWithTypeFlag(t *testing.T) {
 }
 
 func TestCommitMsg_MixedMultipleTasksPerCategory(t *testing.T) {
-	tmpDir := createCommitMsgTestFiles(t)
-	resetCommitMsgFlags()
-	taskDir = tmpDir
+	repo := newCommitMsgRepo(t)
 
 	mockGitDiffAndRoot(t,
 		"--- a/cli/042-feature.md\n"+
@@ -1075,12 +894,9 @@ func TestCommitMsg_MixedMultipleTasksPerCategory(t *testing.T) {
 			"--- /dev/null\n"+
 			"+++ b/cli/046-new-pending.md\n"+
 			"+status: pending\n",
-		tmpDir)
+		repo.Dir)
 
-	output, err := captureCommitMsgOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := commitMsgStdout(t, repo)
 
 	expected := "chore: complete tasks 042, 043; add tasks 045, 046\n"
 	if output != expected {

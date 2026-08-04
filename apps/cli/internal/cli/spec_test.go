@@ -8,19 +8,14 @@ import (
 )
 
 func TestSpecCommand_WritesToDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
+	repo := newTaskRepo(t, nil)
 
-	specForce = false
-	specStdout = false
-	taskDir = tmpDir
-
-	err := runSpec(specCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("spec")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	outputPath := filepath.Join(tmpDir, specFilename)
-	content, err := os.ReadFile(outputPath)
+	content, err := os.ReadFile(repo.Path(specFilename))
 	if err != nil {
 		t.Fatalf("failed to read created file: %v", err)
 	}
@@ -31,24 +26,16 @@ func TestSpecCommand_WritesToDirectory(t *testing.T) {
 }
 
 func TestSpecCommand_RefusesOverwriteWithoutForce(t *testing.T) {
-	tmpDir := t.TempDir()
+	repo := newTaskRepo(t, nil)
+	existingPath := repo.Write(specFilename, "existing content")
 
-	existingPath := filepath.Join(tmpDir, specFilename)
-	if err := os.WriteFile(existingPath, []byte("existing content"), 0644); err != nil {
-		t.Fatalf("failed to create existing file: %v", err)
-	}
-
-	specForce = false
-	specStdout = false
-	taskDir = tmpDir
-
-	err := runSpec(specCmd, []string{})
-	if err == nil {
+	res := repo.Run("spec")
+	if res.Err == nil {
 		t.Fatal("expected error when file already exists")
 	}
 
-	if !bytes.Contains([]byte(err.Error()), []byte("already exists")) {
-		t.Errorf("error message %q should contain 'already exists'", err.Error())
+	if !bytes.Contains([]byte(res.Err.Error()), []byte("already exists")) {
+		t.Errorf("error message %q should contain 'already exists'", res.Err.Error())
 	}
 
 	// Verify original content was not overwritten
@@ -59,20 +46,12 @@ func TestSpecCommand_RefusesOverwriteWithoutForce(t *testing.T) {
 }
 
 func TestSpecCommand_OverwritesWithForce(t *testing.T) {
-	tmpDir := t.TempDir()
+	repo := newTaskRepo(t, nil)
+	existingPath := repo.Write(specFilename, "old content")
 
-	existingPath := filepath.Join(tmpDir, specFilename)
-	if err := os.WriteFile(existingPath, []byte("old content"), 0644); err != nil {
-		t.Fatalf("failed to create existing file: %v", err)
-	}
-
-	specForce = true
-	specStdout = false
-	taskDir = tmpDir
-
-	err := runSpec(specCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error with --force: %v", err)
+	res := repo.Run("spec", "--force")
+	if res.Err != nil {
+		t.Fatalf("unexpected error with --force: %v", res.Err)
 	}
 
 	content, err := os.ReadFile(existingPath)
@@ -86,58 +65,36 @@ func TestSpecCommand_OverwritesWithForce(t *testing.T) {
 }
 
 func TestSpecCommand_StdoutPrintsWithoutCreatingFile(t *testing.T) {
-	tmpDir := t.TempDir()
+	repo := newTaskRepo(t, nil)
 
-	specForce = false
-	specStdout = true
-	taskDir = tmpDir
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runSpec(specCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("spec", "--stdout")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	if output != string(specTemplate) {
+	if res.Stdout != string(specTemplate) {
 		t.Error("stdout output does not match embedded spec")
 	}
 
 	// Verify no file was created
-	outputPath := filepath.Join(tmpDir, specFilename)
-	if _, err := os.Stat(outputPath); err == nil {
+	if _, err := os.Stat(repo.Path(specFilename)); err == nil {
 		t.Errorf("%s should not have been created with --stdout", specFilename)
 	}
 }
 
 func TestSpecCommand_DirWritesToSpecifiedDirectory(t *testing.T) {
-	tmpDir := t.TempDir()
-	subDir := filepath.Join(tmpDir, "docs")
+	repo := newTaskRepo(t, nil)
+	subDir := repo.Path("docs")
 	if err := os.Mkdir(subDir, 0755); err != nil {
 		t.Fatalf("failed to create subdirectory: %v", err)
 	}
 
-	specForce = false
-	specStdout = false
-	taskDir = subDir
-
-	err := runSpec(specCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("spec", "--dir", subDir)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	outputPath := filepath.Join(subDir, specFilename)
-	content, err := os.ReadFile(outputPath)
+	content, err := os.ReadFile(filepath.Join(subDir, specFilename))
 	if err != nil {
 		t.Fatalf("failed to read created file: %v", err)
 	}
@@ -148,17 +105,15 @@ func TestSpecCommand_DirWritesToSpecifiedDirectory(t *testing.T) {
 }
 
 func TestSpecCommand_NonExistentDirectoryReturnsError(t *testing.T) {
-	specForce = false
-	specStdout = false
-	taskDir = "/nonexistent/path/that/does/not/exist"
+	repo := newTaskRepo(t, nil)
 
-	err := runSpec(specCmd, []string{})
-	if err == nil {
+	res := repo.Run("spec", "--dir", "/nonexistent/path/that/does/not/exist")
+	if res.Err == nil {
 		t.Fatal("expected error for non-existent directory")
 	}
 
-	if !bytes.Contains([]byte(err.Error()), []byte("directory does not exist")) {
-		t.Errorf("error message %q should contain 'directory does not exist'", err.Error())
+	if !bytes.Contains([]byte(res.Err.Error()), []byte("directory does not exist")) {
+		t.Errorf("error message %q should contain 'directory does not exist'", res.Err.Error())
 	}
 }
 

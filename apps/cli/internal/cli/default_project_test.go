@@ -19,10 +19,8 @@ func setupDefaultProjectConfig(t *testing.T, defaultProject string, projectsYAML
 }
 
 func TestResolveDefaultProject_ValidProject(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	proj := createProjectWithTasks(t, "tasks", map[string]string{
 		"001-task.md": `---
@@ -47,10 +45,8 @@ created: 2026-01-01
 }
 
 func TestResolveDefaultProject_NotSet(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Global config with no default_project
 	dir := t.TempDir()
@@ -65,10 +61,8 @@ func TestResolveDefaultProject_NotSet(t *testing.T) {
 }
 
 func TestResolveDefaultProject_InvalidProject(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	setupDefaultProjectConfig(t, "nonexistent",
 		"  - id: other\n    name: Other\n    path: /tmp\n")
@@ -80,10 +74,8 @@ func TestResolveDefaultProject_InvalidProject(t *testing.T) {
 }
 
 func TestResolveTaskDir_ProjectFlagOverridesDefault(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	defaultProj := createProjectWithTasks(t, "tasks", map[string]string{
 		"001-task.md": `---
@@ -120,10 +112,8 @@ created: 2026-01-01
 }
 
 func TestResolveTaskDir_DefaultProjectUsedWhenNoLocalConfig(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	proj := createProjectWithTasks(t, "tasks", map[string]string{
 		"001-task.md": `---
@@ -149,10 +139,8 @@ created: 2026-01-01
 }
 
 func TestLoadDefaultProject_ReadsFromConfig(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, ".taskmd.yaml")
@@ -166,10 +154,8 @@ func TestLoadDefaultProject_ReadsFromConfig(t *testing.T) {
 }
 
 func TestLoadDefaultProject_EmptyWhenMissing(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	t.Setenv("TASKMD_HOME_CONFIG", filepath.Join(t.TempDir(), "nonexistent.yaml"))
 

@@ -1,33 +1,37 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/apps/cli/internal/sync"
 )
 
-func resetImportFlags() {
-	importSource = ""
-	importProject = ""
-	importTokenEnv = ""
-	importUserEnv = ""
-	importBaseURL = ""
-	importOutDir = "./tasks"
-	importFilter = ""
-	importDryRun = false
-	importFormat = "table"
-	importRepo = ""
-	importLabels = ""
-	importMilestone = ""
-	importAssignee = ""
-	importURL = ""
-	importJQL = ""
+// chdirTo switches the working directory to dir for the duration of the test.
+func chdirTo(t *testing.T, dir string) {
+	t.Helper()
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(origDir) })
+}
+
+// printImportTableStdout renders printImportTable and returns captured stdout.
+func printImportTableStdout(t *testing.T, result *sync.ImportResult, summary importSummary, quietMode bool) string {
+	t.Helper()
+	var err error
+	stdout, _ := captureOutput(t, func() { err = printImportTable(result, summary, quietMode) })
+	if err != nil {
+		t.Fatalf("printImportTable failed: %v", err)
+	}
+	return stdout
 }
 
 func TestImportCommand_NonInteractive(t *testing.T) {
@@ -42,24 +46,16 @@ func TestImportCommand_NonInteractive(t *testing.T) {
 		},
 	})
 
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir)
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
 
-	resetImportFlags()
-	importSource = sourceName
-	importOutDir = filepath.Join(tmpDir, "tasks")
-
-	err := runImport(importCmd, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("import", "--source", sourceName, "--output-dir", repo.Path("tasks"))
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Verify files were created
-	entries, err := os.ReadDir(filepath.Join(tmpDir, "tasks"))
+	entries, err := os.ReadDir(repo.Path("tasks"))
 	if err != nil {
 		t.Fatalf("failed to read tasks dir: %v", err)
 	}
@@ -79,25 +75,16 @@ func TestImportCommand_DryRun(t *testing.T) {
 		},
 	})
 
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir)
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
 
-	resetImportFlags()
-	importSource = sourceName
-	importOutDir = filepath.Join(tmpDir, "tasks")
-	importDryRun = true
-
-	err := runImport(importCmd, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("import", "--source", sourceName, "--output-dir", repo.Path("tasks"), "--dry-run")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// No files should be created
-	_, statErr := os.Stat(filepath.Join(tmpDir, "tasks"))
+	_, statErr := os.Stat(repo.Path("tasks"))
 	if statErr == nil {
 		t.Error("expected no tasks directory in dry-run mode")
 	}
@@ -114,35 +101,14 @@ func TestImportCommand_JSONOutput(t *testing.T) {
 		},
 	})
 
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
+
+	res := repo.Run("import", "--source", sourceName, "--output-dir", repo.Path("tasks"), "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
-	defer os.Chdir(origDir)
-
-	resetImportFlags()
-	importSource = sourceName
-	importOutDir = filepath.Join(tmpDir, "tasks")
-	importFormat = "json"
-
-	// Capture stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runImport(importCmd, nil)
-
-	w.Close()
-	os.Stdout = old
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := res.Stdout
 
 	// Verify valid JSON
 	var data importResultData
@@ -173,47 +139,19 @@ func TestImportCommand_DuplicateSkip(t *testing.T) {
 		},
 	})
 
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir)
-
 	// Create an existing task with external_id DUP-1
-	tasksDir := filepath.Join(tmpDir, "tasks")
-	if err := os.MkdirAll(tasksDir, 0755); err != nil {
-		t.Fatal(err)
+	repo := newTaskRepo(t, map[string]string{
+		"tasks/001-existing.md": "---\nid: \"001\"\ntitle: \"Existing\"\nstatus: pending\nexternal_id: \"DUP-1\"\n---\n",
+	})
+	chdirTo(t, repo.Dir)
+
+	res := repo.Run("import", "--source", sourceName, "--output-dir", repo.Path("tasks"), "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
-	existingContent := "---\nid: \"001\"\ntitle: \"Existing\"\nstatus: pending\nexternal_id: \"DUP-1\"\n---\n"
-	if err := os.WriteFile(filepath.Join(tasksDir, "001-existing.md"), []byte(existingContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	resetImportFlags()
-	importSource = sourceName
-	importOutDir = tasksDir
-	importFormat = "json"
-
-	// Capture stdout
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runImport(importCmd, nil)
-
-	w.Close()
-	os.Stdout = old
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
 
 	var data importResultData
-	if err := json.Unmarshal(buf.Bytes(), &data); err != nil {
+	if err := json.Unmarshal([]byte(res.Stdout), &data); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
@@ -283,22 +221,14 @@ func TestImportCommand_OutputDirFlag(t *testing.T) {
 		},
 	})
 
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir)
+	repo := newTaskRepo(t, nil)
+	chdirTo(t, repo.Dir)
 
-	customDir := filepath.Join(tmpDir, "custom", "output")
+	customDir := repo.Path("custom/output")
 
-	resetImportFlags()
-	importSource = sourceName
-	importOutDir = customDir
-
-	err := runImport(importCmd, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := repo.Run("import", "--source", sourceName, "--output-dir", customDir)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	entries, err := os.ReadDir(customDir)
@@ -321,19 +251,11 @@ func TestImportCommand_FilterFlagPopulatesConfig(t *testing.T) {
 		},
 	})
 
-	tmpDir := t.TempDir()
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(origDir)
-
-	resetImportFlags()
+	resetCLIState()
 	importSource = sourceName
 	importProject = "owner/repo"
 	importTokenEnv = "GITHUB_TOKEN"
 	importFilter = "state:open labels:bug"
-	importOutDir = filepath.Join(tmpDir, "tasks")
 
 	cfg, err := buildImportConfigFromFlags()
 	if err != nil {
@@ -352,21 +274,19 @@ func TestImportCommand_FilterFlagPopulatesConfig(t *testing.T) {
 }
 
 func TestImportCommand_InvalidFormat(t *testing.T) {
-	resetImportFlags()
-	importSource = "something"
-	importFormat = "invalid"
+	repo := newTaskRepo(t, nil)
 
-	err := runImport(importCmd, nil)
-	if err == nil {
+	res := repo.Run("import", "--source", "something", "--format", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("unexpected error message: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("unexpected error message: %v", res.Err)
 	}
 }
 
 func TestImportCommand_RepoFlagAliasesProject(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "myorg/myrepo"
 
@@ -381,7 +301,7 @@ func TestImportCommand_RepoFlagAliasesProject(t *testing.T) {
 }
 
 func TestImportCommand_ProjectTakesPrecedenceOverRepo(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importProject = "explicit/project"
 	importRepo = "fallback/repo"
@@ -397,7 +317,7 @@ func TestImportCommand_ProjectTakesPrecedenceOverRepo(t *testing.T) {
 }
 
 func TestImportCommand_RepoFlagIgnoredForNonGitHub(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importRepo = "should-be-ignored"
 	importProject = "PROJ"
@@ -413,7 +333,7 @@ func TestImportCommand_RepoFlagIgnoredForNonGitHub(t *testing.T) {
 }
 
 func TestImportCommand_GitHubDefaultTokenEnv(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 
@@ -428,7 +348,7 @@ func TestImportCommand_GitHubDefaultTokenEnv(t *testing.T) {
 }
 
 func TestImportCommand_GitHubDefaultStateOpen(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 
@@ -446,7 +366,7 @@ func TestImportCommand_GitHubDefaultStateOpen(t *testing.T) {
 }
 
 func TestImportCommand_GitHubStateNotOverridden(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importFilter = "state:closed"
@@ -462,7 +382,7 @@ func TestImportCommand_GitHubStateNotOverridden(t *testing.T) {
 }
 
 func TestImportCommand_LabelsShortcutFlag(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importLabels = "bug,critical"
@@ -478,7 +398,7 @@ func TestImportCommand_LabelsShortcutFlag(t *testing.T) {
 }
 
 func TestImportCommand_MilestoneShortcutFlag(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importMilestone = "v1.0"
@@ -494,7 +414,7 @@ func TestImportCommand_MilestoneShortcutFlag(t *testing.T) {
 }
 
 func TestImportCommand_AssigneeShortcutFlag(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importAssignee = "alice"
@@ -510,7 +430,7 @@ func TestImportCommand_AssigneeShortcutFlag(t *testing.T) {
 }
 
 func TestImportCommand_FilterFlagTakesPrecedenceOverShortcut(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importFilter = "labels:from-filter"
@@ -528,7 +448,7 @@ func TestImportCommand_FilterFlagTakesPrecedenceOverShortcut(t *testing.T) {
 }
 
 func TestImportCommand_AllShortcutFlags(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importLabels = "bug"
@@ -555,7 +475,7 @@ func TestImportCommand_AllShortcutFlags(t *testing.T) {
 }
 
 func TestImportCommand_NonGitHubNoDefaultState(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 	importTokenEnv = "JIRA_TOKEN"
@@ -572,7 +492,7 @@ func TestImportCommand_NonGitHubNoDefaultState(t *testing.T) {
 }
 
 func TestImportCommand_JiraURLFlagAliasesBaseURL(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 	importURL = "https://company.atlassian.net"
@@ -588,7 +508,7 @@ func TestImportCommand_JiraURLFlagAliasesBaseURL(t *testing.T) {
 }
 
 func TestImportCommand_BaseURLTakesPrecedenceOverURL(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 	importBaseURL = "https://explicit.atlassian.net"
@@ -605,7 +525,7 @@ func TestImportCommand_BaseURLTakesPrecedenceOverURL(t *testing.T) {
 }
 
 func TestImportCommand_URLFlagIgnoredForNonJira(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "github"
 	importRepo = "owner/repo"
 	importURL = "https://should-be-ignored.com"
@@ -621,7 +541,7 @@ func TestImportCommand_URLFlagIgnoredForNonJira(t *testing.T) {
 }
 
 func TestImportCommand_JQLFlagPopulatesFilters(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 	importJQL = "assignee = currentUser()"
@@ -640,7 +560,7 @@ func TestImportCommand_JQLFlagPopulatesFilters(t *testing.T) {
 }
 
 func TestImportCommand_FilterFlagTakesPrecedenceOverJQL(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 	importFilter = "jql:from-filter"
@@ -658,7 +578,7 @@ func TestImportCommand_FilterFlagTakesPrecedenceOverJQL(t *testing.T) {
 }
 
 func TestImportCommand_JiraDefaultTokenEnv(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 
@@ -673,7 +593,7 @@ func TestImportCommand_JiraDefaultTokenEnv(t *testing.T) {
 }
 
 func TestImportCommand_JiraDefaultUserEnv(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 
@@ -688,7 +608,7 @@ func TestImportCommand_JiraDefaultUserEnv(t *testing.T) {
 }
 
 func TestImportCommand_JiraExplicitEnvOverridesDefaults(t *testing.T) {
-	resetImportFlags()
+	resetCLIState()
 	importSource = "jira"
 	importProject = "PROJ"
 	importTokenEnv = "MY_JIRA_TOKEN"
@@ -728,33 +648,13 @@ func TestProjectHint(t *testing.T) {
 	}
 }
 
-func capturePrintImportTable(t *testing.T, result *sync.ImportResult, summary importSummary, quietMode bool) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := printImportTable(result, summary, quietMode)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("printImportTable failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
-}
-
 func TestPrintImportTable_QuietMode(t *testing.T) {
 	result := &sync.ImportResult{
 		Created: []sync.ImportAction{{ExternalID: "1", LocalID: "001", Title: "Task"}},
 	}
 	summary := importSummary{Total: 1, Created: 1}
 
-	output := capturePrintImportTable(t, result, summary, true)
+	output := printImportTableStdout(t, result, summary, true)
 
 	if output != "" {
 		t.Errorf("expected no output in quiet mode, got %q", output)
@@ -770,7 +670,7 @@ func TestPrintImportTable_WithCreated(t *testing.T) {
 	}
 	summary := importSummary{Total: 2, Created: 2}
 
-	output := capturePrintImportTable(t, result, summary, false)
+	output := printImportTableStdout(t, result, summary, false)
 
 	if !strings.Contains(output, "Created 2 task(s)") {
 		t.Errorf("expected 'Created 2 task(s)', got %q", output)
@@ -791,7 +691,7 @@ func TestPrintImportTable_WithSkipped(t *testing.T) {
 	}
 	summary := importSummary{Total: 1, Skipped: 1}
 
-	output := capturePrintImportTable(t, result, summary, false)
+	output := printImportTableStdout(t, result, summary, false)
 
 	if !strings.Contains(output, "Skipped 1 task(s)") {
 		t.Errorf("expected 'Skipped 1 task(s)', got %q", output)
@@ -809,7 +709,7 @@ func TestPrintImportTable_WithErrors(t *testing.T) {
 	}
 	summary := importSummary{Total: 1, Errors: 1}
 
-	output := capturePrintImportTable(t, result, summary, false)
+	output := printImportTableStdout(t, result, summary, false)
 
 	if !strings.Contains(output, "Errors 1 task(s)") {
 		t.Errorf("expected 'Errors 1 task(s)', got %q", output)
@@ -836,7 +736,7 @@ func TestPrintImportTable_Summary(t *testing.T) {
 	}
 	summary := importSummary{Total: 3, Created: 1, Skipped: 1, Errors: 1}
 
-	output := capturePrintImportTable(t, result, summary, false)
+	output := printImportTableStdout(t, result, summary, false)
 
 	if !strings.Contains(output, "Done: 3 total, 1 created, 1 skipped, 1 errors") {
 		t.Errorf("expected summary line, got %q", output)

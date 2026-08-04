@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,45 +8,20 @@ import (
 	"testing"
 )
 
-func resetDedupFlags() {
-	dedupDryRun = false
-	dedupFormat = "text"
-	dedupNoInteractive = false
-	taskDir = "."
-}
-
-func createTaskFile(t *testing.T, dir, filename, content string) string {
+// dedupStdout runs `deduplicate <args...>` against repo, fails on error, and
+// returns stdout.
+func dedupStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-	path := filepath.Join(dir, filename)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("failed to create test file %s: %v", filename, err)
+	res := repo.Run(append([]string{"deduplicate"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("deduplicate %v failed: %v", args, res.Err)
 	}
-	return path
-}
-
-func captureDedup(t *testing.T, dir string) (string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runDeduplicate(deduplicateCmd, []string{dir})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	return res.Stdout
 }
 
 func TestDeduplicate_NoDuplicates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupNoInteractive = true
-
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -58,9 +32,8 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	createTaskFile(t, tmpDir, "002-task-b.md", `---
+`,
+		"002-task-b.md": `---
 id: "002"
 title: "Task B"
 status: pending
@@ -71,12 +44,10 @@ created: 2026-01-02
 ---
 
 # Task B
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--no-interactive")
 
 	if !strings.Contains(output, "No duplicate IDs found") {
 		t.Errorf("expected 'No duplicate IDs found', got: %s", output)
@@ -84,12 +55,9 @@ created: 2026-01-02
 }
 
 func TestDeduplicate_SingleCollision(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupNoInteractive = true
-
 	// Two tasks with the same ID "001", different created dates.
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -100,9 +68,8 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -113,12 +80,10 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--no-interactive")
 
 	if !strings.Contains(output, "1 duplicate") {
 		t.Errorf("expected '1 duplicate' in output, got: %s", output)
@@ -128,18 +93,18 @@ created: 2026-01-15
 	}
 
 	// Verify: older task (Task A) should still have ID 001
-	contentA, _ := os.ReadFile(filepath.Join(tmpDir, "001-task-a.md"))
+	contentA, _ := os.ReadFile(repo.Path("001-task-a.md"))
 	if !strings.Contains(string(contentA), `id: "001"`) {
 		t.Error("expected older task (Task A) to keep ID 001")
 	}
 
 	// Verify: newer task (Task B) should have a new ID and be renamed
-	files, _ := os.ReadDir(tmpDir)
+	files, _ := os.ReadDir(repo.Dir)
 	foundNewFile := false
 	for _, f := range files {
 		if f.Name() != "001-task-a.md" && strings.HasSuffix(f.Name(), ".md") {
 			foundNewFile = true
-			content, _ := os.ReadFile(filepath.Join(tmpDir, f.Name()))
+			content, _ := os.ReadFile(filepath.Join(repo.Dir, f.Name()))
 			if strings.Contains(string(content), `id: "001"`) {
 				t.Errorf("expected renamed file to have new ID, got content: %s", string(content))
 			}
@@ -154,12 +119,9 @@ created: 2026-01-15
 }
 
 func TestDeduplicate_MultipleCollisions(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupNoInteractive = true
-
-	// Collision on ID "001"
-	createTaskFile(t, tmpDir, "001-first.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Collision on ID "001"
+		"001-first.md": `---
 id: "001"
 title: "First"
 status: pending
@@ -170,9 +132,8 @@ created: 2026-01-01
 ---
 
 # First
-`)
-
-	createTaskFile(t, tmpDir, "001-second.md", `---
+`,
+		"001-second.md": `---
 id: "001"
 title: "Second"
 status: pending
@@ -183,10 +144,9 @@ created: 2026-01-10
 ---
 
 # Second
-`)
-
-	// Collision on ID "002"
-	createTaskFile(t, tmpDir, "002-third.md", `---
+`,
+		// Collision on ID "002"
+		"002-third.md": `---
 id: "002"
 title: "Third"
 status: pending
@@ -197,9 +157,8 @@ created: 2026-01-01
 ---
 
 # Third
-`)
-
-	createTaskFile(t, tmpDir, "002-fourth.md", `---
+`,
+		"002-fourth.md": `---
 id: "002"
 title: "Fourth"
 status: pending
@@ -210,31 +169,26 @@ created: 2026-01-10
 ---
 
 # Fourth
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--no-interactive")
 
 	if !strings.Contains(output, "2 duplicate") {
 		t.Errorf("expected '2 duplicate' in output, got: %s", output)
 	}
 
 	// Verify: both original files still exist
-	files, _ := os.ReadDir(tmpDir)
+	files, _ := os.ReadDir(repo.Dir)
 	if len(files) != 4 {
 		t.Errorf("expected 4 files, got %d", len(files))
 	}
 }
 
 func TestDeduplicate_CrossReferenceUpdate(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupNoInteractive = true
-
-	// Task A: older, keeps ID "001"
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID "001"
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -245,10 +199,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate of "001", will be reassigned
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate of "001", will be reassigned
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -259,10 +212,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001" (the duplicate ID)
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001" (the duplicate ID)
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -273,10 +225,9 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
-
-	// Task D: has parent "001"
-	createTaskFile(t, tmpDir, "003-task-d.md", `---
+`,
+		// Task D: has parent "001"
+		"003-task-d.md": `---
 id: "003"
 title: "Task D"
 status: pending
@@ -288,20 +239,20 @@ created: 2026-01-10
 ---
 
 # Task D
-`)
+`,
+	})
 
-	_, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("deduplicate", "--no-interactive"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Find what the new ID is from the renamed file
-	files, _ := os.ReadDir(tmpDir)
+	files, _ := os.ReadDir(repo.Dir)
 	var newID string
 	for _, f := range files {
 		name := f.Name()
 		if name != "001-task-a.md" && name != "002-task-c.md" && name != "003-task-d.md" && strings.HasSuffix(name, ".md") {
-			content, _ := os.ReadFile(filepath.Join(tmpDir, name))
+			content, _ := os.ReadFile(filepath.Join(repo.Dir, name))
 			// Extract new ID from frontmatter
 			for _, line := range strings.Split(string(content), "\n") {
 				if strings.HasPrefix(strings.TrimSpace(line), "id:") {
@@ -318,19 +269,16 @@ created: 2026-01-10
 
 	// In non-interactive mode, all references to "001" are rewritten to newID.
 	// This is the known limitation documented in the task.
-	contentC, _ := os.ReadFile(filepath.Join(tmpDir, "002-task-c.md"))
+	contentC, _ := os.ReadFile(repo.Path("002-task-c.md"))
 	_ = contentC
 
-	contentD, _ := os.ReadFile(filepath.Join(tmpDir, "003-task-d.md"))
+	contentD, _ := os.ReadFile(repo.Path("003-task-d.md"))
 	_ = contentD
 }
 
 func TestDeduplicate_DryRun(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupDryRun = true
-
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -341,9 +289,8 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -354,12 +301,10 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--dry-run")
 
 	if !strings.Contains(output, "dry-run") {
 		t.Errorf("expected 'dry-run' in output, got: %s", output)
@@ -369,24 +314,20 @@ created: 2026-01-15
 	}
 
 	// Verify: files should NOT be modified
-	contentB, _ := os.ReadFile(filepath.Join(tmpDir, "001-task-b.md"))
+	contentB, _ := os.ReadFile(repo.Path("001-task-b.md"))
 	if !strings.Contains(string(contentB), `id: "001"`) {
 		t.Error("dry-run should not modify files")
 	}
 
 	// Verify: file should NOT be renamed
-	if _, err := os.Stat(filepath.Join(tmpDir, "001-task-b.md")); os.IsNotExist(err) {
+	if _, err := os.Stat(repo.Path("001-task-b.md")); os.IsNotExist(err) {
 		t.Error("dry-run should not rename files")
 	}
 }
 
 func TestDeduplicate_JSONFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupFormat = "json"
-	dedupNoInteractive = true
-
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -397,9 +338,8 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -410,12 +350,10 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--format", "json", "--no-interactive")
 
 	var result deduplicateResult
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -437,11 +375,8 @@ created: 2026-01-15
 }
 
 func TestDeduplicate_NoDuplicates_JSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupFormat = "json"
-
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -452,12 +387,10 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--format", "json")
 
 	var result deduplicateResult
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -470,12 +403,9 @@ created: 2026-01-01
 }
 
 func TestDeduplicate_SameCreatedDate_FallbackToFilepath(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupNoInteractive = true
-
 	// Both tasks have the same created date — should fall back to filepath order.
-	createTaskFile(t, tmpDir, "001-aaa.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-aaa.md": `---
 id: "001"
 title: "AAA"
 status: pending
@@ -486,9 +416,8 @@ created: 2026-01-01
 ---
 
 # AAA
-`)
-
-	createTaskFile(t, tmpDir, "001-zzz.md", `---
+`,
+		"001-zzz.md": `---
 id: "001"
 title: "ZZZ"
 status: pending
@@ -499,21 +428,21 @@ created: 2026-01-01
 ---
 
 # ZZZ
-`)
+`,
+	})
 
-	_, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("deduplicate", "--no-interactive"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// AAA should keep the ID (comes first alphabetically), ZZZ should be reassigned
-	contentAAA, _ := os.ReadFile(filepath.Join(tmpDir, "001-aaa.md"))
+	contentAAA, _ := os.ReadFile(repo.Path("001-aaa.md"))
 	if !strings.Contains(string(contentAAA), `id: "001"`) {
 		t.Error("expected AAA (first alphabetically) to keep ID 001")
 	}
 
 	// ZZZ file should have been renamed
-	if _, err := os.Stat(filepath.Join(tmpDir, "001-zzz.md")); err == nil {
+	if _, err := os.Stat(repo.Path("001-zzz.md")); err == nil {
 		t.Error("expected 001-zzz.md to be renamed")
 	}
 }
@@ -570,16 +499,14 @@ func TestBuildNewFilePath(t *testing.T) {
 // --- Interactive disambiguation tests ---
 
 func TestDeduplicate_InteractiveDisambiguation(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-
 	// Override TTY check to return true for interactive mode.
 	oldIsTTY := dedupIsTTY
 	dedupIsTTY = func() bool { return true }
 	defer func() { dedupIsTTY = oldIsTTY }()
 
-	// Task A: older, keeps ID "001"
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID "001"
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -590,10 +517,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate of "001", will be reassigned
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate of "001", will be reassigned
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -604,10 +530,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001" — user will choose [1] (Task A, keeps ID)
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001" — user will choose [1] (Task A, keeps ID)
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -618,35 +543,33 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
+`,
+	})
 
 	// Simulate user choosing "1" (the oldest task, which keeps ID "001").
 	oldStdin := dedupStdinReader
 	dedupStdinReader = strings.NewReader("1\n")
 	defer func() { dedupStdinReader = oldStdin }()
 
-	_, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("deduplicate"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Task C should still reference "001" because user chose the task that keeps the ID.
-	contentC, _ := os.ReadFile(filepath.Join(tmpDir, "002-task-c.md"))
+	contentC, _ := os.ReadFile(repo.Path("002-task-c.md"))
 	if !strings.Contains(string(contentC), `"001"`) {
 		t.Errorf("expected Task C to still reference '001', got:\n%s", string(contentC))
 	}
 }
 
 func TestDeduplicate_InteractiveChooseReassigned(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-
 	oldIsTTY := dedupIsTTY
 	dedupIsTTY = func() bool { return true }
 	defer func() { dedupIsTTY = oldIsTTY }()
 
-	// Task A: older, keeps ID "001"
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID "001"
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -657,10 +580,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate, will be reassigned
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate, will be reassigned
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -671,10 +593,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001" — user will choose [2] (Task B, gets new ID)
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001" — user will choose [2] (Task B, gets new ID)
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -685,35 +606,33 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
+`,
+	})
 
 	// Simulate user choosing "2" (the reassigned task).
 	oldStdin := dedupStdinReader
 	dedupStdinReader = strings.NewReader("2\n")
 	defer func() { dedupStdinReader = oldStdin }()
 
-	_, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("deduplicate"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Task C should now reference the new ID (not "001").
-	contentC, _ := os.ReadFile(filepath.Join(tmpDir, "002-task-c.md"))
+	contentC, _ := os.ReadFile(repo.Path("002-task-c.md"))
 	if strings.Contains(string(contentC), `"001"`) {
 		t.Errorf("expected Task C's reference to be updated to new ID, got:\n%s", string(contentC))
 	}
 }
 
 func TestDeduplicate_InteractiveMultipleRefs(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-
 	oldIsTTY := dedupIsTTY
 	dedupIsTTY = func() bool { return true }
 	defer func() { dedupIsTTY = oldIsTTY }()
 
-	// Task A: older, keeps ID "001"
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID "001"
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -724,10 +643,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate of "001"
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate of "001"
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -738,10 +656,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001" — user chooses [1] (keep original)
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001" — user chooses [1] (keep original)
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -752,10 +669,9 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
-
-	// Task D: parent "001" — user chooses [2] (reassigned)
-	createTaskFile(t, tmpDir, "003-task-d.md", `---
+`,
+		// Task D: parent "001" — user chooses [2] (reassigned)
+		"003-task-d.md": `---
 id: "003"
 title: "Task D"
 status: pending
@@ -767,42 +683,39 @@ created: 2026-01-10
 ---
 
 # Task D
-`)
+`,
+	})
 
 	// Two prompts: first "1\n" for Task C's dep, then "2\n" for Task D's parent.
 	oldStdin := dedupStdinReader
 	dedupStdinReader = strings.NewReader("1\n2\n")
 	defer func() { dedupStdinReader = oldStdin }()
 
-	_, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if res := repo.Run("deduplicate"); res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Task C should still reference "001" (chose oldest).
-	contentC, _ := os.ReadFile(filepath.Join(tmpDir, "002-task-c.md"))
+	contentC, _ := os.ReadFile(repo.Path("002-task-c.md"))
 	if !strings.Contains(string(contentC), `"001"`) {
 		t.Errorf("expected Task C to still reference '001', got:\n%s", string(contentC))
 	}
 
 	// Task D should reference the new ID (chose reassigned).
-	contentD, _ := os.ReadFile(filepath.Join(tmpDir, "003-task-d.md"))
+	contentD, _ := os.ReadFile(repo.Path("003-task-d.md"))
 	if strings.Contains(string(contentD), `parent: "001"`) {
 		t.Errorf("expected Task D's parent to be updated to new ID, got:\n%s", string(contentD))
 	}
 }
 
 func TestDeduplicate_NoInteractiveFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupNoInteractive = true
-
 	oldIsTTY := dedupIsTTY
 	dedupIsTTY = func() bool { return true }
 	defer func() { dedupIsTTY = oldIsTTY }()
 
-	// Task A: older, keeps ID "001"
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID "001"
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -813,10 +726,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -827,10 +739,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001"
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001"
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -841,13 +752,11 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
+`,
+	})
 
 	// Should NOT prompt — no stdin needed.
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--no-interactive")
 
 	if !strings.Contains(output, "1 duplicate") {
 		t.Errorf("expected '1 duplicate' in output, got: %s", output)
@@ -858,16 +767,14 @@ created: 2026-01-10
 }
 
 func TestDeduplicate_NonTTYFallback(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-
 	// Simulate non-TTY environment.
 	oldIsTTY := dedupIsTTY
 	dedupIsTTY = func() bool { return false }
 	defer func() { dedupIsTTY = oldIsTTY }()
 
-	// Task A: older, keeps ID
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -878,10 +785,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -892,10 +798,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001"
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001"
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -906,13 +811,11 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
+`,
+	})
 
 	// Should NOT prompt (non-TTY) — no stdin input needed.
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo)
 
 	if !strings.Contains(output, "Resolved") {
 		t.Errorf("expected 'Resolved' in output, got: %s", output)
@@ -920,12 +823,9 @@ created: 2026-01-10
 }
 
 func TestDeduplicate_DryRunShowsAmbiguous(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-	dedupDryRun = true
-
-	// Task A: older, keeps ID "001"
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		// Task A: older, keeps ID "001"
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -936,10 +836,9 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	// Task B: newer duplicate of "001"
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		// Task B: newer duplicate of "001"
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -950,10 +849,9 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
-
-	// Task C: depends on "001" — ambiguous reference
-	createTaskFile(t, tmpDir, "002-task-c.md", `---
+`,
+		// Task C: depends on "001" — ambiguous reference
+		"002-task-c.md": `---
 id: "002"
 title: "Task C"
 status: pending
@@ -964,12 +862,10 @@ created: 2026-01-10
 ---
 
 # Task C
-`)
+`,
+	})
 
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo, "--dry-run")
 
 	if !strings.Contains(output, "Ambiguous references detected") {
 		t.Errorf("expected dry-run to show ambiguous references, got:\n%s", output)
@@ -986,15 +882,13 @@ created: 2026-01-10
 }
 
 func TestDeduplicate_NoAmbiguousRefs(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetDedupFlags()
-
 	oldIsTTY := dedupIsTTY
 	dedupIsTTY = func() bool { return true }
 	defer func() { dedupIsTTY = oldIsTTY }()
 
 	// Two tasks with same ID but no other task references them.
-	createTaskFile(t, tmpDir, "001-task-a.md", `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-task-a.md": `---
 id: "001"
 title: "Task A"
 status: pending
@@ -1005,9 +899,8 @@ created: 2026-01-01
 ---
 
 # Task A
-`)
-
-	createTaskFile(t, tmpDir, "001-task-b.md", `---
+`,
+		"001-task-b.md": `---
 id: "001"
 title: "Task B"
 status: pending
@@ -1018,13 +911,11 @@ created: 2026-01-15
 ---
 
 # Task B
-`)
+`,
+	})
 
 	// No stdin input needed — no ambiguous refs means no prompting.
-	output, err := captureDedup(t, tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	output := dedupStdout(t, repo)
 
 	if !strings.Contains(output, "Resolved") {
 		t.Errorf("expected 'Resolved' in output, got: %s", output)

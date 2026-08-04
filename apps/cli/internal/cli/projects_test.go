@@ -1,17 +1,12 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-func resetProjectsFlags() {
-	projectsFormat = "table"
-}
 
 // setupGlobalRegistry creates a temporary global config file with the given YAML content
 // and sets TASKMD_HOME_CONFIG to point to it.
@@ -32,86 +27,54 @@ func setupEmptyGlobalRegistry(t *testing.T) {
 	t.Setenv("TASKMD_HOME_CONFIG", filepath.Join(configDir, "nonexistent.yaml"))
 }
 
-// createProjectWithTasks creates a project directory with .taskmd.yaml and task files.
-func createProjectWithTasks(t *testing.T, taskDir string, tasks map[string]string) string {
+// createProjectWithTasks creates a project directory (a taskRepo) with a
+// .taskmd.yaml pointing at taskSubDir and the given task files, returning the
+// project's absolute path.
+func createProjectWithTasks(t *testing.T, taskSubDir string, tasks map[string]string) string {
 	t.Helper()
-	projectDir := t.TempDir()
-
-	tasksPath := filepath.Join(projectDir, taskDir)
-	if err := os.MkdirAll(tasksPath, 0755); err != nil {
-		t.Fatalf("failed to create tasks dir: %v", err)
-	}
-
-	// Write .taskmd.yaml pointing to the task directory
-	configContent := "task-dir: " + taskDir + "\n"
-	if err := os.WriteFile(filepath.Join(projectDir, ".taskmd.yaml"), []byte(configContent), 0644); err != nil {
-		t.Fatalf("failed to write .taskmd.yaml: %v", err)
-	}
-
+	repo := newTaskRepo(t, nil)
+	repo.Write(configFilename, "task-dir: "+taskSubDir+"\n")
 	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tasksPath, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create task file %s: %v", filename, err)
-		}
+		repo.Write(filepath.Join(taskSubDir, filename), content)
 	}
-
-	return projectDir
+	return repo.Dir
 }
 
-func captureProjectsOutput(t *testing.T) (string, string, error) {
+// runProjectsCmd runs `projects <args...>` against a throwaway repo (the command
+// reads the global registry, not a task dir) and returns the result.
+func runProjectsCmd(t *testing.T, args ...string) cliResult {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	rOut, wOut, _ := os.Pipe()
-	os.Stdout = wOut
-
-	oldStderr := os.Stderr
-	rErr, wErr, _ := os.Pipe()
-	os.Stderr = wErr
-
-	err := runProjects(projectsCmd, nil)
-
-	wOut.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	var bufOut, bufErr bytes.Buffer
-	bufOut.ReadFrom(rOut)
-	bufErr.ReadFrom(rErr)
-	return bufOut.String(), bufErr.String(), err
+	repo := newTaskRepo(t, nil)
+	return repo.Run(append([]string{"projects"}, args...)...)
 }
 
 func TestProjects_NoProjectsRegistered(t *testing.T) {
-	resetProjectsFlags()
 	setupEmptyGlobalRegistry(t)
 
-	_, stderr, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	if !strings.Contains(stderr, "No projects registered") {
-		t.Errorf("expected 'No projects registered' message, got:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "No projects registered") {
+		t.Errorf("expected 'No projects registered' message, got:\n%s", res.Stderr)
 	}
 }
 
 func TestProjects_EmptyProjectsList(t *testing.T) {
-	resetProjectsFlags()
 	setupGlobalRegistry(t, "projects: []\n")
 
-	_, stderr, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	if !strings.Contains(stderr, "No projects registered") {
-		t.Errorf("expected 'No projects registered' message, got:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "No projects registered") {
+		t.Errorf("expected 'No projects registered' message, got:\n%s", res.Stderr)
 	}
 }
 
 func TestProjects_ValidProjectsTable(t *testing.T) {
-	resetProjectsFlags()
-
 	projectDir := createProjectWithTasks(t, "tasks", map[string]string{
 		"001.md": taskFile("001", "Task A", "pending"),
 		"002.md": taskFile("002", "Task B", "in-progress"),
@@ -124,29 +87,26 @@ func TestProjects_ValidProjectsTable(t *testing.T) {
 		"    name: \"Test Project\"\n"+
 		"    path: "+projectDir+"\n")
 
-	stdout, _, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	for _, expected := range []string{"PROJECT", "PATH", "TASKS", "PENDING", "IN-PROGRESS", "COMPLETED"} {
-		if !strings.Contains(stdout, expected) {
-			t.Errorf("table output missing header %q:\n%s", expected, stdout)
+		if !strings.Contains(res.Stdout, expected) {
+			t.Errorf("table output missing header %q:\n%s", expected, res.Stdout)
 		}
 	}
 
-	if !strings.Contains(stdout, "Test Project") {
-		t.Errorf("table output missing project name:\n%s", stdout)
+	if !strings.Contains(res.Stdout, "Test Project") {
+		t.Errorf("table output missing project name:\n%s", res.Stdout)
 	}
-	if !strings.Contains(stdout, projectDir) {
-		t.Errorf("table output missing project path:\n%s", stdout)
+	if !strings.Contains(res.Stdout, projectDir) {
+		t.Errorf("table output missing project path:\n%s", res.Stdout)
 	}
 }
 
 func TestProjects_JSONOutput(t *testing.T) {
-	resetProjectsFlags()
-	projectsFormat = "json"
-
 	projectDir := createProjectWithTasks(t, "tasks", map[string]string{
 		"001.md": taskFile("001", "Task A", "pending"),
 		"002.md": taskFile("002", "Task B", "in-progress"),
@@ -158,14 +118,14 @@ func TestProjects_JSONOutput(t *testing.T) {
 		"    name: \"My Project\"\n"+
 		"    path: "+projectDir+"\n")
 
-	stdout, _, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	var summaries []ProjectSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if len(summaries) != 1 {
@@ -194,8 +154,6 @@ func TestProjects_JSONOutput(t *testing.T) {
 }
 
 func TestProjects_UnreachablePath(t *testing.T) {
-	resetProjectsFlags()
-
 	// Create one valid project
 	projectDir := createProjectWithTasks(t, "tasks", map[string]string{
 		"001.md": taskFile("001", "Task A", "pending"),
@@ -209,28 +167,25 @@ func TestProjects_UnreachablePath(t *testing.T) {
 		"    name: \"Valid Project\"\n"+
 		"    path: "+projectDir+"\n")
 
-	stdout, stderr, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	if !strings.Contains(stderr, "Warning") {
-		t.Errorf("expected warning for missing project, got stderr:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "Warning") {
+		t.Errorf("expected warning for missing project, got stderr:\n%s", res.Stderr)
 	}
-	if !strings.Contains(stderr, "Missing Project") {
-		t.Errorf("expected warning to mention 'Missing Project', got stderr:\n%s", stderr)
+	if !strings.Contains(res.Stderr, "Missing Project") {
+		t.Errorf("expected warning to mention 'Missing Project', got stderr:\n%s", res.Stderr)
 	}
 
 	// Valid project should still appear
-	if !strings.Contains(stdout, "Valid Project") {
-		t.Errorf("expected valid project in output, got:\n%s", stdout)
+	if !strings.Contains(res.Stdout, "Valid Project") {
+		t.Errorf("expected valid project in output, got:\n%s", res.Stdout)
 	}
 }
 
 func TestProjects_YAMLOutput(t *testing.T) {
-	resetProjectsFlags()
-	projectsFormat = "yaml"
-
 	projectDir := createProjectWithTasks(t, "tasks", map[string]string{
 		"001.md": taskFile("001", "Task A", "completed"),
 	})
@@ -240,50 +195,38 @@ func TestProjects_YAMLOutput(t *testing.T) {
 		"    name: \"YAML Project\"\n"+
 		"    path: "+projectDir+"\n")
 
-	stdout, _, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t, "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	if !strings.Contains(stdout, "name: YAML Project") {
-		t.Errorf("expected YAML output with project name, got:\n%s", stdout)
+	if !strings.Contains(res.Stdout, "name: YAML Project") {
+		t.Errorf("expected YAML output with project name, got:\n%s", res.Stdout)
 	}
-	if !strings.Contains(stdout, "completed: 1") {
-		t.Errorf("expected YAML output with completed count, got:\n%s", stdout)
+	if !strings.Contains(res.Stdout, "completed: 1") {
+		t.Errorf("expected YAML output with completed count, got:\n%s", res.Stdout)
 	}
 }
 
 func TestProjects_DefaultTaskDir(t *testing.T) {
-	resetProjectsFlags()
-	projectsFormat = "json"
-
 	// Create project without .taskmd.yaml — should default to ./tasks
-	projectDir := t.TempDir()
-	tasksDir := filepath.Join(projectDir, "tasks")
-	if err := os.MkdirAll(tasksDir, 0755); err != nil {
-		t.Fatalf("failed to create tasks dir: %v", err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(tasksDir, "001.md"),
-		[]byte(taskFile("001", "Default Dir Task", "pending")),
-		0644,
-	); err != nil {
-		t.Fatalf("failed to write task: %v", err)
-	}
+	repo := newTaskRepo(t, map[string]string{
+		"tasks/001.md": taskFile("001", "Default Dir Task", "pending"),
+	})
 
 	setupGlobalRegistry(t, "projects:\n"+
 		"  - id: proj1\n"+
 		"    name: \"Default Dir Project\"\n"+
-		"    path: "+projectDir+"\n")
+		"    path: "+repo.Dir+"\n")
 
-	stdout, _, err := captureProjectsOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runProjectsCmd(t, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	var summaries []ProjectSummary
-	if err := json.Unmarshal([]byte(stdout), &summaries); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if len(summaries) != 1 {
@@ -295,17 +238,8 @@ func TestProjects_DefaultTaskDir(t *testing.T) {
 }
 
 func TestProjects_InvalidFormat(t *testing.T) {
-	resetProjectsFlags()
-	projectsFormat = "csv"
-
-	setupGlobalRegistry(t, "projects:\n"+
-		"  - id: proj1\n"+
-		"    name: \"Test\"\n"+
-		"    path: /tmp\n")
-
-	// Create the /tmp path so it passes stat check, but the format error should come first
-	// since collectProjectSummaries runs before format switch — actually format switch is after.
-	// We need a valid project for the format branch to be reached.
+	// A valid project is needed so the format switch (which runs after
+	// collectProjectSummaries) is reached.
 	projectDir := createProjectWithTasks(t, "tasks", map[string]string{
 		"001.md": taskFile("001", "Task", "pending"),
 	})
@@ -314,12 +248,12 @@ func TestProjects_InvalidFormat(t *testing.T) {
 		"    name: \"Test\"\n"+
 		"    path: "+projectDir+"\n")
 
-	_, _, err := captureProjectsOutput(t)
-	if err == nil {
+	res := runProjectsCmd(t, "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 

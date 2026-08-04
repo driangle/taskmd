@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,95 +11,65 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/todos"
 )
 
-func resetTodosFlags() {
-	todosDir = "."
-	todosMarkers = nil
-	todosInclude = nil
-	todosExclude = nil
-	todosFormat = "table"
-	todosRawText = false
-	todosRich = false
-	noColor = true
-}
-
-func createTodosTestDir(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	writeTodosTestFile(t, filepath.Join(dir, "main.go"), `package main
+// todosSourceFiles is the canonical set of source files with TODO-style comments
+// scanned by the todos command tests. Kept inline (these are source files, not
+// task files) because their comment markers are the subject of the tests.
+func todosSourceFiles() map[string]string {
+	return map[string]string{
+		"main.go": `package main
 
 // TODO: implement main logic
 func main() {}
 
 // FIXME: handle error case
 func process() error { return nil }
-`)
-
-	writeTodosTestFile(t, filepath.Join(dir, "app.py"), `# HACK: workaround for upstream bug
+`,
+		"app.py": `# HACK: workaround for upstream bug
 import os
-`)
-
-	writeTodosTestFile(t, filepath.Join(dir, "style.css"), `/* NOTE: using hardcoded values */
+`,
+		"style.css": `/* NOTE: using hardcoded values */
 .container { width: 100%; }
-`)
-
-	return dir
-}
-
-func writeTodosTestFile(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
+`,
 	}
 }
 
-func captureTodosTableOutput(t *testing.T, items []todos.TodoItem) string {
+// todosTableStdout renders items through outputTodosTable and returns stdout,
+// failing on error. Color is disabled for deterministic output.
+func todosTableStdout(t *testing.T, items []todos.TodoItem, columns []string, rich bool) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
-	os.Stdout = w
-	os.Stderr = wErr
-
-	err := outputTodosTable(items, defaultColumns, false)
-	if err != nil {
-		w.Close()
-		wErr.Close()
-		os.Stdout = oldStdout
-		os.Stderr = oldStderr
-		t.Fatalf("outputTodosTable failed: %v", err)
+	noColor = true
+	var runErr error
+	stdout, _ := captureOutput(t, func() {
+		runErr = outputTodosTable(items, columns, rich)
+	})
+	if runErr != nil {
+		t.Fatalf("outputTodosTable failed: %v", runErr)
 	}
+	return stdout
+}
 
-	w.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	// drain stderr too
-	var stderrBuf bytes.Buffer
-	stderrBuf.ReadFrom(rErr)
-	return buf.String()
+// todosListJSON runs `todos list` for a JSON result, fails on error, and parses.
+func todosListJSON(t *testing.T, res cliResult) []todos.TodoItem {
+	t.Helper()
+	if res.Err != nil {
+		t.Fatalf("todos list failed: %v", res.Err)
+	}
+	var parsed []todos.TodoItem
+	if err := json.Unmarshal([]byte(res.Stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
+	}
+	return parsed
 }
 
 func TestTodosList_TableOutput(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
-	todosDir = dir
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	// Scan and capture output
-	items, err := todos.Scan(todos.ScanOptions{Dir: dir})
+	items, err := todos.Scan(todos.ScanOptions{Dir: repo.Dir})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	output := captureTodosTableOutput(t, items)
+	output := todosTableStdout(t, items, defaultColumns, false)
 
 	if !strings.Contains(output, "FILE") || !strings.Contains(output, "LINE") {
 		t.Error("expected header with FILE and LINE")
@@ -121,41 +89,29 @@ func TestTodosList_TableOutput(t *testing.T) {
 }
 
 func TestTodosList_TableOutputEmpty(t *testing.T) {
-	resetTodosFlags()
-
-	output := captureTodosTableOutput(t, nil)
+	output := todosTableStdout(t, nil, defaultColumns, false)
 	if !strings.Contains(output, "No TODO comments found") {
 		t.Error("expected 'No TODO comments found' message")
 	}
 }
 
 func TestTodosList_JSONOutput(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	items, err := todos.Scan(todos.ScanOptions{Dir: dir})
+	items, err := todos.Scan(todos.ScanOptions{Dir: repo.Dir})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err = WriteJSON(os.Stdout, items)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("WriteJSON failed: %v", err)
+	var runErr error
+	stdout, _ := captureOutput(t, func() { runErr = WriteJSON(os.Stdout, items) })
+	if runErr != nil {
+		t.Fatalf("WriteJSON failed: %v", runErr)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
 	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, buf.String())
+	if err := json.Unmarshal([]byte(stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, stdout)
 	}
 
 	if len(parsed) == 0 {
@@ -177,29 +133,18 @@ func TestTodosList_JSONOutput(t *testing.T) {
 }
 
 func TestTodosList_YAMLOutput(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	items, err := todos.Scan(todos.ScanOptions{Dir: dir})
+	items, err := todos.Scan(todos.ScanOptions{Dir: repo.Dir})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err = WriteYAML(os.Stdout, items)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("WriteYAML failed: %v", err)
+	var runErr error
+	output, _ := captureOutput(t, func() { runErr = WriteYAML(os.Stdout, items) })
+	if runErr != nil {
+		t.Fatalf("WriteYAML failed: %v", runErr)
 	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
 
 	if !strings.Contains(output, "file:") || !strings.Contains(output, "line:") {
 		t.Error("expected YAML with file and line fields")
@@ -210,11 +155,10 @@ func TestTodosList_YAMLOutput(t *testing.T) {
 }
 
 func TestTodosList_MarkerFilter(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
+	repo := newTaskRepo(t, todosSourceFiles())
 
 	items, err := todos.Scan(todos.ScanOptions{
-		Dir:     dir,
+		Dir:     repo.Dir,
 		Markers: []string{"TODO"},
 	})
 	if err != nil {
@@ -229,8 +173,6 @@ func TestTodosList_MarkerFilter(t *testing.T) {
 }
 
 func TestTodosList_InvalidMarker(t *testing.T) {
-	resetTodosFlags()
-
 	err := validateMarkers([]string{"INVALID"})
 	if err == nil {
 		t.Fatal("expected error for invalid marker")
@@ -242,8 +184,6 @@ func TestTodosList_InvalidMarker(t *testing.T) {
 }
 
 func TestTodosList_ValidMarkers(t *testing.T) {
-	resetTodosFlags()
-
 	err := validateMarkers(todos.DefaultMarkers)
 	if err != nil {
 		t.Fatalf("expected no error for valid markers, got: %v", err)
@@ -251,30 +191,10 @@ func TestTodosList_ValidMarkers(t *testing.T) {
 }
 
 func TestTodosList_RunCommand(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
-	todosDir = dir
-	todosFormat = "json"
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
+	res := repo.Run("todos", "list", "--dir", repo.Dir, "--format", "json")
+	parsed := todosListJSON(t, res)
 
 	if len(parsed) == 0 {
 		t.Fatal("expected items from runTodosList")
@@ -282,30 +202,10 @@ func TestTodosList_RunCommand(t *testing.T) {
 }
 
 func TestTodosList_EmptyDirectory(t *testing.T) {
-	resetTodosFlags()
-	dir := t.TempDir()
-	todosDir = dir
-	todosFormat = "json"
+	repo := newTaskRepo(t, nil)
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
+	res := repo.Run("todos", "list", "--dir", repo.Dir, "--format", "json")
+	parsed := todosListJSON(t, res)
 
 	if len(parsed) != 0 {
 		t.Fatalf("expected 0 items for empty dir, got %d", len(parsed))
@@ -313,16 +213,14 @@ func TestTodosList_EmptyDirectory(t *testing.T) {
 }
 
 func TestTodosList_InvalidFormat(t *testing.T) {
-	resetTodosFlags()
-	todosDir = t.TempDir()
-	todosFormat = "xml"
+	repo := newTaskRepo(t, nil)
 
-	err := runTodosList(nil, nil)
-	if err == nil {
+	res := repo.Run("todos", "list", "--dir", repo.Dir, "--format", "xml")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %s", err.Error())
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %s", res.Err.Error())
 	}
 }
 
@@ -381,40 +279,18 @@ func TestMergeConfigExcludes_NeitherSet(t *testing.T) {
 }
 
 func TestTodosList_ConfigExcludePattern(t *testing.T) {
-	resetTodosFlags()
-	dir := t.TempDir()
-	todosDir = dir
-	todosFormat = "json"
-
-	writeTodosTestFile(t, filepath.Join(dir, "main.go"), `package main
+	repo := newTaskRepo(t, map[string]string{
+		"main.go": `package main
 // TODO: keep this
-`)
-	writeTodosTestFile(t, filepath.Join(dir, "main_test.go"), `package main
+`,
+		"main_test.go": `package main
 // TODO: exclude this via config
-`)
+`,
+	})
 
-	viper.Set("todos.exclude", []string{"*_test.go"})
-	defer viper.Set("todos.exclude", nil)
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
+	res := repo.RunWith(func() { viper.Set("todos.exclude", []string{"*_test.go"}) },
+		"todos", "list", "--dir", repo.Dir, "--format", "json")
+	parsed := todosListJSON(t, res)
 
 	if len(parsed) != 1 {
 		t.Fatalf("expected 1 item (test file excluded by config), got %d", len(parsed))
@@ -425,43 +301,20 @@ func TestTodosList_ConfigExcludePattern(t *testing.T) {
 }
 
 func TestTodosList_ConfigAndCLIExcludeCombine(t *testing.T) {
-	resetTodosFlags()
-	dir := t.TempDir()
-	todosDir = dir
-	todosFormat = "json"
-	todosExclude = []string{"*.py"}
-
-	writeTodosTestFile(t, filepath.Join(dir, "main.go"), `package main
+	repo := newTaskRepo(t, map[string]string{
+		"main.go": `package main
 // TODO: keep this
-`)
-	writeTodosTestFile(t, filepath.Join(dir, "main_test.go"), `package main
+`,
+		"main_test.go": `package main
 // TODO: exclude via config
-`)
-	writeTodosTestFile(t, filepath.Join(dir, "app.py"), `# TODO: exclude via CLI flag
-`)
+`,
+		"app.py": `# TODO: exclude via CLI flag
+`,
+	})
 
-	viper.Set("todos.exclude", []string{"*_test.go"})
-	defer viper.Set("todos.exclude", nil)
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
+	res := repo.RunWith(func() { viper.Set("todos.exclude", []string{"*_test.go"}) },
+		"todos", "list", "--dir", repo.Dir, "--format", "json", "--exclude", "*.py")
+	parsed := todosListJSON(t, res)
 
 	if len(parsed) != 1 {
 		t.Fatalf("expected 1 item (test+py excluded), got %d", len(parsed))
@@ -472,40 +325,18 @@ func TestTodosList_ConfigAndCLIExcludeCombine(t *testing.T) {
 }
 
 func TestTodosList_ConfigExcludePathPattern(t *testing.T) {
-	resetTodosFlags()
-	dir := t.TempDir()
-	todosDir = dir
-	todosFormat = "json"
-
-	writeTodosTestFile(t, filepath.Join(dir, "main.go"), `package main
+	repo := newTaskRepo(t, map[string]string{
+		"main.go": `package main
 // TODO: keep this
-`)
-	writeTodosTestFile(t, filepath.Join(dir, "sub", "deep.go"), `package sub
+`,
+		"sub/deep.go": `package sub
 // TODO: exclude via path pattern
-`)
+`,
+	})
 
-	viper.Set("todos.exclude", []string{"sub/*.go"})
-	defer viper.Set("todos.exclude", nil)
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
+	res := repo.RunWith(func() { viper.Set("todos.exclude", []string{"sub/*.go"}) },
+		"todos", "list", "--dir", repo.Dir, "--format", "json")
+	parsed := todosListJSON(t, res)
 
 	if len(parsed) != 1 {
 		t.Fatalf("expected 1 item (sub/*.go excluded by config), got %d", len(parsed))
@@ -516,40 +347,17 @@ func TestTodosList_ConfigExcludePathPattern(t *testing.T) {
 }
 
 func TestTodosList_NoConfigExcludeUnchangedBehavior(t *testing.T) {
-	resetTodosFlags()
-	dir := t.TempDir()
-	todosDir = dir
-	todosFormat = "json"
-
-	// Ensure no config excludes are set
-	viper.Set("todos.exclude", nil)
-
-	writeTodosTestFile(t, filepath.Join(dir, "main.go"), `package main
+	repo := newTaskRepo(t, map[string]string{
+		"main.go": `package main
 // TODO: one
-`)
-	writeTodosTestFile(t, filepath.Join(dir, "main_test.go"), `package main
+`,
+		"main_test.go": `package main
 // TODO: two
-`)
+`,
+	})
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
+	res := repo.Run("todos", "list", "--dir", repo.Dir, "--format", "json")
+	parsed := todosListJSON(t, res)
 
 	if len(parsed) != 2 {
 		t.Fatalf("expected 2 items (no config excludes), got %d", len(parsed))
@@ -557,29 +365,18 @@ func TestTodosList_NoConfigExcludeUnchangedBehavior(t *testing.T) {
 }
 
 func TestTodosList_JSONOutputNewFields(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	items, err := todos.Scan(todos.ScanOptions{Dir: dir})
+	items, err := todos.Scan(todos.ScanOptions{Dir: repo.Dir})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err = WriteJSON(os.Stdout, items)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("WriteJSON failed: %v", err)
+	var runErr error
+	output, _ := captureOutput(t, func() { runErr = WriteJSON(os.Stdout, items) })
+	if runErr != nil {
+		t.Fatalf("WriteJSON failed: %v", runErr)
 	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
 
 	// Check that new fields are present in JSON
 	if !strings.Contains(output, `"id"`) {
@@ -597,7 +394,7 @@ func TestTodosList_JSONOutputNewFields(t *testing.T) {
 
 	// Verify fields parse correctly
 	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("failed to parse JSON: %v", err)
 	}
 	for _, item := range parsed {
@@ -614,34 +411,20 @@ func TestTodosList_JSONOutputNewFields(t *testing.T) {
 }
 
 func TestTodosList_RawTextFlag(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
-	todosDir = dir
-	todosFormat = "json"
-	todosRawText = true
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
+	res := repo.Run("todos", "list", "--dir", repo.Dir, "--format", "json", "--raw-text")
+	if res.Err != nil {
+		t.Fatalf("runTodosList failed: %v", res.Err)
 	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output := res.Stdout
 
 	if !strings.Contains(output, `"raw_text"`) {
 		t.Error("expected 'raw_text' field in JSON output when --raw-text is set")
 	}
 
 	var parsed []todos.TodoItem
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("failed to parse JSON: %v", err)
 	}
 	for _, item := range parsed {
@@ -652,64 +435,27 @@ func TestTodosList_RawTextFlag(t *testing.T) {
 }
 
 func TestTodosList_NoRawTextByDefault(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
-	todosDir = dir
-	todosFormat = "json"
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTodosList(nil, nil)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTodosList failed: %v", err)
+	res := repo.Run("todos", "list", "--dir", repo.Dir, "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runTodosList failed: %v", res.Err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	if strings.Contains(output, `"raw_text"`) {
+	if strings.Contains(res.Stdout, `"raw_text"`) {
 		t.Error("did not expect 'raw_text' in JSON output by default")
 	}
 }
 
 func TestTodosList_RichTableOutput(t *testing.T) {
-	resetTodosFlags()
-	dir := createTodosTestDir(t)
-	todosDir = dir
+	repo := newTaskRepo(t, todosSourceFiles())
 
-	items, err := todos.Scan(todos.ScanOptions{Dir: dir})
+	items, err := todos.Scan(todos.ScanOptions{Dir: repo.Dir})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
-	os.Stdout = w
-	os.Stderr = wErr
-
-	err = outputTodosTable(items, richColumns, true)
-	w.Close()
-	wErr.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("outputTodosTable with rich failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	var stderrBuf bytes.Buffer
-	stderrBuf.ReadFrom(rErr)
-	output := buf.String()
+	output := todosTableStdout(t, items, richColumns, true)
 
 	if !strings.Contains(output, "SCOPE") {
 		t.Error("expected SCOPE column in rich table output")

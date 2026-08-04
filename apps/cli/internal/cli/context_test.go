@@ -1,23 +1,19 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/apps/cli/internal/taskcontext"
 )
 
-func createContextTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// contextFiles is the context-specific fixture: task files exercising
+// touches/context/deps permutations, the referenced files they point at, and a
+// .taskmd.yaml defining the `cli` scope. Kept inline because the scope config
+// and referenced-file layout are the subject of these tests.
+func contextFiles() map[string]string {
+	return map[string]string{
 		"001-touches.md": `---
 id: "001"
 title: "Task with touches"
@@ -87,86 +83,39 @@ created: 2026-02-14
 
 # Missing files
 `,
-	}
-
-	for filename, content := range tasks {
-		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatalf("Failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	// Create referenced files
-	createDirAndFile(t, tmpDir, "docs/readme.md", "# README\n")
-	createDirAndFile(t, tmpDir, "docs/notes.md", "# Notes\n")
-	createDirAndFile(t, tmpDir, "src/main.go", "package main\n")
-	createDirAndFile(t, tmpDir, "src/util.go", "package main\n")
-
-	// Create a .taskmd.yaml with scope definitions
-	configContent := `scopes:
+		"docs/readme.md": "# README\n",
+		"docs/notes.md":  "# Notes\n",
+		"src/main.go":    "package main\n",
+		"src/util.go":    "package main\n",
+		".taskmd.yaml": `scopes:
   cli:
     paths:
       - "src/main.go"
       - "src/util.go"
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(configContent), 0o644); err != nil {
-		t.Fatalf("Failed to create config: %v", err)
+`,
 	}
-
-	return tmpDir
 }
 
-func createDirAndFile(t *testing.T, root, relPath, content string) {
+// contextWithConfig runs `context <args...>` against repo with the repo's
+// .taskmd.yaml scope config loaded into viper. The harness deliberately skips
+// config discovery, so the config is seeded through RunWith (mirroring the old
+// setupTestConfig) so scope paths and the project root resolve correctly.
+func contextWithConfig(t *testing.T, repo *taskRepo, args ...string) cliResult {
 	t.Helper()
-	fullPath := filepath.Join(root, relPath)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-}
-
-func resetContextFlags() {
-	ctxTaskID = ""
-	ctxFormat = "text"
-	ctxResolve = false
-	ctxIncludeContent = false
-	ctxIncludeDeps = false
-	ctxMaxFiles = 0
-	taskDir = "."
-}
-
-func captureContextOutput(t *testing.T) (string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runContext(contextCmd, nil)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	return repo.RunWith(func() {
+		cfgFile = repo.Path(".taskmd.yaml")
+		initConfig()
+	}, append([]string{"context"}, args...)...)
 }
 
 func TestContext_TouchesOnly(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, contextFiles())
 
-	// Override config path to use tmpDir's .taskmd.yaml
-	setupTestConfig(t, tmpDir)
-
-	ctxTaskID = "001"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "001")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "Context for task") {
 		t.Errorf("expected header, got: %s", output)
@@ -180,16 +129,13 @@ func TestContext_TouchesOnly(t *testing.T) {
 }
 
 func TestContext_ExplicitOnly(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "002"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "002")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "docs/readme.md") {
 		t.Errorf("expected docs/readme.md in output, got: %s", output)
@@ -200,16 +146,13 @@ func TestContext_ExplicitOnly(t *testing.T) {
 }
 
 func TestContext_BothSources(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "003"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "003")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "Scope files") {
 		t.Errorf("expected scope files section, got: %s", output)
@@ -220,16 +163,13 @@ func TestContext_BothSources(t *testing.T) {
 }
 
 func TestContext_EmptyTask(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "005"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "005")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "No context files found") {
 		t.Errorf("expected 'No context files found', got: %s", output)
@@ -237,31 +177,25 @@ func TestContext_EmptyTask(t *testing.T) {
 }
 
 func TestContext_TaskNotFound(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "999"
-	_, err := captureContextOutput(t)
-	if err == nil {
+	res := repo.Run("context", "--task-id", "999")
+	if res.Err == nil {
 		t.Fatal("expected error for non-existent task")
 	}
-	if !strings.Contains(err.Error(), "task not found") {
-		t.Errorf("expected 'task not found', got: %v", err)
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("expected 'task not found', got: %v", res.Err)
 	}
 }
 
 func TestContext_MissingFiles(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "006"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "006")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "does/not/exist.go") {
 		t.Errorf("expected missing file path in output, got: %s", output)
@@ -272,17 +206,13 @@ func TestContext_MissingFiles(t *testing.T) {
 }
 
 func TestContext_JSON(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "003"
-	ctxFormat = "json"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "003", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	var result taskcontext.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -316,17 +246,13 @@ func TestContext_JSON(t *testing.T) {
 }
 
 func TestContext_YAML(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "002"
-	ctxFormat = "yaml"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "002", "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "task_id:") {
 		t.Errorf("expected YAML task_id field, got: %s", output)
@@ -337,18 +263,13 @@ func TestContext_YAML(t *testing.T) {
 }
 
 func TestContext_IncludeContent(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "002"
-	ctxFormat = "json"
-	ctxIncludeContent = true
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "002", "--format", "json", "--include-content")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	var result taskcontext.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -367,18 +288,14 @@ func TestContext_IncludeContent(t *testing.T) {
 }
 
 func TestContext_IncludeContentText(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "002"
-	ctxIncludeContent = true
 	// default format is text
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "002", "--include-content")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	// Task body should appear
 	if !strings.Contains(output, "Some body text here.") {
@@ -397,18 +314,13 @@ func TestContext_IncludeContentText(t *testing.T) {
 }
 
 func TestContext_IncludeDeps(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "004"
-	ctxFormat = "json"
-	ctxIncludeDeps = true
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "004", "--format", "json", "--include-deps")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	var result taskcontext.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -430,18 +342,13 @@ func TestContext_IncludeDeps(t *testing.T) {
 }
 
 func TestContext_MaxFiles(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "003"
-	ctxFormat = "json"
-	ctxMaxFiles = 1
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "003", "--format", "json", "--max-files", "1")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	var result taskcontext.Result
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -454,32 +361,25 @@ func TestContext_MaxFiles(t *testing.T) {
 }
 
 func TestContext_InvalidFormat(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "001"
-	ctxFormat = "csv"
-	_, err := captureContextOutput(t)
-	if err == nil {
+	res := repo.Run("context", "--task-id", "001", "--format", "csv")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestContext_Dependencies(t *testing.T) {
-	tmpDir := createContextTestFiles(t)
-	resetContextFlags()
-	taskDir = tmpDir
-	setupTestConfig(t, tmpDir)
+	repo := newTaskRepo(t, contextFiles())
 
-	ctxTaskID = "004"
-	output, err := captureContextOutput(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := contextWithConfig(t, repo, "--task-id", "004")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
+	output := res.Stdout
 
 	if !strings.Contains(output, "Dependencies") {
 		t.Errorf("expected Dependencies section, got: %s", output)
@@ -487,19 +387,4 @@ func TestContext_Dependencies(t *testing.T) {
 	if !strings.Contains(output, "001") {
 		t.Errorf("expected dependency ID 001, got: %s", output)
 	}
-}
-
-// setupTestConfig sets viper to read the .taskmd.yaml from the test directory.
-func setupTestConfig(t *testing.T, dir string) {
-	t.Helper()
-	configPath := filepath.Join(dir, ".taskmd.yaml")
-	oldConfigFile := cfgFile
-	t.Cleanup(func() {
-		cfgFile = oldConfigFile
-		viper.Reset()
-	})
-	cfgFile = configPath
-	initConfig()
-	// Ensure taskDir still points to tmpDir (config's "dir" is relative to the config file)
-	taskDir = dir
 }

@@ -1,41 +1,59 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-func resetTagsFlags() {
-	tagsFilters = []string{}
-	noColor = true
+// tagsFiles is the tags-specific fixture: three tasks whose tag sets drive the
+// aggregation counts these tests assert on. Kept inline because the exact
+// tag-to-task mapping is the subject of the tests.
+func tagsFiles() map[string]string {
+	return map[string]string{
+		"001-task-one.md": `---
+id: "001"
+title: "Task One"
+status: pending
+tags:
+  - cli
+  - mvp
+---
+# Task One
+`,
+		"002-task-two.md": `---
+id: "002"
+title: "Task Two"
+status: completed
+tags:
+  - cli
+  - web
+---
+# Task Two
+`,
+		"003-task-three.md": `---
+id: "003"
+title: "Task Three"
+status: pending
+tags:
+  - mvp
+  - docs
+---
+# Task Three
+`,
+	}
 }
 
-func captureTagsTableOutput(t *testing.T, tagInfos []TagInfo) string {
+// tagsStdout runs `tags <args...>` against repo, fails on error, returns stdout.
+func tagsStdout(t *testing.T, repo *taskRepo, args ...string) string {
 	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputTagsTable(tagInfos)
-	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
-		t.Fatalf("outputTagsTable failed: %v", err)
+	res := repo.Run(append([]string{"tags"}, args...)...)
+	if res.Err != nil {
+		t.Fatalf("tags %v failed: %v", args, res.Err)
 	}
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
+	return res.Stdout
 }
 
 func TestAggregateTags_HappyPath(t *testing.T) {
@@ -115,7 +133,8 @@ func TestAggregateTags_TieBreakAlphabetical(t *testing.T) {
 }
 
 func TestOutputTagsTable_HappyPath(t *testing.T) {
-	resetTagsFlags()
+	noColor = true
+	defer func() { noColor = false }()
 
 	tagInfos := []TagInfo{
 		{Tag: "cli", Count: 12},
@@ -123,7 +142,13 @@ func TestOutputTagsTable_HappyPath(t *testing.T) {
 		{Tag: "commands", Count: 5},
 	}
 
-	output := captureTagsTableOutput(t, tagInfos)
+	var err error
+	output, _ := captureOutput(t, func() {
+		err = outputTagsTable(tagInfos)
+	})
+	if err != nil {
+		t.Fatalf("outputTagsTable failed: %v", err)
+	}
 
 	if !strings.Contains(output, "TAG") || !strings.Contains(output, "COUNT") {
 		t.Error("expected header with TAG and COUNT")
@@ -140,9 +165,16 @@ func TestOutputTagsTable_HappyPath(t *testing.T) {
 }
 
 func TestOutputTagsTable_NoTags(t *testing.T) {
-	resetTagsFlags()
+	noColor = true
+	defer func() { noColor = false }()
 
-	output := captureTagsTableOutput(t, []TagInfo{})
+	var err error
+	output, _ := captureOutput(t, func() {
+		err = outputTagsTable([]TagInfo{})
+	})
+	if err != nil {
+		t.Fatalf("outputTagsTable failed: %v", err)
+	}
 
 	if !strings.Contains(output, "No tags found") {
 		t.Error("expected 'No tags found' message for empty tags")
@@ -150,32 +182,21 @@ func TestOutputTagsTable_NoTags(t *testing.T) {
 }
 
 func TestOutputTagsJSON(t *testing.T) {
-	resetTagsFlags()
-
 	tagInfos := []TagInfo{
 		{Tag: "cli", Count: 5},
 		{Tag: "web", Count: 3},
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := outputTagsJSON(tagInfos)
+	var err error
+	output, _ := captureOutput(t, func() {
+		err = outputTagsJSON(tagInfos)
+	})
 	if err != nil {
-		w.Close()
-		os.Stdout = oldStdout
 		t.Fatalf("outputTagsJSON failed: %v", err)
 	}
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
 	var parsed []TagInfo
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
 		t.Fatalf("failed to parse JSON output: %v", err)
 	}
 
@@ -190,72 +211,10 @@ func TestOutputTagsJSON(t *testing.T) {
 	}
 }
 
-func createTagsTestFiles(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	task1 := `---
-id: "001"
-title: "Task One"
-status: pending
-tags:
-  - cli
-  - mvp
----
-# Task One
-`
-	task2 := `---
-id: "002"
-title: "Task Two"
-status: completed
-tags:
-  - cli
-  - web
----
-# Task Two
-`
-	task3 := `---
-id: "003"
-title: "Task Three"
-status: pending
-tags:
-  - mvp
-  - docs
----
-# Task Three
-`
-	os.WriteFile(filepath.Join(dir, "001-task-one.md"), []byte(task1), 0644)
-	os.WriteFile(filepath.Join(dir, "002-task-two.md"), []byte(task2), 0644)
-	os.WriteFile(filepath.Join(dir, "003-task-three.md"), []byte(task3), 0644)
-	return dir
-}
-
-func captureRunTagsOutput(t *testing.T, args []string) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runTags(tagsCmd, args)
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("runTags failed: %v", err)
-	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String()
-}
-
 func TestRunTags_TableOutput(t *testing.T) {
-	dir := createTagsTestFiles(t)
-	resetTagsFlags()
-	tagsFormat = "table"
+	repo := newTaskRepo(t, tagsFiles())
 
-	output := captureRunTagsOutput(t, []string{dir})
+	output := tagsStdout(t, repo, "--format", "table", "--no-color")
 
 	if !strings.Contains(output, "TAG") || !strings.Contains(output, "COUNT") {
 		t.Error("expected TAG and COUNT headers in table output")
@@ -269,11 +228,9 @@ func TestRunTags_TableOutput(t *testing.T) {
 }
 
 func TestRunTags_JSONOutput(t *testing.T) {
-	dir := createTagsTestFiles(t)
-	resetTagsFlags()
-	tagsFormat = "json"
+	repo := newTaskRepo(t, tagsFiles())
 
-	output := captureRunTagsOutput(t, []string{dir})
+	output := tagsStdout(t, repo, "--format", "json")
 
 	var parsed []TagInfo
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
@@ -298,11 +255,9 @@ func TestRunTags_JSONOutput(t *testing.T) {
 }
 
 func TestRunTags_YAMLOutput(t *testing.T) {
-	dir := createTagsTestFiles(t)
-	resetTagsFlags()
-	tagsFormat = "yaml"
+	repo := newTaskRepo(t, tagsFiles())
 
-	output := captureRunTagsOutput(t, []string{dir})
+	output := tagsStdout(t, repo, "--format", "yaml")
 
 	if !strings.Contains(output, "tag:") || !strings.Contains(output, "count:") {
 		t.Error("expected YAML keys 'tag:' and 'count:' in output")
@@ -310,26 +265,21 @@ func TestRunTags_YAMLOutput(t *testing.T) {
 }
 
 func TestRunTags_InvalidFormat(t *testing.T) {
-	dir := createTagsTestFiles(t)
-	resetTagsFlags()
-	tagsFormat = "invalid"
+	repo := newTaskRepo(t, tagsFiles())
 
-	err := runTags(tagsCmd, []string{dir})
-	if err == nil {
+	res := repo.Run("tags", "--format", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestRunTags_WithFilter(t *testing.T) {
-	dir := createTagsTestFiles(t)
-	resetTagsFlags()
-	tagsFormat = "json"
-	tagsFilters = []string{"status=pending"}
+	repo := newTaskRepo(t, tagsFiles())
 
-	output := captureRunTagsOutput(t, []string{dir})
+	output := tagsStdout(t, repo, "--format", "json", "--filter", "status=pending")
 
 	var parsed []TagInfo
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
@@ -354,11 +304,9 @@ func TestRunTags_WithFilter(t *testing.T) {
 }
 
 func TestRunTags_EmptyDir(t *testing.T) {
-	dir := t.TempDir()
-	resetTagsFlags()
-	tagsFormat = "table"
+	repo := newTaskRepo(t, nil)
 
-	output := captureRunTagsOutput(t, []string{dir})
+	output := tagsStdout(t, repo, "--format", "table", "--no-color")
 
 	if !strings.Contains(output, "No tags found") {
 		t.Error("expected 'No tags found' for empty directory")

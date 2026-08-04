@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -43,65 +40,27 @@ func TestResolveScanDir_PositionalArgOverridesFlag(t *testing.T) {
 }
 
 func TestDirFlag_ListIntegration(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create a minimal task file
-	taskContent := `---
+	repo := newTaskRepo(t, map[string]string{
+		"001.md": `---
 id: "001"
 title: "Test Task"
 status: pending
 priority: high
 ---
 # Test Task
-`
-	err := os.WriteFile(filepath.Join(tmpDir, "001.md"), []byte(taskContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test task file: %v", err)
-	}
+`,
+	})
 
-	// Save and reset flags
-	oldDir := taskDir
-	oldListFormat := listFormat
-	oldFilters := listFilters
-	oldSort := listSort
-	oldColumns := listColumns
-	defer func() {
-		taskDir = oldDir
-		listFormat = oldListFormat
-		listFilters = oldFilters
-		listSort = oldSort
-		listColumns = oldColumns
-	}()
-
-	// Use --task-dir flag (no positional arg)
-	taskDir = tmpDir
-	listFormat = "json"
-	listFilters = []string{}
-	listSort = ""
-	listColumns = "id,title,status,priority"
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err = runList(listCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	if err != nil {
-		t.Fatalf("runList with --dir flag failed: %v", err)
+	// Use --task-dir flag (no positional arg) to verify the flag is honored.
+	res := repo.Run("list", "--task-dir", repo.Dir, "--format", "json", "--columns", "id,title,status,priority")
+	if res.Err != nil {
+		t.Fatalf("runList with --dir flag failed: %v", res.Err)
 	}
 
 	// Verify output contains the task
 	var tasks []map[string]any
-	if err := json.Unmarshal([]byte(output), &tasks); err != nil {
-		t.Fatalf("failed to parse JSON output: %v\noutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &tasks); err != nil {
+		t.Fatalf("failed to parse JSON output: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if len(tasks) != 1 {

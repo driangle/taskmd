@@ -9,25 +9,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// resetViper clears viper state for a clean test environment
-func resetViper() {
-	viper.Reset()
-}
-
-// resetFlags resets global flag variables to their defaults
-func resetFlags() {
-	cfgFile = ""
-	stdin = false
-	quiet = false
-	verbose = false
-	taskDir = "."
-	projectFlag = ""
-	allProjectsFlag = false
-	webPort = 8080
-	webDev = false
-	webOpen = false
-}
-
 // createConfigFile creates a .taskmd.yaml file with the given content
 func createConfigFile(t *testing.T, dir, content string) string {
 	t.Helper()
@@ -39,10 +20,8 @@ func createConfigFile(t *testing.T, dir, content string) string {
 }
 
 func TestConfigFile_ProjectLevel(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper() // Clean up after test
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create a temporary project directory with config
 	projectDir := t.TempDir()
@@ -92,10 +71,8 @@ verbose: true
 }
 
 func TestConfigFile_GlobalLevel(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create a temporary home directory with config
 	homeDir := t.TempDir()
@@ -149,10 +126,8 @@ verbose: true
 }
 
 func TestConfigFile_Precedence_ProjectOverGlobal(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create global config
 	homeDir := t.TempDir()
@@ -213,10 +188,8 @@ verbose: false
 }
 
 func TestConfigFile_Precedence_FlagOverConfig(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create project config
 	projectDir := t.TempDir()
@@ -266,10 +239,8 @@ verbose: true
 }
 
 func TestConfigFile_WebOptions(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create project config with web options
 	projectDir := t.TempDir()
@@ -321,10 +292,8 @@ web:
 }
 
 func TestConfigFile_Defaults(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create empty temp directory (no config file)
 	workDir := t.TempDir()
@@ -371,10 +340,8 @@ func TestConfigFile_Defaults(t *testing.T) {
 }
 
 func TestConfigFile_ExplicitConfigFile(t *testing.T) {
-	resetViper()
-	resetFlags()
-	defer resetViper()
-	defer resetFlags()
+	resetCLIState()
+	defer resetCLIState()
 
 	// Create a custom config file in a specific location
 	configDir := t.TempDir()

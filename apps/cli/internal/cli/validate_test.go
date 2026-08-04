@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -58,16 +57,10 @@ func TestParseScopeEntries_WithoutDescription(t *testing.T) {
 
 // --- Helpers ---
 
-func resetValidateFlags() {
-	validateFormat = "text"
-	validateStrict = false
-}
-
-func createValidateTestFiles(t *testing.T) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-
-	tasks := map[string]string{
+// validateFiles is the recurring valid-task fixture for validate command tests:
+// two valid tasks where 002 depends on 001. Command-specific, so it stays inline.
+func validateFiles() map[string]string {
+	return map[string]string{
 		"001-valid.md": `---
 id: "001"
 title: "Valid Task"
@@ -95,31 +88,6 @@ created: 2026-02-08
 Another valid task.
 `,
 	}
-
-	for filename, content := range tasks {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), []byte(content), 0644); err != nil {
-			t.Fatalf("failed to create test file %s: %v", filename, err)
-		}
-	}
-
-	return tmpDir
-}
-
-func captureValidateOutput(t *testing.T, args []string) (string, error) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runValidate(validateCmd, args)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
 }
 
 // --- Unit tests (no file I/O) ---
@@ -155,18 +123,9 @@ func TestOutputValidationText_NoIssues(t *testing.T) {
 		TaskCount: 5,
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	outputValidationText(result, false)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		outputValidationText(result, false)
+	})
 
 	if !strings.Contains(output, "5 task(s) are valid") {
 		t.Errorf("expected success message, got:\n%s", output)
@@ -183,18 +142,9 @@ func TestOutputValidationText_WithErrors(t *testing.T) {
 		TaskCount: 3,
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	outputValidationText(result, false)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		outputValidationText(result, false)
+	})
 
 	if !strings.Contains(output, "2 error(s)") {
 		t.Errorf("expected error count, got:\n%s", output)
@@ -210,18 +160,9 @@ func TestOutputValidationText_WithWarnings(t *testing.T) {
 		TaskCount: 2,
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	outputValidationText(result, false)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		outputValidationText(result, false)
+	})
 
 	if !strings.Contains(output, "1 warning(s)") {
 		t.Errorf("expected warning count, got:\n%s", output)
@@ -234,18 +175,9 @@ func TestOutputValidationText_Quiet(t *testing.T) {
 		TaskCount: 3,
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	outputValidationText(result, true)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		outputValidationText(result, true)
+	})
 
 	if output != "" {
 		t.Errorf("expected no output in quiet mode, got:\n%s", output)
@@ -259,18 +191,9 @@ func TestPrintIssue_WithTaskID(t *testing.T) {
 		Message: "something wrong",
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	printIssue(issue, getRenderer())
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		printIssue(issue, getRenderer())
+	})
 
 	if !strings.Contains(output, "042") {
 		t.Errorf("expected task ID in output, got:\n%s", output)
@@ -286,18 +209,9 @@ func TestPrintIssue_WithoutTaskID(t *testing.T) {
 		Message: "global error",
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	printIssue(issue, getRenderer())
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		printIssue(issue, getRenderer())
+	})
 
 	if !strings.Contains(output, "global error") {
 		t.Errorf("expected message in output, got:\n%s", output)
@@ -316,18 +230,9 @@ func TestPrintIssue_WithFilePath(t *testing.T) {
 		Message:  "some issue",
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	printIssue(issue, getRenderer())
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	output, _ := captureOutput(t, func() {
+		printIssue(issue, getRenderer())
+	})
 
 	if !strings.Contains(output, "tasks/001-test.md") {
 		t.Errorf("expected file path in output, got:\n%s", output)
@@ -343,22 +248,14 @@ func TestOutputValidationJSON(t *testing.T) {
 		TaskCount: 2,
 	}
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var jsonErr error
+	output, _ := captureOutput(t, func() {
+		jsonErr = outputValidationJSON(result)
+	})
 
-	err := outputValidationJSON(result)
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("outputValidationJSON failed: %v", err)
+	if jsonErr != nil {
+		t.Fatalf("outputValidationJSON failed: %v", jsonErr)
 	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
 
 	var parsed validator.ValidationResult
 	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
@@ -379,32 +276,29 @@ func TestOutputValidationJSON(t *testing.T) {
 // --- Command-level tests ---
 
 func TestRunValidate_ValidTasks(t *testing.T) {
-	tmpDir := createValidateTestFiles(t)
-	resetValidateFlags()
+	repo := newTaskRepo(t, validateFiles())
 
-	output, err := captureValidateOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runValidate failed: %v", err)
+	res := repo.Run("validate")
+	if res.Err != nil {
+		t.Fatalf("runValidate failed: %v", res.Err)
 	}
 
-	if !strings.Contains(output, "2 task(s) are valid") {
-		t.Errorf("expected success message, got:\n%s", output)
+	if !strings.Contains(res.Stdout, "2 task(s) are valid") {
+		t.Errorf("expected success message, got:\n%s", res.Stdout)
 	}
 }
 
 func TestRunValidate_JSONFormat(t *testing.T) {
-	tmpDir := createValidateTestFiles(t)
-	resetValidateFlags()
-	validateFormat = "json"
+	repo := newTaskRepo(t, validateFiles())
 
-	output, err := captureValidateOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runValidate failed: %v", err)
+	res := repo.Run("validate", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runValidate failed: %v", res.Err)
 	}
 
 	var parsed validator.ValidationResult
-	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if parsed.TaskCount != 2 {
@@ -413,24 +307,21 @@ func TestRunValidate_JSONFormat(t *testing.T) {
 }
 
 func TestRunValidate_InvalidFormat(t *testing.T) {
-	tmpDir := createValidateTestFiles(t)
-	resetValidateFlags()
-	validateFormat = "invalid"
+	repo := newTaskRepo(t, validateFiles())
 
-	_, err := captureValidateOutput(t, []string{tmpDir})
-	if err == nil {
+	res := repo.Run("validate", "--format", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid format, got nil")
 	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("expected 'unsupported format' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "unsupported format") {
+		t.Errorf("expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 
 func TestRunValidate_StrictMode_NoWarnings(t *testing.T) {
 	// Valid tasks with ALL optional fields filled — strict mode should produce no warnings
-	tmpDir := t.TempDir()
-
-	task := `---
+	repo := newTaskRepo(t, map[string]string{
+		"001-complete.md": `---
 id: "001"
 title: "Complete Task"
 status: pending
@@ -442,23 +333,17 @@ created: 2026-02-08
 ---
 
 A fully specified task with body content.
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "001-complete.md"), []byte(task), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
+`,
+	})
 
-	resetValidateFlags()
-	validateStrict = true
-	validateFormat = "json"
-
-	output, err := captureValidateOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runValidate failed: %v", err)
+	res := repo.Run("validate", "--strict", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runValidate failed: %v", res.Err)
 	}
 
 	var parsed validator.ValidationResult
-	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	if parsed.Warnings != 0 {
@@ -531,10 +416,9 @@ func TestRunValidate_InvalidTasks(t *testing.T) {
 }
 
 func TestRunValidate_WithArchive(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Active task that depends on an archived task
-	activeTask := `---
+	// Active task that depends on an archived task; archived task lives under archive/.
+	repo := newTaskRepo(t, map[string]string{
+		"010-active.md": `---
 id: "010"
 title: "Active Task"
 status: pending
@@ -542,39 +426,25 @@ dependencies: ["050"]
 ---
 
 Depends on archived task.
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "010-active.md"), []byte(activeTask), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
-
-	// Archived task in archive directory
-	archiveDir := filepath.Join(tmpDir, "archive")
-	if err := os.MkdirAll(archiveDir, 0755); err != nil {
-		t.Fatalf("failed to create archive dir: %v", err)
-	}
-	archivedTask := `---
+`,
+		"archive/050-archived.md": `---
 id: "050"
 title: "Archived Task"
 status: completed
 ---
 
 Done.
-`
-	if err := os.WriteFile(filepath.Join(archiveDir, "050-archived.md"), []byte(archivedTask), 0644); err != nil {
-		t.Fatalf("failed to create archived file: %v", err)
-	}
+`,
+	})
 
-	resetValidateFlags()
-	validateFormat = "json"
-
-	output, err := captureValidateOutput(t, []string{tmpDir})
-	if err != nil {
-		t.Fatalf("runValidate failed: %v", err)
+	res := repo.Run("validate", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("runValidate failed: %v", res.Err)
 	}
 
 	var parsed validator.ValidationResult
-	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, output)
+	if err := json.Unmarshal([]byte(res.Stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse JSON: %v\noutput: %s", err, res.Stdout)
 	}
 
 	// Should NOT have a missing dependency error since "050" is in archive
@@ -642,33 +512,6 @@ func TestCollectArchivedIDs_NoArchive(t *testing.T) {
 }
 
 func TestRunValidate_WithConfig_Scopes(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Create a task with a touches field
-	task := `---
-id: "001"
-title: "Task with touches"
-status: pending
-touches: ["cli/graph", "undefined-scope"]
----
-
-A task that touches scopes.
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, "001-task.md"), []byte(task), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
-
-	// Create a .taskmd.yaml config with scopes
-	config := `scopes:
-  cli/graph:
-    description: "Graph visualization"
-    paths:
-      - "apps/cli/internal/graph/"
-`
-	if err := os.WriteFile(filepath.Join(tmpDir, ".taskmd.yaml"), []byte(config), 0644); err != nil {
-		t.Fatalf("failed to create config file: %v", err)
-	}
-
 	// Use validateConfig directly with mock config data to avoid viper global state
 	v := validator.NewValidator(false)
 	tasks := []*model.Task{
@@ -681,7 +524,7 @@ A task that touches scopes.
 			"cli/graph": {Description: "Graph visualization", Paths: []string{"apps/cli/internal/graph/"}},
 		},
 		TopKeys:    []string{"scopes"},
-		ConfigPath: filepath.Join(tmpDir, ".taskmd.yaml"),
+		ConfigPath: ".taskmd.yaml",
 	}
 
 	validateConfig(v, validationResult, tasks)

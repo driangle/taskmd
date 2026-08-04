@@ -243,7 +243,26 @@ func (r *taskRepo) Path(name string) string {
 // error-path tests need no special casing.
 func (r *taskRepo) Run(args ...string) cliResult {
 	r.t.Helper()
+	return r.RunWith(nil, args...)
+}
+
+// RunWith is Run with a configure hook invoked after the global-state reset and
+// before the command executes. Use it for tests that must seed viper config the
+// harness's hermetic reset would otherwise wipe.
+//
+// The harness runs commands' RunE directly and deliberately skips cobra's
+// initConfig (which would discover the developer's real .taskmd.yaml), so a repo
+// .taskmd.yaml is NOT auto-loaded. Tests that need config (e.g. phase ordering,
+// strict mode) inject it here — it runs after resetCLIState()'s viper.Reset, so
+// it survives into the command, and the next Run's reset clears it. Example:
+//
+//	repo.RunWith(func() { viper.Set("phases", items) }, "next", "--format", "json")
+func (r *taskRepo) RunWith(configure func(), args ...string) cliResult {
+	r.t.Helper()
 	resetCLIState()
+	if configure != nil {
+		configure()
+	}
 
 	cmd, flagArgs, findErr := rootCmd.Find(args)
 	if findErr != nil {

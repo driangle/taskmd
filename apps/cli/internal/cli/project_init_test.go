@@ -8,41 +8,34 @@ import (
 	"testing"
 )
 
-func resetProjectInitFlags(tmpDir string) {
-	projectInitForce = false
-	projectInitStdout = false
-	projectInitClaude = false
-	projectInitGemini = false
-	projectInitCodex = false
-	projectInitNoSpec = false
-	projectInitNoAgent = false
-	projectInitNoTemplates = false
-	projectInitTaskDir = tmpDir
-	projectInitIDStrategy = ""
-	projectInitIDPrefix = ""
-	projectInitRoot = tmpDir
-	projectInitIsTTY = func() bool { return false }
-	taskDir = tmpDir
-	// Reset cobra flag changed state so resolveInitIDStrategy sees them as unset
-	if f := projectInitCmd.Flags().Lookup("id-strategy"); f != nil {
-		f.Changed = false
-	}
-	if f := projectInitCmd.Flags().Lookup("id-prefix"); f != nil {
-		f.Changed = false
-	}
+// runInit executes the `init` command against repo, rooted at repo.Dir with the
+// task directory also at repo.Dir (so files land in the repo root), in non-TTY
+// mode. projectInitRoot and projectInitIsTTY are non-flag globals the harness
+// reset does not cover, so they are seeded in the RunWith configure hook.
+func runInit(repo *taskRepo, args ...string) cliResult {
+	return runInitIn(repo, repo.Dir, repo.Dir, args...)
+}
+
+// runInitIn is runInit with explicit project root and task directory, for tests
+// that place the task directory apart from the project root.
+func runInitIn(repo *taskRepo, root, taskDir string, args ...string) cliResult {
+	return repo.RunWith(func() {
+		projectInitRoot = root
+		projectInitTaskDir = taskDir
+		projectInitIsTTY = func() bool { return false }
+	}, append([]string{"init"}, args...)...)
 }
 
 func TestProjectInit_DefaultWritesBothFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create CLAUDE.md (default agent) in root
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	content, err := os.ReadFile(claudePath)
 	if err != nil {
 		t.Fatalf("failed to read CLAUDE.md: %v", err)
@@ -52,7 +45,7 @@ func TestProjectInit_DefaultWritesBothFiles(t *testing.T) {
 	}
 
 	// Should create TASKMD_SPEC.md in task dir (same as root in this test)
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	content, err = os.ReadFile(specPath)
 	if err != nil {
 		t.Fatalf("failed to read %s: %v", specFilename, err)
@@ -63,17 +56,15 @@ func TestProjectInit_DefaultWritesBothFiles(t *testing.T) {
 }
 
 func TestProjectInit_GeminiFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitGemini = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--gemini")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create GEMINI.md
-	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
+	geminiPath := filepath.Join(repo.Dir, "GEMINI.md")
 	content, err := os.ReadFile(geminiPath)
 	if err != nil {
 		t.Fatalf("failed to read GEMINI.md: %v", err)
@@ -83,32 +74,29 @@ func TestProjectInit_GeminiFlag(t *testing.T) {
 	}
 
 	// Should create TASKMD_SPEC.md
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		t.Error("TASKMD_SPEC.md should have been created")
 	}
 
 	// Should NOT create CLAUDE.md
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); err == nil {
 		t.Error("CLAUDE.md should not have been created when --gemini is specified")
 	}
 }
 
 func TestProjectInit_MultipleAgentFlags(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitGemini = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--gemini")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create CLAUDE.md, GEMINI.md, and TASKMD_SPEC.md
 	for _, name := range []string{"CLAUDE.md", "GEMINI.md", specFilename} {
-		path := filepath.Join(tmpDir, name)
+		path := filepath.Join(repo.Dir, name)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			t.Errorf("%s should have been created", name)
 		}
@@ -116,82 +104,70 @@ func TestProjectInit_MultipleAgentFlags(t *testing.T) {
 }
 
 func TestProjectInit_NoSpecFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitNoSpec = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--no-spec")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create CLAUDE.md
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); os.IsNotExist(err) {
 		t.Error("CLAUDE.md should have been created")
 	}
 
 	// Should NOT create TASKMD_SPEC.md
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); err == nil {
 		t.Error("TASKMD_SPEC.md should not have been created with --no-spec")
 	}
 }
 
 func TestProjectInit_NoAgentFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitNoAgent = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--no-agent")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create TASKMD_SPEC.md
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		t.Error("TASKMD_SPEC.md should have been created")
 	}
 
 	// Should NOT create CLAUDE.md
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); err == nil {
 		t.Error("CLAUDE.md should not have been created with --no-agent")
 	}
 }
 
 func TestProjectInit_NoSpecAndNoAgentAndNoTemplatesIsError(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitNoSpec = true
-	projectInitNoAgent = true
-	projectInitNoTemplates = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err == nil {
+	res := runInit(repo, "--no-spec", "--no-agent", "--no-templates")
+	if res.Err == nil {
 		t.Fatal("expected error when all --no-* flags are set")
 	}
 
-	if !strings.Contains(err.Error(), "nothing to do") {
-		t.Errorf("error message %q should contain 'nothing to do'", err.Error())
+	if !strings.Contains(res.Err.Error(), "nothing to do") {
+		t.Errorf("error message %q should contain 'nothing to do'", res.Err.Error())
 	}
 }
 
 func TestProjectInit_ForceOverwritesExistingFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitForce = true
+	repo := newTaskRepo(t, nil)
 
 	// Create existing files
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
-	specPath := filepath.Join(tmpDir, specFilename)
-	os.WriteFile(claudePath, []byte("old claude"), 0644)
-	os.WriteFile(specPath, []byte("old spec"), 0644)
+	claudePath := repo.Write("CLAUDE.md", "old claude")
+	specPath := repo.Write(specFilename, "old spec")
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--force")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Verify files were overwritten
@@ -207,34 +183,19 @@ func TestProjectInit_ForceOverwritesExistingFiles(t *testing.T) {
 }
 
 func TestProjectInit_ExistingFilesSkippedWithoutForce(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
+	repo := newTaskRepo(t, nil)
 
 	// Create an existing CLAUDE.md
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
-	os.WriteFile(claudePath, []byte("existing claude"), 0644)
+	claudePath := repo.Write("CLAUDE.md", "existing claude")
 
-	// Capture stderr for the warning
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("expected no error when skipping existing files, got: %v", err)
+	res := runInit(repo)
+	if res.Err != nil {
+		t.Fatalf("expected no error when skipping existing files, got: %v", res.Err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	stderrOutput := buf.String()
-
 	// Should have a warning about skipping
-	if !strings.Contains(stderrOutput, "Skipped") {
-		t.Errorf("expected skip warning on stderr, got: %q", stderrOutput)
+	if !strings.Contains(res.Stderr, "Skipped") {
+		t.Errorf("expected skip warning on stderr, got: %q", res.Stderr)
 	}
 
 	// Original file should be unchanged
@@ -244,24 +205,22 @@ func TestProjectInit_ExistingFilesSkippedWithoutForce(t *testing.T) {
 	}
 
 	// TASKMD_SPEC.md should still be created (it didn't exist)
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		t.Error("TASKMD_SPEC.md should have been created even though CLAUDE.md was skipped")
 	}
 }
 
 func TestProjectInit_DirFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	subDir := filepath.Join(tmpDir, "my-project")
+	repo := newTaskRepo(t, nil)
+	subDir := filepath.Join(repo.Dir, "my-project")
 	if err := os.Mkdir(subDir, 0755); err != nil {
 		t.Fatalf("failed to create subdirectory: %v", err)
 	}
 
-	resetProjectInitFlags(subDir)
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInitIn(repo, subDir, subDir)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	claudePath := filepath.Join(subDir, "CLAUDE.md")
@@ -276,90 +235,69 @@ func TestProjectInit_DirFlag(t *testing.T) {
 }
 
 func TestProjectInit_StdoutPrintsWithoutCreatingFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitStdout = true
+	repo := newTaskRepo(t, nil)
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--stdout")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
 
 	// Should contain both agent template and spec template
-	if !strings.Contains(output, string(claudeTemplate)) {
+	if !strings.Contains(res.Stdout, string(claudeTemplate)) {
 		t.Error("stdout output should contain Claude template")
 	}
-	if !strings.Contains(output, string(initSpecTemplate)) {
+	if !strings.Contains(res.Stdout, string(initSpecTemplate)) {
 		t.Error("stdout output should contain spec template")
 	}
 
 	// No files should have been created
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); err == nil {
 		t.Error("CLAUDE.md should not have been created with --stdout")
 	}
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); err == nil {
 		t.Error("TASKMD_SPEC.md should not have been created with --stdout")
 	}
 }
 
 func TestProjectInit_CodexFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitCodex = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--codex")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create AGENTS.md and TASKMD_SPEC.md
-	agentsPath := filepath.Join(tmpDir, "AGENTS.md")
+	agentsPath := filepath.Join(repo.Dir, "AGENTS.md")
 	if _, err := os.Stat(agentsPath); os.IsNotExist(err) {
 		t.Error("AGENTS.md should have been created")
 	}
 
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		t.Error("TASKMD_SPEC.md should have been created")
 	}
 
 	// Should NOT create CLAUDE.md
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); err == nil {
 		t.Error("CLAUDE.md should not have been created when --codex is specified")
 	}
 }
 
 func TestProjectInit_AllAgentFlags(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitGemini = true
-	projectInitCodex = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--gemini", "--codex")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	expected := []string{"CLAUDE.md", "GEMINI.md", "AGENTS.md", specFilename}
 	for _, name := range expected {
-		path := filepath.Join(tmpDir, name)
+		path := filepath.Join(repo.Dir, name)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			t.Errorf("%s should have been created", name)
 		}
@@ -367,27 +305,14 @@ func TestProjectInit_AllAgentFlags(t *testing.T) {
 }
 
 func TestProjectInit_PartialSkipStillCreatesOthers(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitGemini = true
+	repo := newTaskRepo(t, nil)
 
 	// Create only CLAUDE.md as existing
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
-	os.WriteFile(claudePath, []byte("existing"), 0644)
+	claudePath := repo.Write("CLAUDE.md", "existing")
 
-	// Suppress stderr warnings
-	oldStderr := os.Stderr
-	_, w, _ := os.Pipe()
-	os.Stderr = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--gemini")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// CLAUDE.md should be unchanged (skipped)
@@ -397,13 +322,13 @@ func TestProjectInit_PartialSkipStillCreatesOthers(t *testing.T) {
 	}
 
 	// GEMINI.md should be created
-	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
+	geminiPath := filepath.Join(repo.Dir, "GEMINI.md")
 	if _, err := os.Stat(geminiPath); os.IsNotExist(err) {
 		t.Error("GEMINI.md should have been created")
 	}
 
 	// TASKMD_SPEC.md should be created
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); os.IsNotExist(err) {
 		t.Error("TASKMD_SPEC.md should have been created")
 	}
@@ -412,18 +337,13 @@ func TestProjectInit_PartialSkipStillCreatesOthers(t *testing.T) {
 // --- New tests for interactive init ---
 
 func TestProjectInit_SeparateDirectories(t *testing.T) {
-	tmpDir := t.TempDir()
-	rootDir := tmpDir
-	taskDirPath := filepath.Join(tmpDir, "my-tasks")
+	repo := newTaskRepo(t, nil)
+	rootDir := repo.Dir
+	taskDirPath := filepath.Join(repo.Dir, "my-tasks")
 
-	resetProjectInitFlags(taskDirPath)
-	projectInitRoot = rootDir
-	projectInitTaskDir = taskDirPath
-	projectInitClaude = true
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInitIn(repo, rootDir, taskDirPath, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Agent config should be in task directory
@@ -452,84 +372,65 @@ func TestProjectInit_SeparateDirectories(t *testing.T) {
 }
 
 func TestProjectInit_ConfigFileContent(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	configPath := filepath.Join(tmpDir, configFilename)
+	configPath := filepath.Join(repo.Dir, configFilename)
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read %s: %v", configFilename, err)
 	}
 
-	expected := "dir: " + tmpDir + "\n"
+	expected := "dir: " + repo.Dir + "\n"
 	if string(content) != expected {
 		t.Errorf("config content = %q, want %q", string(content), expected)
 	}
 }
 
 func TestProjectInit_NonTTY_DefaultsClaude(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	// No agent flags set, non-TTY (default from reset)
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// No agent flags set, non-TTY (default from runInit)
+	res := runInit(repo)
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Should create CLAUDE.md (the non-TTY default)
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); os.IsNotExist(err) {
 		t.Error("CLAUDE.md should have been created as non-TTY default")
 	}
 
 	// Should NOT create GEMINI.md or AGENTS.md
-	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
+	geminiPath := filepath.Join(repo.Dir, "GEMINI.md")
 	if _, err := os.Stat(geminiPath); err == nil {
 		t.Error("GEMINI.md should not have been created")
 	}
-	agentsPath := filepath.Join(tmpDir, "AGENTS.md")
+	agentsPath := filepath.Join(repo.Dir, "AGENTS.md")
 	if _, err := os.Stat(agentsPath); err == nil {
 		t.Error("AGENTS.md should not have been created")
 	}
 }
 
 func TestProjectInit_ExistingConfig_SkippedWithoutForce(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
 
 	// Create existing config
-	configPath := filepath.Join(tmpDir, configFilename)
-	os.WriteFile(configPath, []byte("dir: ./old-tasks\n"), 0644)
+	configPath := repo.Write(configFilename, "dir: ./old-tasks\n")
 
-	// Capture stderr
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	stderrOutput := buf.String()
-
 	// Should warn about skipping config
-	if !strings.Contains(stderrOutput, "Skipped") || !strings.Contains(stderrOutput, configFilename) {
-		t.Errorf("expected skip warning for %s, got: %q", configFilename, stderrOutput)
+	if !strings.Contains(res.Stderr, "Skipped") || !strings.Contains(res.Stderr, configFilename) {
+		t.Errorf("expected skip warning for %s, got: %q", configFilename, res.Stderr)
 	}
 
 	// Config should be unchanged
@@ -540,59 +441,39 @@ func TestProjectInit_ExistingConfig_SkippedWithoutForce(t *testing.T) {
 }
 
 func TestProjectInit_ExistingConfig_OverwrittenWithForce(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitForce = true
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
 
 	// Create existing config
-	configPath := filepath.Join(tmpDir, configFilename)
-	os.WriteFile(configPath, []byte("dir: ./old-tasks\n"), 0644)
+	configPath := repo.Write(configFilename, "dir: ./old-tasks\n")
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--force", "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Config should be overwritten
 	content, _ := os.ReadFile(configPath)
-	expected := "dir: " + tmpDir + "\n"
+	expected := "dir: " + repo.Dir + "\n"
 	if string(content) != expected {
 		t.Errorf("config content = %q, want %q", string(content), expected)
 	}
 }
 
 func TestProjectInit_ExistingTaskDir_Graceful(t *testing.T) {
-	tmpDir := t.TempDir()
-	taskDirPath := filepath.Join(tmpDir, "tasks")
-	os.MkdirAll(taskDirPath, 0755)
-
-	resetProjectInitFlags(taskDirPath)
-	projectInitRoot = tmpDir
-	projectInitTaskDir = taskDirPath
-	projectInitClaude = true
-
-	// Capture stderr
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	repo := newTaskRepo(t, nil)
+	taskDirPath := filepath.Join(repo.Dir, "tasks")
+	if err := os.MkdirAll(taskDirPath, 0755); err != nil {
+		t.Fatalf("failed to create task dir: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	stderrOutput := buf.String()
+	res := runInitIn(repo, repo.Dir, taskDirPath, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
+	}
 
 	// Should note existing directory
-	if !strings.Contains(stderrOutput, "already exists") {
-		t.Errorf("expected 'already exists' note, got: %q", stderrOutput)
+	if !strings.Contains(res.Stderr, "already exists") {
+		t.Errorf("expected 'already exists' note, got: %q", res.Stderr)
 	}
 
 	// Spec should still be created in the existing task dir
@@ -603,22 +484,17 @@ func TestProjectInit_ExistingTaskDir_Graceful(t *testing.T) {
 }
 
 func TestProjectInit_CreatesTaskDir(t *testing.T) {
-	tmpDir := t.TempDir()
-	taskDirPath := filepath.Join(tmpDir, "new-tasks")
-
-	resetProjectInitFlags(taskDirPath)
-	projectInitRoot = tmpDir
-	projectInitTaskDir = taskDirPath
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
+	taskDirPath := filepath.Join(repo.Dir, "new-tasks")
 
 	// Verify task dir doesn't exist yet
 	if _, err := os.Stat(taskDirPath); err == nil {
 		t.Fatal("task directory should not exist before init")
 	}
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInitIn(repo, repo.Dir, taskDirPath, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Task directory should now exist
@@ -638,55 +514,41 @@ func TestProjectInit_CreatesTaskDir(t *testing.T) {
 }
 
 func TestProjectInit_Stdout_NoSideEffects(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitStdout = true
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	_, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--stdout", "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// No config file should have been created
-	configPath := filepath.Join(tmpDir, configFilename)
+	configPath := filepath.Join(repo.Dir, configFilename)
 	if _, err := os.Stat(configPath); err == nil {
 		t.Error(".taskmd.yaml should not have been created with --stdout")
 	}
 
 	// No agent files should have been created
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	if _, err := os.Stat(claudePath); err == nil {
 		t.Error("CLAUDE.md should not have been created with --stdout")
 	}
 
 	// No spec file should have been created
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	if _, err := os.Stat(specPath); err == nil {
 		t.Error("TASKMD_SPEC.md should not have been created with --stdout")
 	}
 }
 
 func TestProjectInit_CreatesTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	tmplDir := filepath.Join(tmpDir, ".taskmd", "templates")
+	tmplDir := filepath.Join(repo.Dir, ".taskmd", "templates")
 	info, err := os.Stat(tmplDir)
 	if err != nil {
 		t.Fatalf("expected .taskmd/templates/ to be created: %v", err)
@@ -705,71 +567,50 @@ func TestProjectInit_CreatesTemplates(t *testing.T) {
 }
 
 func TestProjectInit_NoTemplatesFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitNoTemplates = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--no-templates")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	tmplDir := filepath.Join(tmpDir, ".taskmd", "templates")
+	tmplDir := filepath.Join(repo.Dir, ".taskmd", "templates")
 	if _, err := os.Stat(tmplDir); err == nil {
 		t.Error(".taskmd/templates/ should not have been created with --no-templates")
 	}
 }
 
 func TestProjectInit_TemplatesNotOverwrittenWithoutForce(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
+	repo := newTaskRepo(t, nil)
 
 	// Create an existing template
-	tmplDir := filepath.Join(tmpDir, ".taskmd", "templates")
-	os.MkdirAll(tmplDir, 0755)
-	os.WriteFile(filepath.Join(tmplDir, "feature.md"), []byte("custom content"), 0644)
+	featurePath := repo.Write(filepath.Join(".taskmd", "templates", "feature.md"), "custom content")
 
-	// Suppress stderr
-	oldStderr := os.Stderr
-	_, w, _ := os.Pipe()
-	os.Stderr = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stderr = oldStderr
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Custom template should be unchanged
-	content, _ := os.ReadFile(filepath.Join(tmplDir, "feature.md"))
+	content, _ := os.ReadFile(featurePath)
 	if string(content) != "custom content" {
 		t.Error("existing template should not have been overwritten without --force")
 	}
 }
 
 func TestProjectInit_TemplatesOverwrittenWithForce(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitForce = true
+	repo := newTaskRepo(t, nil)
 
 	// Create an existing template
-	tmplDir := filepath.Join(tmpDir, ".taskmd", "templates")
-	os.MkdirAll(tmplDir, 0755)
-	os.WriteFile(filepath.Join(tmplDir, "feature.md"), []byte("custom content"), 0644)
+	featurePath := repo.Write(filepath.Join(".taskmd", "templates", "feature.md"), "custom content")
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--force")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Template should be overwritten with built-in content
-	content, _ := os.ReadFile(filepath.Join(tmplDir, "feature.md"))
+	content, _ := os.ReadFile(featurePath)
 	if string(content) == "custom content" {
 		t.Error("template should have been overwritten with --force")
 	}
@@ -779,46 +620,33 @@ func TestProjectInit_TemplatesOverwrittenWithForce(t *testing.T) {
 }
 
 func TestProjectInit_EnsureTaskDir_PathIsFile(t *testing.T) {
-	tmpDir := t.TempDir()
+	repo := newTaskRepo(t, nil)
 
 	// Create a file where the task directory should be
-	filePath := filepath.Join(tmpDir, "tasks")
-	if err := os.WriteFile(filePath, []byte("not a directory"), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
+	filePath := repo.Write("tasks", "not a directory")
 
-	resetProjectInitFlags(tmpDir)
-	projectInitRoot = tmpDir
-	projectInitTaskDir = filePath
-	projectInitClaude = true
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err == nil {
+	res := runInitIn(repo, repo.Dir, filePath, "--claude")
+	if res.Err == nil {
 		t.Fatal("expected error when task-dir path is a file")
 	}
 
-	if !strings.Contains(err.Error(), "not a directory") {
-		t.Errorf("expected 'not a directory' error, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "not a directory") {
+		t.Errorf("expected 'not a directory' error, got: %v", res.Err)
 	}
 }
 
 // --- ID Strategy tests ---
 
 func TestProjectInit_IDStrategy_ULID_ConfigAndTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitIDStrategy = "ulid"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "ulid")
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--id-strategy", "ulid")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// Check config file includes id section
-	configPath := filepath.Join(tmpDir, configFilename)
+	configPath := filepath.Join(repo.Dir, configFilename)
 	configContent, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)
@@ -832,7 +660,7 @@ func TestProjectInit_IDStrategy_ULID_ConfigAndTemplates(t *testing.T) {
 	}
 
 	// Check CLAUDE.md has ULID examples
-	claudePath := filepath.Join(tmpDir, "CLAUDE.md")
+	claudePath := filepath.Join(repo.Dir, "CLAUDE.md")
 	claudeContent, err := os.ReadFile(claudePath)
 	if err != nil {
 		t.Fatalf("failed to read CLAUDE.md: %v", err)
@@ -849,7 +677,7 @@ func TestProjectInit_IDStrategy_ULID_ConfigAndTemplates(t *testing.T) {
 	}
 
 	// Check spec has ULID section
-	specPath := filepath.Join(tmpDir, specFilename)
+	specPath := filepath.Join(repo.Dir, specFilename)
 	specContent, err := os.ReadFile(specPath)
 	if err != nil {
 		t.Fatalf("failed to read spec: %v", err)
@@ -860,19 +688,14 @@ func TestProjectInit_IDStrategy_ULID_ConfigAndTemplates(t *testing.T) {
 }
 
 func TestProjectInit_IDStrategy_Random_ConfigAndTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitIDStrategy = "random"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "random")
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--id-strategy", "random")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	configContent, _ := os.ReadFile(filepath.Join(tmpDir, configFilename))
+	configContent, _ := os.ReadFile(filepath.Join(repo.Dir, configFilename))
 	configStr := string(configContent)
 	if !strings.Contains(configStr, "strategy: random") {
 		t.Errorf("config should contain 'strategy: random', got: %s", configStr)
@@ -881,7 +704,7 @@ func TestProjectInit_IDStrategy_Random_ConfigAndTemplates(t *testing.T) {
 		t.Errorf("config should contain 'length: 6', got: %s", configStr)
 	}
 
-	claudeContent, _ := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	claudeContent, _ := os.ReadFile(filepath.Join(repo.Dir, "CLAUDE.md"))
 	if !strings.Contains(string(claudeContent), `id: "a3f9x2"`) {
 		t.Error("CLAUDE.md should contain random example ID")
 	}
@@ -891,21 +714,14 @@ func TestProjectInit_IDStrategy_Random_ConfigAndTemplates(t *testing.T) {
 }
 
 func TestProjectInit_IDStrategy_Prefixed_ConfigAndTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitIDStrategy = "prefixed"
-	projectInitIDPrefix = "dr"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "prefixed")
-	projectInitCmd.Flags().Set("id-prefix", "dr")
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--id-strategy", "prefixed", "--id-prefix", "dr")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	configContent, _ := os.ReadFile(filepath.Join(tmpDir, configFilename))
+	configContent, _ := os.ReadFile(filepath.Join(repo.Dir, configFilename))
 	configStr := string(configContent)
 	if !strings.Contains(configStr, "strategy: prefixed") {
 		t.Errorf("config should contain 'strategy: prefixed', got: %s", configStr)
@@ -914,7 +730,7 @@ func TestProjectInit_IDStrategy_Prefixed_ConfigAndTemplates(t *testing.T) {
 		t.Errorf("config should contain 'prefix: dr', got: %s", configStr)
 	}
 
-	claudeContent, _ := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	claudeContent, _ := os.ReadFile(filepath.Join(repo.Dir, "CLAUDE.md"))
 	claudeStr := string(claudeContent)
 	if !strings.Contains(claudeStr, `id: "dr-001"`) {
 		t.Errorf("CLAUDE.md should contain prefixed example ID, got relevant part missing")
@@ -923,24 +739,22 @@ func TestProjectInit_IDStrategy_Prefixed_ConfigAndTemplates(t *testing.T) {
 		t.Error("CLAUDE.md should contain prefixed example filename")
 	}
 
-	specContent, _ := os.ReadFile(filepath.Join(tmpDir, specFilename))
+	specContent, _ := os.ReadFile(filepath.Join(repo.Dir, specFilename))
 	if !strings.Contains(string(specContent), "prefixed") {
 		t.Error("spec should contain prefixed documentation section")
 	}
 }
 
 func TestProjectInit_IDStrategy_Sequential_NoIDConfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	// No --id-strategy flag set, should default to sequential
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// No --id-strategy flag set, should default to sequential
+	res := runInit(repo, "--claude")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	configContent, _ := os.ReadFile(filepath.Join(tmpDir, configFilename))
+	configContent, _ := os.ReadFile(filepath.Join(repo.Dir, configFilename))
 	configStr := string(configContent)
 	// Sequential is default, so no id: section should be written
 	if strings.Contains(configStr, "id:") {
@@ -948,64 +762,47 @@ func TestProjectInit_IDStrategy_Sequential_NoIDConfig(t *testing.T) {
 	}
 
 	// Templates should remain unchanged (sequential examples)
-	claudeContent, _ := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	claudeContent, _ := os.ReadFile(filepath.Join(repo.Dir, "CLAUDE.md"))
 	if !bytes.Equal(claudeContent, claudeTemplate) {
 		t.Error("CLAUDE.md should match raw template for sequential strategy")
 	}
 }
 
 func TestProjectInit_IDStrategy_InvalidStrategy(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitIDStrategy = "invalid"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "invalid")
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err == nil {
+	res := runInit(repo, "--claude", "--id-strategy", "invalid")
+	if res.Err == nil {
 		t.Fatal("expected error for invalid strategy")
 	}
-	if !strings.Contains(err.Error(), "invalid --id-strategy") {
-		t.Errorf("error should mention invalid strategy, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "invalid --id-strategy") {
+		t.Errorf("error should mention invalid strategy, got: %v", res.Err)
 	}
 }
 
 func TestProjectInit_IDStrategy_PrefixedWithoutPrefix_NonTTY(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitIDStrategy = "prefixed"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "prefixed")
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err == nil {
+	res := runInit(repo, "--claude", "--id-strategy", "prefixed")
+	if res.Err == nil {
 		t.Fatal("expected error for prefixed strategy without prefix in non-TTY mode")
 	}
-	if !strings.Contains(err.Error(), "id-prefix") {
-		t.Errorf("error should mention id-prefix, got: %v", err)
+	if !strings.Contains(res.Err.Error(), "id-prefix") {
+		t.Errorf("error should mention id-prefix, got: %v", res.Err)
 	}
 }
 
 func TestProjectInit_IDStrategy_ULID_AllAgents(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitClaude = true
-	projectInitGemini = true
-	projectInitCodex = true
-	projectInitIDStrategy = "ulid"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "ulid")
-
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--claude", "--gemini", "--codex", "--id-strategy", "ulid")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
 	// All agent files should have ULID examples
 	for _, name := range []string{"CLAUDE.md", "GEMINI.md", "AGENTS.md"} {
-		content, err := os.ReadFile(filepath.Join(tmpDir, name))
+		content, err := os.ReadFile(filepath.Join(repo.Dir, name))
 		if err != nil {
 			t.Fatalf("failed to read %s: %v", name, err)
 		}
@@ -1016,36 +813,17 @@ func TestProjectInit_IDStrategy_ULID_AllAgents(t *testing.T) {
 }
 
 func TestProjectInit_IDStrategy_Stdout_ShowsReplacedContent(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitStdout = true
-	projectInitClaude = true
-	projectInitIDStrategy = "ulid"
+	repo := newTaskRepo(t, nil)
 
-	projectInitCmd.Flags().Set("id-strategy", "ulid")
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runProjectInit(projectInitCmd, []string{})
-
-	w.Close()
-	os.Stdout = oldStdout
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--stdout", "--claude", "--id-strategy", "ulid")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
-
-	if !strings.Contains(output, `id: "01h5a3mpk"`) {
+	if !strings.Contains(res.Stdout, `id: "01h5a3mpk"`) {
 		t.Error("stdout should contain ULID example ID")
 	}
-	if strings.Contains(output, `id: "001"`) {
+	if strings.Contains(res.Stdout, `id: "001"`) {
 		t.Error("stdout should not contain sequential example ID")
 	}
 }
@@ -1145,17 +923,14 @@ func TestApplyIDStrategyReplacements_Sequential_NoOp(t *testing.T) {
 }
 
 func TestProjectInit_NoSpecNoAgentStillCreatesTemplates(t *testing.T) {
-	tmpDir := t.TempDir()
-	resetProjectInitFlags(tmpDir)
-	projectInitNoSpec = true
-	projectInitNoAgent = true
+	repo := newTaskRepo(t, nil)
 
-	err := runProjectInit(projectInitCmd, []string{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	res := runInit(repo, "--no-spec", "--no-agent")
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
 	}
 
-	tmplDir := filepath.Join(tmpDir, ".taskmd", "templates")
+	tmplDir := filepath.Join(repo.Dir, ".taskmd", "templates")
 	if _, err := os.Stat(tmplDir); os.IsNotExist(err) {
 		t.Error("expected .taskmd/templates/ to be created even with --no-spec and --no-agent")
 	}
