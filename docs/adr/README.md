@@ -10,3 +10,6 @@ sequentially and keep them short.
 
 - [0001 — Core scope boundary](0001-core-scope-boundary.md): what belongs in core
   taskmd vs. optional/adjacent; homes for `sync` and the source-TODO scanner.
+- [0002 — Lite plugin prose conformance](0002-lite-plugin-prose-conformance.md): the
+  lite plugin's prose reimplements CLI algorithms; the CLI is authoritative and
+  conformance tests fail the build on drift.

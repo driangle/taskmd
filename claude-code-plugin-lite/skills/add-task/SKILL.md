@@ -29,7 +29,7 @@ The user's task description is in `$ARGUMENTS`.
    - Scan existing files with `Glob` for `<task-dir>/**/*.md` to determine used IDs
    - **Sequential** (default): Find the highest numeric ID, add 1, zero-pad to `padding` width (default 3). E.g., if highest is `042`, next is `043`
    - **Prefixed**: Find highest number with the configured prefix. E.g., `dr-001`, `dr-002`
-   - **Random**: Generate a random alphanumeric string of configured `length` (default 6) containing at least one digit
+   - **Random**: Generate a random alphanumeric string (lowercase letters and digits, i.e. base36) of configured `length` (default 6)
    - **ULID**: Generate a ULID-like ID — use current timestamp in Crockford Base32 + random chars
 
 5. **Create the task file** using `Write`:

@@ -1,7 +1,7 @@
 ---
 id: "01kz3c244"
 title: "Add conformance check for lite plugin prose logic vs CLI"
-status: pending
+status: completed
 priority: medium
 effort: medium
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: ["01kz3c242"]
 tags: [plugins, testing, correctness]
 created_at: 2026-08-03
+completed_at: 2026-08-04
 ---
 
 # Add conformance check for lite plugin prose logic vs CLI
@@ -25,13 +26,13 @@ every CLI behavior change must be manually re-expressed in 13 files.
 
 ## Tasks
 
-- [ ] Inventory which CLI behaviors the lite skills reimplement (ID strategies, slug rules,
+- [x] Inventory which CLI behaviors the lite skills reimplement (ID strategies, slug rules,
       frontmatter template, validation rules)
-- [ ] Define a small set of golden fixtures (inputs → expected file/frontmatter) shared by both
-- [ ] Add a check that the lite skills' documented rules match CLI output on those fixtures
+- [x] Define a small set of golden fixtures (inputs → expected file/frontmatter) shared by both
+- [x] Add a check that the lite skills' documented rules match CLI output on those fixtures
       (e.g. assert generated frontmatter/slug/ID-shape equivalence)
-- [ ] Wire the check into CI so lite/CLI drift fails the build
-- [ ] Document the "single source of truth is the CLI" contract in the lite plugin README
+- [x] Wire the check into CI so lite/CLI drift fails the build
+- [x] Document the "single source of truth is the CLI" contract in the lite plugin README
 
 ## Acceptance Criteria
 

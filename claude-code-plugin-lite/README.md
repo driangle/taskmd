@@ -46,3 +46,27 @@ No shell commands are executed. All task operations -- listing, filtering, sorti
 ## Specification Reference
 
 For the full taskmd format specification including frontmatter schema, ID strategies, validation rules, and configuration options, see [SPEC_REFERENCE.md](./SPEC_REFERENCE.md).
+
+## The CLI is the source of truth
+
+Because this plugin runs without the Go binary, its skills re-express core CLI
+algorithms as English prose — ID generation (sequential / prefixed / random /
+ULID), slug rules, the new-task frontmatter template, and the validation enums
+all live here a second time. **When the prose and the CLI disagree, the CLI
+wins.** The prose is a derived copy that must follow the CLI's behavior, never
+the other way around.
+
+Two Go test suites keep this contract honest, so drift fails the build (they run
+in CI via `go test ./...` from `apps/cli`):
+
+- `apps/cli/internal/cli/spec_reference_test.go` guards
+  [`SPEC_REFERENCE.md`](./SPEC_REFERENCE.md) against the canonical spec document
+  (enum sets and required fields).
+- `apps/cli/internal/cli/lite_conformance_test.go` guards the **skill prose**
+  against the CLI's actual runtime behavior: it derives each fact from real CLI
+  code (the `nextid`/`slug` SDK functions, the `add` command's frontmatter
+  writer, the in-package enum lists) and asserts the matching `SKILL.md`
+  documents it.
+
+If a conformance test fails, update the named `SKILL.md` so its prose matches
+the current CLI behavior — do not weaken the test.
