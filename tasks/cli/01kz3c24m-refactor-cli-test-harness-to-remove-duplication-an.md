@@ -1,7 +1,7 @@
 ---
 id: "01kz3c24m"
 title: "Refactor CLI test harness to remove duplication and enable parallelism"
-status: pending
+status: completed
 priority: medium
 effort: large
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [cli, testing, tech-debt]
 created_at: 2026-08-03
+completed_at: 2026-08-04
 ---
 
 # Refactor CLI test harness to remove duplication and enable parallelism
@@ -25,12 +26,12 @@ cannot parallelize). Fix the root cause and reclaim the LOC without losing cover
 
 ## Tasks
 
-- [ ] Build one shared command-test harness (setup dir, run command, capture stdout/stderr, reset state)
-- [ ] Replace the ~79 per-command reset/capture/create helpers with the shared harness
-- [ ] Move the 298 inline YAML task fixtures into shared `testdata/` fixtures
-- [ ] Convert repetitive single-flag-variant tests into table-driven `t.Run` subtests
-- [ ] Where feasible, isolate global state so tests can call `t.Parallel()`
-- [ ] Confirm coverage is unchanged (compare `go test -cover` before/after)
+- [x] Build one shared command-test harness (setup dir, run command, capture stdout/stderr, reset state)
+- [x] Replace the ~79 per-command reset/capture/create helpers with the shared harness
+- [x] Move the 298 inline YAML task fixtures into shared `testdata/` fixtures
+- [x] Convert repetitive single-flag-variant tests into table-driven `t.Run` subtests
+- [x] Where feasible, isolate global state so tests can call `t.Parallel()`
+- [x] Confirm coverage is unchanged (compare `go test -cover` before/after)
 
 ## Acceptance Criteria
 
