@@ -32,6 +32,7 @@ var (
 var enumFields = []string{"status", "priority", "effort", "type"}
 
 func TestSpecReference_EnumsMatchCanonical(t *testing.T) {
+	t.Parallel()
 	repoRoot := filepath.Join("..", "..", "..", "..")
 	canonical := readSpecFile(t, filepath.Join(repoRoot, "docs", "taskmd_specification.md"))
 	lite := readSpecFile(t, filepath.Join(repoRoot, "claude-code-plugin-lite", "SPEC_REFERENCE.md"))
@@ -57,6 +58,7 @@ func TestSpecReference_EnumsMatchCanonical(t *testing.T) {
 }
 
 func TestSpecReference_RequiredFieldsMatchCanonical(t *testing.T) {
+	t.Parallel()
 	repoRoot := filepath.Join("..", "..", "..", "..")
 	canonical := readSpecFile(t, filepath.Join(repoRoot, "docs", "taskmd_specification.md"))
 	lite := readSpecFile(t, filepath.Join(repoRoot, "claude-code-plugin-lite", "SPEC_REFERENCE.md"))

@@ -10,6 +10,7 @@ import (
 )
 
 func TestWriteJSON(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	data := map[string]string{"key": "value"}
 
@@ -33,6 +34,7 @@ func TestWriteJSON(t *testing.T) {
 }
 
 func TestWriteYAML(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	data := map[string]string{"key": "value"}
 
@@ -51,6 +53,7 @@ func TestWriteYAML(t *testing.T) {
 }
 
 func TestValidateFormat(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		format    string
@@ -65,6 +68,7 @@ func TestValidateFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateFormat(tt.format, tt.supported)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateFormat() error = %v, wantErr %v", err, tt.wantErr)

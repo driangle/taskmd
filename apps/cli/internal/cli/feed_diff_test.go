@@ -6,7 +6,11 @@ import (
 	"github.com/driangle/taskmd/sdk/go/feed"
 )
 
+// These tests exercise pure helper functions (no CLI command, no global state),
+// so every test and subtest runs with t.Parallel().
+
 func TestExtractFrontmatterFields(t *testing.T) {
+	t.Parallel()
 	content := "---\nid: 042\ntitle: \"Add Auth\"\nstatus: pending\npriority: medium\n---\n# Body"
 	fields := feed.ExtractFrontmatterFields(content)
 
@@ -25,6 +29,7 @@ func TestExtractFrontmatterFields(t *testing.T) {
 }
 
 func TestExtractFrontmatterFields_NoFrontmatter(t *testing.T) {
+	t.Parallel()
 	fields := feed.ExtractFrontmatterFields("# Just markdown")
 	if len(fields) != 0 {
 		t.Errorf("expected no fields, got %d", len(fields))
@@ -32,6 +37,7 @@ func TestExtractFrontmatterFields_NoFrontmatter(t *testing.T) {
 }
 
 func TestExtractSubtasks(t *testing.T) {
+	t.Parallel()
 	content := "---\nid: 042\n---\n# Task\n\n- [ ] Add tests\n- [x] Write docs\n- [ ] Deploy\n"
 	subtasks := feed.ExtractSubtasks(content)
 
@@ -50,6 +56,7 @@ func TestExtractSubtasks(t *testing.T) {
 }
 
 func TestExtractSubtasks_NoFrontmatter(t *testing.T) {
+	t.Parallel()
 	content := "# Task\n\n- [x] Done\n- [ ] Not done\n"
 	subtasks := feed.ExtractSubtasks(content)
 	if len(subtasks) != 2 {
@@ -57,180 +64,125 @@ func TestExtractSubtasks_NoFrontmatter(t *testing.T) {
 	}
 }
 
-func TestAnalyzeDiff_StatusChange(t *testing.T) {
-	oldContent := "---\nid: 042\nstatus: pending\npriority: medium\n---\n# Task"
-	newContent := "---\nid: 042\nstatus: in-progress\npriority: medium\n---\n# Task"
+// wantFieldChange / wantSubtaskChange describe the expected AnalyzeDiff output
+// for one table row, in the order AnalyzeDiff emits them.
+type wantFieldChange struct {
+	field, old, new string
+}
+type wantSubtaskChange struct {
+	text string
+	done bool
+}
 
-	fieldChanges, subtaskChanges := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 1 {
-		t.Fatalf("expected 1 field change, got %d", len(fieldChanges))
+// assertFieldChanges verifies got matches want element-for-element (order included).
+func assertFieldChanges(t *testing.T, got []feed.FieldChange, want []wantFieldChange) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("field changes: got %d, want %d (%v)", len(got), len(want), got)
 	}
-	if fieldChanges[0].Field != "status" {
-		t.Errorf("expected field 'status', got %q", fieldChanges[0].Field)
-	}
-	if fieldChanges[0].OldValue != "pending" {
-		t.Errorf("expected old value 'pending', got %q", fieldChanges[0].OldValue)
-	}
-	if fieldChanges[0].NewValue != "in-progress" {
-		t.Errorf("expected new value 'in-progress', got %q", fieldChanges[0].NewValue)
-	}
-	if len(subtaskChanges) != 0 {
-		t.Errorf("expected no subtask changes, got %d", len(subtaskChanges))
+	for i, w := range want {
+		if got[i].Field != w.field || got[i].OldValue != w.old || got[i].NewValue != w.new {
+			t.Errorf("field change %d: got {%q %q->%q}, want {%q %q->%q}",
+				i, got[i].Field, got[i].OldValue, got[i].NewValue, w.field, w.old, w.new)
+		}
 	}
 }
 
-func TestAnalyzeDiff_PriorityChange(t *testing.T) {
-	oldContent := "---\nid: 042\nstatus: pending\npriority: medium\n---\n# Task"
-	newContent := "---\nid: 042\nstatus: pending\npriority: high\n---\n# Task"
-
-	fieldChanges, _ := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 1 {
-		t.Fatalf("expected 1 field change, got %d", len(fieldChanges))
+// assertSubtaskChanges verifies got matches want element-for-element (order included).
+func assertSubtaskChanges(t *testing.T, got []feed.SubtaskChange, want []wantSubtaskChange) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("subtask changes: got %d, want %d (%v)", len(got), len(want), got)
 	}
-	if fieldChanges[0].Field != "priority" {
-		t.Errorf("expected field 'priority', got %q", fieldChanges[0].Field)
-	}
-	if fieldChanges[0].OldValue != "medium" || fieldChanges[0].NewValue != "high" {
-		t.Errorf("expected medium -> high, got %s -> %s", fieldChanges[0].OldValue, fieldChanges[0].NewValue)
+	for i, w := range want {
+		if got[i].Text != w.text || got[i].Done != w.done {
+			t.Errorf("subtask change %d: got {%q done=%v}, want {%q done=%v}",
+				i, got[i].Text, got[i].Done, w.text, w.done)
+		}
 	}
 }
 
-func TestAnalyzeDiff_SubtaskCompletion(t *testing.T) {
-	oldContent := "---\nid: 042\nstatus: in-progress\n---\n# Task\n\n- [ ] Add tests\n- [ ] Write docs\n"
-	newContent := "---\nid: 042\nstatus: in-progress\n---\n# Task\n\n- [x] Add tests\n- [ ] Write docs\n"
+// TestAnalyzeDiff collapses the many single-scenario AnalyzeDiff_* tests into one
+// table. Each row supplies old/new content and the expected field and subtask
+// changes in the order AnalyzeDiff emits them (both sorted by key/text), so the
+// table also guards that ordering.
+func TestAnalyzeDiff(t *testing.T) {
+	t.Parallel()
 
-	fieldChanges, subtaskChanges := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 0 {
-		t.Errorf("expected no field changes, got %d", len(fieldChanges))
+	tests := []struct {
+		name         string
+		old          string
+		new          string
+		wantFields   []wantFieldChange
+		wantSubtasks []wantSubtaskChange
+	}{
+		{
+			name:       "status change",
+			old:        "---\nid: 042\nstatus: pending\npriority: medium\n---\n# Task",
+			new:        "---\nid: 042\nstatus: in-progress\npriority: medium\n---\n# Task",
+			wantFields: []wantFieldChange{{"status", "pending", "in-progress"}},
+		},
+		{
+			name:       "priority change",
+			old:        "---\nid: 042\nstatus: pending\npriority: medium\n---\n# Task",
+			new:        "---\nid: 042\nstatus: pending\npriority: high\n---\n# Task",
+			wantFields: []wantFieldChange{{"priority", "medium", "high"}},
+		},
+		{
+			name:         "subtask completion",
+			old:          "---\nid: 042\nstatus: in-progress\n---\n# Task\n\n- [ ] Add tests\n- [ ] Write docs\n",
+			new:          "---\nid: 042\nstatus: in-progress\n---\n# Task\n\n- [x] Add tests\n- [ ] Write docs\n",
+			wantSubtasks: []wantSubtaskChange{{"Add tests", true}},
+		},
+		{
+			name:         "multiple subtask completions sorted by text",
+			old:          "---\nid: 042\n---\n# Task\n\n- [ ] Add tests\n- [ ] Write docs\n- [ ] Deploy\n",
+			new:          "---\nid: 042\n---\n# Task\n\n- [x] Add tests\n- [ ] Write docs\n- [x] Deploy\n",
+			wantSubtasks: []wantSubtaskChange{{"Add tests", true}, {"Deploy", true}},
+		},
+		{
+			name:         "mixed field and subtask changes sorted by key",
+			old:          "---\nid: 042\nstatus: pending\npriority: medium\n---\n# Task\n\n- [ ] Add tests\n",
+			new:          "---\nid: 042\nstatus: in-progress\npriority: high\n---\n# Task\n\n- [x] Add tests\n",
+			wantFields:   []wantFieldChange{{"priority", "medium", "high"}, {"status", "pending", "in-progress"}},
+			wantSubtasks: []wantSubtaskChange{{"Add tests", true}},
+		},
+		{
+			name: "no changes",
+			old:  "---\nid: 042\nstatus: pending\n---\n# Task\n\n- [ ] Add tests\n",
+			new:  "---\nid: 042\nstatus: pending\n---\n# Task\n\n- [ ] Add tests\n",
+		},
+		{
+			name: "no frontmatter",
+			old:  "# Just markdown",
+			new:  "# Updated markdown",
+		},
+		{
+			name:         "subtask unchecked",
+			old:          "---\nid: 042\n---\n# Task\n\n- [x] Add tests\n",
+			new:          "---\nid: 042\n---\n# Task\n\n- [ ] Add tests\n",
+			wantSubtasks: []wantSubtaskChange{{"Add tests", false}},
+		},
+		{
+			name:       "new field added has empty old value",
+			old:        "---\nid: 042\nstatus: pending\n---\n# Task",
+			new:        "---\nid: 042\nstatus: pending\npriority: high\n---\n# Task",
+			wantFields: []wantFieldChange{{"priority", "", "high"}},
+		},
+		{
+			name:       "status to completed",
+			old:        "---\nid: 042\nstatus: in-progress\n---\n# Task",
+			new:        "---\nid: 042\nstatus: completed\n---\n# Task",
+			wantFields: []wantFieldChange{{"status", "in-progress", "completed"}},
+		},
 	}
-	if len(subtaskChanges) != 1 {
-		t.Fatalf("expected 1 subtask change, got %d", len(subtaskChanges))
-	}
-	if subtaskChanges[0].Text != "Add tests" {
-		t.Errorf("expected subtask 'Add tests', got %q", subtaskChanges[0].Text)
-	}
-	if !subtaskChanges[0].Done {
-		t.Error("expected subtask to be marked done")
-	}
-}
 
-func TestAnalyzeDiff_MultipleSubtaskCompletions(t *testing.T) {
-	oldContent := "---\nid: 042\n---\n# Task\n\n- [ ] Add tests\n- [ ] Write docs\n- [ ] Deploy\n"
-	newContent := "---\nid: 042\n---\n# Task\n\n- [x] Add tests\n- [ ] Write docs\n- [x] Deploy\n"
-
-	_, subtaskChanges := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(subtaskChanges) != 2 {
-		t.Fatalf("expected 2 subtask changes, got %d", len(subtaskChanges))
-	}
-	// Sorted by text
-	if subtaskChanges[0].Text != "Add tests" {
-		t.Errorf("expected first subtask 'Add tests', got %q", subtaskChanges[0].Text)
-	}
-	if subtaskChanges[1].Text != "Deploy" {
-		t.Errorf("expected second subtask 'Deploy', got %q", subtaskChanges[1].Text)
-	}
-}
-
-func TestAnalyzeDiff_MixedChanges(t *testing.T) {
-	oldContent := "---\nid: 042\nstatus: pending\npriority: medium\n---\n# Task\n\n- [ ] Add tests\n"
-	newContent := "---\nid: 042\nstatus: in-progress\npriority: high\n---\n# Task\n\n- [x] Add tests\n"
-
-	fieldChanges, subtaskChanges := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 2 {
-		t.Fatalf("expected 2 field changes, got %d", len(fieldChanges))
-	}
-	if len(subtaskChanges) != 1 {
-		t.Fatalf("expected 1 subtask change, got %d", len(subtaskChanges))
-	}
-
-	// Field changes are sorted by key name
-	if fieldChanges[0].Field != "priority" {
-		t.Errorf("expected first field change 'priority', got %q", fieldChanges[0].Field)
-	}
-	if fieldChanges[1].Field != "status" {
-		t.Errorf("expected second field change 'status', got %q", fieldChanges[1].Field)
-	}
-}
-
-func TestAnalyzeDiff_NoChanges(t *testing.T) {
-	content := "---\nid: 042\nstatus: pending\n---\n# Task\n\n- [ ] Add tests\n"
-
-	fieldChanges, subtaskChanges := feed.AnalyzeDiff(content, content)
-
-	if len(fieldChanges) != 0 {
-		t.Errorf("expected no field changes, got %d", len(fieldChanges))
-	}
-	if len(subtaskChanges) != 0 {
-		t.Errorf("expected no subtask changes, got %d", len(subtaskChanges))
-	}
-}
-
-func TestAnalyzeDiff_NoFrontmatter(t *testing.T) {
-	oldContent := "# Just markdown"
-	newContent := "# Updated markdown"
-
-	fieldChanges, subtaskChanges := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 0 {
-		t.Errorf("expected no field changes, got %d", len(fieldChanges))
-	}
-	if len(subtaskChanges) != 0 {
-		t.Errorf("expected no subtask changes, got %d", len(subtaskChanges))
-	}
-}
-
-func TestAnalyzeDiff_SubtaskUnchecked(t *testing.T) {
-	oldContent := "---\nid: 042\n---\n# Task\n\n- [x] Add tests\n"
-	newContent := "---\nid: 042\n---\n# Task\n\n- [ ] Add tests\n"
-
-	_, subtaskChanges := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(subtaskChanges) != 1 {
-		t.Fatalf("expected 1 subtask change, got %d", len(subtaskChanges))
-	}
-	if subtaskChanges[0].Done {
-		t.Error("expected subtask to be unchecked")
-	}
-}
-
-func TestAnalyzeDiff_NewFieldAdded(t *testing.T) {
-	oldContent := "---\nid: 042\nstatus: pending\n---\n# Task"
-	newContent := "---\nid: 042\nstatus: pending\npriority: high\n---\n# Task"
-
-	fieldChanges, _ := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 1 {
-		t.Fatalf("expected 1 field change, got %d", len(fieldChanges))
-	}
-	if fieldChanges[0].Field != "priority" {
-		t.Errorf("expected field 'priority', got %q", fieldChanges[0].Field)
-	}
-	if fieldChanges[0].OldValue != "" {
-		t.Errorf("expected empty old value, got %q", fieldChanges[0].OldValue)
-	}
-	if fieldChanges[0].NewValue != "high" {
-		t.Errorf("expected new value 'high', got %q", fieldChanges[0].NewValue)
-	}
-}
-
-func TestAnalyzeDiff_StatusToCompleted(t *testing.T) {
-	oldContent := "---\nid: 042\nstatus: in-progress\n---\n# Task"
-	newContent := "---\nid: 042\nstatus: completed\n---\n# Task"
-
-	fieldChanges, _ := feed.AnalyzeDiff(oldContent, newContent)
-
-	if len(fieldChanges) != 1 {
-		t.Fatalf("expected 1 field change, got %d", len(fieldChanges))
-	}
-	if fieldChanges[0].Field != "status" {
-		t.Errorf("expected field 'status', got %q", fieldChanges[0].Field)
-	}
-	if fieldChanges[0].NewValue != "completed" {
-		t.Errorf("expected new value 'completed', got %q", fieldChanges[0].NewValue)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fieldChanges, subtaskChanges := feed.AnalyzeDiff(tt.old, tt.new)
+			assertFieldChanges(t, fieldChanges, tt.wantFields)
+			assertSubtaskChanges(t, subtaskChanges, tt.wantSubtasks)
+		})
 	}
 }

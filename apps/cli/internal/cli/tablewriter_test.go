@@ -7,6 +7,7 @@ import (
 )
 
 func TestTableWriter_BasicAlignment(t *testing.T) {
+	t.Parallel()
 	tw := NewTableWriter()
 	tw.AddHeader([]string{"ID", "TITLE", "STATUS"})
 	tw.AddSeparator()
@@ -43,6 +44,7 @@ func TestTableWriter_BasicAlignment(t *testing.T) {
 }
 
 func TestTableWriter_ColorAlignment(t *testing.T) {
+	t.Parallel()
 	tw := NewTableWriter()
 	tw.AddHeader([]string{"ID", "STATUS"})
 	tw.AddSeparator()
@@ -87,6 +89,7 @@ func TestTableWriter_ColorAlignment(t *testing.T) {
 }
 
 func TestTableWriter_EmptyTable(t *testing.T) {
+	t.Parallel()
 	tw := NewTableWriter()
 
 	var buf bytes.Buffer
@@ -98,6 +101,7 @@ func TestTableWriter_EmptyTable(t *testing.T) {
 }
 
 func TestTableWriter_SeparatorSizing(t *testing.T) {
+	t.Parallel()
 	tw := NewTableWriter()
 	tw.AddHeader([]string{"A", "BB"})
 	tw.AddSeparator()
@@ -125,6 +129,7 @@ func TestTableWriter_SeparatorSizing(t *testing.T) {
 }
 
 func TestStripANSI(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		input string
@@ -139,6 +144,7 @@ func TestStripANSI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := StripANSI(tt.input)
 			if got != tt.want {
 				t.Errorf("StripANSI(%q) = %q, want %q", tt.input, got, tt.want)
@@ -148,6 +154,7 @@ func TestStripANSI(t *testing.T) {
 }
 
 func TestTableWriter_HeaderOnly(t *testing.T) {
+	t.Parallel()
 	tw := NewTableWriter()
 	tw.AddHeader([]string{"COL1", "COL2"})
 	tw.AddSeparator()

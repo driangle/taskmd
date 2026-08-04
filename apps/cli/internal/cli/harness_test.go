@@ -24,11 +24,23 @@ package cli
 // would pollute tests with the developer's real config. Running RunE directly
 // with a fresh viper keeps every test isolated to its temp repo.
 //
-// Parallelism: Run swaps the process-global os.Stdout/os.Stderr, so command
-// tests driven through Run must NOT call t.Parallel() yet. Pure-function unit
-// tests (no Run, no global flag mutation) may. Making read-only command tests
-// parallel-safe requires routing command output through cmd.OutOrStdout(), which
-// is tracked as a separate follow-up (see task 01kz3nmka).
+// Parallelism: command tests driven through Run must NOT call t.Parallel() yet,
+// for two independent reasons:
+//
+//  1. Run swaps the process-global os.Stdout/os.Stderr (via captureOutput), so
+//     two Runs in flight would clobber each other's capture.
+//  2. Cobra flags are bound to package-global vars (StringVar(&getFormat, ...)),
+//     and resetCLIState() resets that shared tree plus taskDir on every Run;
+//     concurrent Runs would race on those globals regardless of stdout.
+//
+// Pure-function unit tests (no Run, no global flag/env mutation) already run with
+// t.Parallel() — see feed_diff_test.go, filter_test.go, format_test.go,
+// suggest_test.go, tablewriter_test.go, spec_reference_test.go, input_test.go,
+// and the renderer-based tests in colors_test.go. Making read-only *command*
+// tests parallel-safe needs both (a) routing output through cmd.OutOrStdout()
+// instead of os.Stdout and (b) moving flag state off package globals into
+// per-invocation context. That flag-architecture change is the remaining
+// follow-up; until it lands, command tests stay serial by design.
 
 import (
 	"bytes"

@@ -6,6 +6,7 @@ import (
 )
 
 func TestSuggestValue(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -24,6 +25,7 @@ func TestSuggestValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := suggestValue(tt.input, tt.valid)
 			if got != tt.expected {
 				t.Errorf("suggestValue(%q) = %q, want %q", tt.input, got, tt.expected)
@@ -33,6 +35,7 @@ func TestSuggestValue(t *testing.T) {
 }
 
 func TestInvalidValueError_WithSuggestion(t *testing.T) {
+	t.Parallel()
 	err := invalidValueError("status", "pening", validStatusValues)
 	errMsg := err.Error()
 
@@ -45,6 +48,7 @@ func TestInvalidValueError_WithSuggestion(t *testing.T) {
 }
 
 func TestInvalidValueError_NoSuggestion(t *testing.T) {
+	t.Parallel()
 	err := invalidValueError("status", "zzzzzzzzz", validStatusValues)
 	errMsg := err.Error()
 

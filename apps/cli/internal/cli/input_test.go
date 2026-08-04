@@ -8,6 +8,7 @@ import (
 )
 
 func TestInputResolver_ResolveInput(t *testing.T) {
+	t.Parallel()
 	// Create a temporary directory and file for testing
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
@@ -39,6 +40,7 @@ func TestInputResolver_ResolveInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			resolver := NewInputResolver(tt.useStdin, false)
 			reader, cleanup, err := resolver.ResolveInput(tt.args)
 
@@ -65,6 +67,7 @@ func TestInputResolver_ResolveInput(t *testing.T) {
 }
 
 func TestInputResolver_ReadAll(t *testing.T) {
+	t.Parallel()
 	// Create a temporary file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")

@@ -122,11 +122,50 @@ func TestGet_TaskNotFound_NoMatches(t *testing.T) {
 	}
 }
 
-func TestGet_TextFormat(t *testing.T) {
+// TestGet_Formats groups the per-format output variants (text/json/yaml plus the
+// unsupported-format error) into one table. Each format asserts differently
+// (substring checks vs. JSON unmarshal), so rows carry a check closure rather
+// than a shared expected value. These subtests do NOT use t.Parallel(): repo.Run
+// swaps the process-global os.Stdout and mutates package-global flag vars, so
+// command-driven tests must stay serial until that state is per-invocation (see
+// the harness note in harness_test.go).
+func TestGet_Formats(t *testing.T) {
 	repo := newTaskRepoFromFixture(t, "dependency-chain")
 
-	output := getStdout(t, repo, "002")
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string // non-empty means the run should fail with this substring
+		check   func(t *testing.T, output string)
+	}{
+		{name: "text format", args: []string{"002"}, check: assertGetText},
+		{name: "json format", args: []string{"002", "--format", "json"}, check: assertGetJSON},
+		{name: "yaml format", args: []string{"001", "--format", "yaml"}, check: assertGetYAML},
+		{name: "unsupported format", args: []string{"001", "--format", "csv"}, wantErr: "unsupported format"},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := repo.Run(append([]string{"get"}, tt.args...)...)
+			if tt.wantErr != "" {
+				if res.Err == nil {
+					t.Fatalf("Expected error for %s", tt.name)
+				}
+				if !strings.Contains(res.Err.Error(), tt.wantErr) {
+					t.Errorf("Expected %q error, got: %v", tt.wantErr, res.Err)
+				}
+				return
+			}
+			if res.Err != nil {
+				t.Fatalf("unexpected error: %v", res.Err)
+			}
+			tt.check(t, res.Stdout)
+		})
+	}
+}
+
+func assertGetText(t *testing.T, output string) {
+	t.Helper()
 	expected := []string{
 		"Task: 002",
 		"Title: Implement authentication",
@@ -141,7 +180,6 @@ func TestGet_TextFormat(t *testing.T) {
 		"Dependencies:",
 		"Depends on: 001 (Setup project)",
 	}
-
 	for _, exp := range expected {
 		if !strings.Contains(output, exp) {
 			t.Errorf("Expected output to contain %q", exp)
@@ -149,16 +187,12 @@ func TestGet_TextFormat(t *testing.T) {
 	}
 }
 
-func TestGet_JSONFormat(t *testing.T) {
-	repo := newTaskRepoFromFixture(t, "dependency-chain")
-
-	output := getStdout(t, repo, "002", "--format", "json")
-
+func assertGetJSON(t *testing.T, output string) {
+	t.Helper()
 	var result getOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
 	}
-
 	if result.ID != "002" {
 		t.Errorf("Expected ID '002', got %q", result.ID)
 	}
@@ -176,28 +210,13 @@ func TestGet_JSONFormat(t *testing.T) {
 	}
 }
 
-func TestGet_YAMLFormat(t *testing.T) {
-	repo := newTaskRepoFromFixture(t, "dependency-chain")
-
-	output := getStdout(t, repo, "001", "--format", "yaml")
-
+func assertGetYAML(t *testing.T, output string) {
+	t.Helper()
 	expected := []string{"id: \"001\"", "title: Setup project", "status: completed"}
 	for _, exp := range expected {
 		if !strings.Contains(output, exp) {
 			t.Errorf("Expected YAML output to contain %q", exp)
 		}
-	}
-}
-
-func TestGet_UnsupportedFormat(t *testing.T) {
-	repo := newTaskRepoFromFixture(t, "dependency-chain")
-
-	res := repo.Run("get", "001", "--format", "csv")
-	if res.Err == nil {
-		t.Fatal("Expected error for unsupported format")
-	}
-	if !strings.Contains(res.Err.Error(), "unsupported format") {
-		t.Errorf("Expected 'unsupported format' error, got: %v", res.Err)
 	}
 }
 

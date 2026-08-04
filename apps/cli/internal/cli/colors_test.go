@@ -9,6 +9,12 @@ import (
 	"github.com/muesli/termenv"
 )
 
+// The TestColorsEnabled_* and TestGetRenderer_* tests below cannot use
+// t.Parallel(): they mutate the package-global noColor/forceColor flags and the
+// process-wide NO_COLOR env var. The renderer-based tests further down
+// (TestFormatHelpers_*, TestEffortColors, TestFormatHeading_Effort) operate on a
+// local *lipgloss.Renderer with no global state, so they do run in parallel.
+
 func TestColorsEnabled_NoColorFlag(t *testing.T) {
 	noColor = true
 	forceColor = false
@@ -102,6 +108,7 @@ func asciiRenderer() *lipgloss.Renderer {
 }
 
 func TestFormatHelpers_WithColors(t *testing.T) {
+	t.Parallel()
 	r := ansiRenderer()
 
 	tests := []struct {
@@ -121,6 +128,7 @@ func TestFormatHelpers_WithColors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := tt.fn()
 			if !strings.Contains(result, "\x1b[") {
 				t.Errorf("Expected ANSI codes in %s output, got: %q", tt.name, result)
@@ -130,6 +138,7 @@ func TestFormatHelpers_WithColors(t *testing.T) {
 }
 
 func TestFormatHelpers_WithoutColors(t *testing.T) {
+	t.Parallel()
 	r := asciiRenderer()
 
 	tests := []struct {
@@ -150,6 +159,7 @@ func TestFormatHelpers_WithoutColors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := tt.fn()
 			if strings.Contains(result, "\x1b[") {
 				t.Errorf("Expected no ANSI codes in %s output, got: %q", tt.name, result)
@@ -162,6 +172,7 @@ func TestFormatHelpers_WithoutColors(t *testing.T) {
 }
 
 func TestEffortColors(t *testing.T) {
+	t.Parallel()
 	r := ansiRenderer()
 
 	small := formatEffort("small", r)
@@ -181,6 +192,7 @@ func TestEffortColors(t *testing.T) {
 }
 
 func TestFormatHeading_Effort(t *testing.T) {
+	t.Parallel()
 	r := ansiRenderer()
 
 	result := formatHeading("small", "effort", r)

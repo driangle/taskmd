@@ -7,6 +7,7 @@ import (
 )
 
 func TestMatchesFilter(t *testing.T) {
+	t.Parallel()
 	task := &model.Task{
 		ID:           "001",
 		Title:        "Test Task",
@@ -42,6 +43,7 @@ func TestMatchesFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := matchesFilter(task, tt.field, tt.value)
 			if result != tt.expected {
 				t.Errorf("matchesFilter(%s, %s) = %v, want %v", tt.field, tt.value, result, tt.expected)
@@ -51,6 +53,7 @@ func TestMatchesFilter(t *testing.T) {
 }
 
 func TestApplyFilters(t *testing.T) {
+	t.Parallel()
 	tasks := []*model.Task{
 		{ID: "001", Status: model.StatusPending, Priority: model.PriorityHigh},
 		{ID: "002", Status: model.StatusCompleted, Priority: model.PriorityLow},
@@ -74,6 +77,7 @@ func TestApplyFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := applyFilters(tasks, tt.filters)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("applyFilters() error = %v, wantErr %v", err, tt.wantErr)
@@ -87,6 +91,7 @@ func TestApplyFilters(t *testing.T) {
 }
 
 func TestMatchesAllFilters(t *testing.T) {
+	t.Parallel()
 	task := &model.Task{
 		ID:       "001",
 		Status:   model.StatusPending,
@@ -123,6 +128,7 @@ func TestMatchesAllFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := matchesAllFilters(task, tt.filters)
 			if result != tt.expected {
 				t.Errorf("matchesAllFilters() = %v, want %v", result, tt.expected)
