@@ -1,7 +1,7 @@
 ---
 id: "01kz3c24b"
 title: "Consolidate overlapping read-view commands"
-status: pending
+status: cancelled
 priority: medium
 effort: large
 type: improvement
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: ["01kz3c24f"]
 tags: [cli, scope, ux]
 created_at: 2026-08-03
+cancelled_at: 2026-08-04
 ---
 
 # Consolidate overlapping read-view commands
