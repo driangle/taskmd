@@ -195,6 +195,29 @@ export TASKMD_VERBOSE=true
 4. Environment variables
 5. Built-in defaults
 
+### `TASKMD_TASK_DIR` — shared task directory {#taskmd-task-dir}
+
+`TASKMD_TASK_DIR` points taskmd at a specific task directory and is the
+recommended way to make several git worktrees operate on **one shared task
+tracker** (see [Sharing a task directory across worktrees](../guide/best-practices#shared-task-dir)).
+
+```bash
+export TASKMD_TASK_DIR=/abs/path/to/shared/tasks
+```
+
+Unlike other `TASKMD_` variables, `TASKMD_TASK_DIR` intentionally **overrides
+the project/global `.taskmd.yaml` value** so that agents launched inside
+different worktrees all resolve to the same directory regardless of each
+worktree's committed config. Its precedence is:
+
+1. `--project` flag
+2. `--task-dir` / `--dir` flag
+3. `TASKMD_TASK_DIR`
+4. `.taskmd.yaml` (`task-dir` / `dir`)
+5. Built-in default (`.`)
+
+Use an absolute path so it resolves consistently from any working directory.
+
 ## Sync Configuration {#sync-configuration}
 
 The `sync` command reads its configuration from the `sync` section of `.taskmd.yaml`. Each source defines where to fetch tasks from, how to map fields, and where to write files.

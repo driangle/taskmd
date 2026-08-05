@@ -1535,3 +1535,87 @@ func TestHandleBoard_WithProject(t *testing.T) {
 		t.Fatal("expected project task P01 in board response")
 	}
 }
+
+func TestHandleAddWorklog_Success(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"author":"alice","content":"first comment"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/001/worklog", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleAddWorklog(dp, false)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var entries []WorklogEntryJSON
+	if err := json.Unmarshal(rec.Body.Bytes(), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Author != "alice" || entries[0].Content != "first comment" {
+		t.Errorf("unexpected entry: %+v", entries[0])
+	}
+
+	// Verify the worklog file was written with the author.
+	content, err := os.ReadFile(filepath.Join(dir, ".worklogs", "001.md"))
+	if err != nil {
+		t.Fatalf("worklog file not created: %v", err)
+	}
+	if !strings.Contains(string(content), "— alice") {
+		t.Errorf("worklog file missing author, got:\n%s", content)
+	}
+}
+
+func TestHandleAddWorklog_ReadOnly(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"content":"nope"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/001/worklog", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleAddWorklog(dp, true)(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 in read-only mode, got %d", rec.Code)
+	}
+}
+
+func TestHandleAddWorklog_EmptyContent(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"author":"alice","content":"   "}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/001/worklog", body)
+	req.SetPathValue("id", "001")
+	rec := httptest.NewRecorder()
+
+	handleAddWorklog(dp, false)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for empty content, got %d", rec.Code)
+	}
+}
+
+func TestHandleAddWorklog_NotFound(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	body := strings.NewReader(`{"content":"hi"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/999/worklog", body)
+	req.SetPathValue("id", "999")
+	rec := httptest.NewRecorder()
+
+	handleAddWorklog(dp, false)(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}

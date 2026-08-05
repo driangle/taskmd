@@ -607,6 +607,44 @@ scopes:
 
 Full setup with worklogs for audit trail, scopes for parallel AI sessions, and PR-review workflow for team coordination.
 
+## Sharing a task directory across worktrees {#shared-task-dir}
+
+When several agents (or an agent plus the web dashboard) work in parallel, you
+usually want them to share **one** task tracker so status changes and worklog
+comments are visible to everyone immediately — rather than each git worktree
+editing its own private copy of `tasks/` and reconciling later through merges.
+
+Point every process at the same directory with
+[`TASKMD_TASK_DIR`](/reference/configuration#taskmd-task-dir):
+
+```bash
+# In each worktree / agent environment
+export TASKMD_TASK_DIR=/abs/path/to/shared/tasks
+```
+
+Now `taskmd set`, `taskmd worklog`, the MCP server, and the web dashboard all
+read and write the same files, regardless of which worktree they run in.
+
+**Concurrency safety.** Sharing one directory means multiple processes may write
+at once. taskmd handles this automatically:
+
+- **Atomic writes** — task files are written via a temp file + rename, so a
+  reader (or scanner) never sees a half-written file.
+- **Per-task locking** — each write takes a short advisory lock at
+  `<task-dir>/.taskmd/locks/<id>.lock` for the duration of the read-modify-write.
+  Writers to the *same* task serialize; writers to *different* tasks never
+  contend. This prevents lost updates when, say, two agents update the same task
+  or post worklog comments concurrently.
+
+Notes:
+
+- Locking uses `flock` and is reliable on local filesystems (macOS, Linux). It is
+  **not** guaranteed on networked filesystems (NFS); keep the shared directory on
+  a local disk.
+- `.taskmd/locks/` and atomic-write temp files are machine-local — add
+  `.taskmd/locks/` and `.tmp-*` to `.gitignore` if the shared directory is itself
+  a git repository.
+
 ## What's Next?
 
 - **[CLI Guide](/guide/cli)** -- full command reference

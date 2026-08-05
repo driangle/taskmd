@@ -7,11 +7,14 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/driangle/taskmd/sdk/go/lock"
 )
 
 // Entry is a single timestamped worklog entry.
 type Entry struct {
 	Timestamp time.Time `json:"timestamp" yaml:"timestamp"`
+	Author    string    `json:"author,omitempty" yaml:"author,omitempty"`
 	Content   string    `json:"content" yaml:"content"`
 }
 
@@ -22,8 +25,11 @@ type Worklog struct {
 	Entries  []Entry `json:"entries" yaml:"entries"`
 }
 
-// timestampHeader matches "## <ISO-8601 timestamp>" headings.
-var timestampHeader = regexp.MustCompile(`^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2}))`)
+// timestampHeader matches "## <ISO-8601 timestamp>" headings, with an optional
+// " — <author>" suffix (an em dash or hyphen separator is accepted). Group 1 is
+// the timestamp; group 2 is the author (empty when omitted, e.g. legacy
+// entries written before author attribution).
+var timestampHeader = regexp.MustCompile(`^## (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2}))(?:\s+[—-]\s+(.+?))?\s*$`)
 
 // ParseWorklog reads a worklog file and splits it into entries on ## timestamp headings.
 func ParseWorklog(filePath string) (*Worklog, error) {
@@ -49,7 +55,7 @@ func parseEntries(content string) []Entry {
 	var contentLines []string
 
 	for _, line := range lines {
-		if m := timestampHeader.FindStringSubmatch(line); len(m) == 2 {
+		if m := timestampHeader.FindStringSubmatch(line); len(m) >= 2 {
 			// Flush previous entry
 			if current != nil {
 				current.Content = strings.TrimSpace(strings.Join(contentLines, "\n"))
@@ -62,7 +68,11 @@ func parseEntries(content string) []Entry {
 				contentLines = nil
 				continue
 			}
-			current = &Entry{Timestamp: ts}
+			author := ""
+			if len(m) > 2 {
+				author = strings.TrimSpace(m[2])
+			}
+			current = &Entry{Timestamp: ts, Author: author}
 			contentLines = nil
 		} else if current != nil {
 			contentLines = append(contentLines, line)
@@ -93,14 +103,19 @@ func WorklogPath(taskFilePath string, taskID string) string {
 }
 
 // AppendEntry appends a new timestamped entry to a worklog file,
-// creating the file and .worklogs/ directory if needed.
-func AppendEntry(filePath string, message string) error {
+// creating the file and .worklogs/ directory if needed. If author is non-empty
+// it is recorded in the entry heading as "## <timestamp> — <author>".
+func AppendEntry(filePath, author, message string) error {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create worklogs directory: %w", err)
 	}
 
-	entry := fmt.Sprintf("\n## %s\n\n%s\n", time.Now().UTC().Format(time.RFC3339), message)
+	header := "## " + time.Now().UTC().Format(time.RFC3339)
+	if a := strings.TrimSpace(author); a != "" {
+		header += " — " + a
+	}
+	entry := fmt.Sprintf("\n%s\n\n%s\n", header, message)
 
 	// If file doesn't exist, create it without leading newline
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
@@ -118,6 +133,18 @@ func AppendEntry(filePath string, message string) error {
 	}
 
 	return nil
+}
+
+// AppendEntryLocked appends a worklog entry while holding the per-task lock
+// (scoped to scanDir), serializing it against concurrent worklog appends and
+// task-file writes for the same task ID across processes.
+func AppendEntryLocked(scanDir, filePath, taskID, author, message string) error {
+	l, err := lock.Acquire(lock.TaskLockPath(scanDir, taskID), lock.DefaultTimeout)
+	if err != nil {
+		return fmt.Errorf("lock task %s: %w", taskID, err)
+	}
+	defer l.Release()
+	return AppendEntry(filePath, author, message)
 }
 
 // Exists checks whether a worklog file exists for the given path.

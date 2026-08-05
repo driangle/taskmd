@@ -124,6 +124,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tasks", handleTasks(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}", handleTaskByID(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}/worklog", handleWorklog(s.dp))
+	mux.HandleFunc("POST /api/tasks/{id}/worklog", handleAddWorklog(s.dp, s.config.ReadOnly))
 	mux.HandleFunc("PUT /api/tasks/{id}", handleUpdateTask(s.dp, s.config.ReadOnly))
 	mux.HandleFunc("GET /api/board", handleBoard(s.dp, s.config.Phases))
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))

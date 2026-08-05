@@ -19,7 +19,10 @@ export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { project } = useProject();
   const { data: task, error, isLoading, mutate } = useTaskDetail(id, project);
-  const { data: worklogEntries } = useWorklog(id, project);
+  const { data: worklogEntries, mutate: mutateWorklog } = useWorklog(
+    id,
+    project,
+  );
   const { readonly } = useConfig(project);
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -188,9 +191,12 @@ export function TaskDetailPage() {
               </div>
             )}
 
-            {worklogEntries && worklogEntries.length > 0 && (
-              <WorklogSection entries={worklogEntries} />
-            )}
+            <WorklogSection
+              entries={worklogEntries ?? []}
+              taskId={id}
+              readonly={readonly}
+              onAdded={() => mutateWorklog()}
+            />
 
             {task.file_path && (
               <div className="mt-4 text-xs text-gray-400 font-mono break-all">

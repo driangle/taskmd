@@ -3,8 +3,10 @@ package taskfile
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/driangle/taskmd/sdk/go/lock"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -133,7 +135,54 @@ func UpdateTaskFile(filePath string, req UpdateRequest) error {
 		lines = replaceBody(lines, closeIdx, *req.Body)
 	}
 
-	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+	return writeFileAtomic(filePath, []byte(strings.Join(lines, "\n")), 0o644)
+}
+
+// UpdateTaskFileLocked acquires the per-task lock for taskID (scoped to scanDir)
+// and then performs UpdateTaskFile within the critical section. This serializes
+// concurrent writers to the same task across processes (parallel agents, the
+// web server, and CLI invocations) sharing a task directory, preventing lost
+// updates.
+func UpdateTaskFileLocked(scanDir, filePath, taskID string, req UpdateRequest) error {
+	l, err := lock.Acquire(lock.TaskLockPath(scanDir, taskID), lock.DefaultTimeout)
+	if err != nil {
+		return fmt.Errorf("lock task %s: %w", taskID, err)
+	}
+	defer l.Release()
+	return UpdateTaskFile(filePath, req)
+}
+
+// writeFileAtomic writes data to path atomically: it writes to a temporary file
+// in the same directory, fsyncs it, then renames it over the target. Readers
+// therefore never observe a partially written file — they see either the old
+// contents or the complete new contents.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".tmp-"+filepath.Base(path)+"-*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // no-op after a successful rename
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("sync temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		return fmt.Errorf("chmod temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("rename temp file: %w", err)
+	}
+	return nil
 }
 
 type scalarUpdate struct {
@@ -491,7 +540,7 @@ func ReplaceID(filePath, newID string) error {
 	for i := openIdx + 1; i < closeIdx; i++ {
 		if strings.HasPrefix(strings.TrimSpace(lines[i]), "id:") {
 			lines[i] = fmt.Sprintf("id: %q", newID)
-			return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+			return writeFileAtomic(filePath, []byte(strings.Join(lines, "\n")), 0o644)
 		}
 	}
 
@@ -520,7 +569,7 @@ func ReplaceReference(filePath, oldID, newID string) error {
 		return nil
 	}
 
-	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+	return writeFileAtomic(filePath, []byte(strings.Join(lines, "\n")), 0o644)
 }
 
 // replaceRefsInLines performs the actual replacement of oldID with newID within frontmatter lines.

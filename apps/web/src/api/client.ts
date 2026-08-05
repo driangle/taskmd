@@ -1,4 +1,9 @@
-import type { ApiError, Task, TaskUpdateRequest } from "./types.ts";
+import type {
+  ApiError,
+  Task,
+  TaskUpdateRequest,
+  WorklogEntry,
+} from "./types.ts";
 
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -25,6 +30,26 @@ export async function updateTask(
 ): Promise<Task> {
   const res = await fetch(`/api/tasks/${id}`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body: ApiError = await res.json().catch(() => ({
+      error: `HTTP ${res.status}`,
+    }));
+    throw new ApiRequestError(body.error, body.details);
+  }
+
+  return res.json();
+}
+
+export async function addWorklogEntry(
+  id: string,
+  data: { author?: string; content: string },
+): Promise<WorklogEntry[]> {
+  const res = await fetch(`/api/tasks/${id}/worklog`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
