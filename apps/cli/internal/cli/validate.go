@@ -249,6 +249,11 @@ func loadConfigForValidation() *validator.ConfigData {
 	if raw != nil {
 		if scopeMap, ok := raw.(map[string]any); ok {
 			config.Scopes = parseScopeEntries(scopeMap)
+		} else {
+			config.StructuralErrors = append(config.StructuralErrors,
+				fmt.Sprintf("scopes must be a mapping of scope-id to { paths, description }, but found a %s. "+
+					"Scopes are keyed by id (e.g. `cli/graph:`), not a list of `- id:` entries. "+
+					"See the Scopes section of the spec.", yamlContainerKind(raw)))
 		}
 	}
 
@@ -344,6 +349,21 @@ func toInt(v any) int {
 		return int(n)
 	default:
 		return 0
+	}
+}
+
+// yamlContainerKind describes the shape of a decoded YAML value for use in
+// config error messages ("list", "string", "number", or "value").
+func yamlContainerKind(v any) string {
+	switch v.(type) {
+	case []any:
+		return "list"
+	case string:
+		return "string"
+	case int, int64, float64, bool:
+		return "scalar value"
+	default:
+		return "value of the wrong type"
 	}
 }
 

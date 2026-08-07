@@ -60,12 +60,17 @@ func (vr *ValidationResult) AddIssue(level ValidationLevel, taskID, filePath, me
 // ConfigData holds parsed config file data for validation.
 // Extracted in the CLI layer so the validator stays viper-free.
 type ConfigData struct {
-	Scopes     map[string]ScopeConfig
-	Phases     []PhaseConfig
-	TopKeys    []string
-	ConfigPath string
-	Workflow   string
-	ID         *IDConfig
+	Scopes map[string]ScopeConfig
+	Phases []PhaseConfig
+	// StructuralErrors holds problems detected while parsing the raw config
+	// that can't be represented in the typed fields above — e.g. a section
+	// with the wrong YAML container type (a list where a map is expected).
+	// The CLI layer populates these; ValidateConfig surfaces them as errors.
+	StructuralErrors []string
+	TopKeys          []string
+	ConfigPath       string
+	Workflow         string
+	ID               *IDConfig
 }
 
 // PhaseConfig holds the configuration for a single phase entry.
@@ -367,6 +372,7 @@ func (v *Validator) ValidateConfig(config *ConfigData) *ValidationResult {
 		return result
 	}
 
+	v.checkStructuralErrors(config, result)
 	v.checkConfigScopes(config, result)
 	v.checkUnknownConfigKeys(config, result)
 	v.checkWorkflowValue(config, result)
@@ -453,6 +459,14 @@ func (v *Validator) checkPhaseConfig(config *ConfigData, result *ValidationResul
 			}
 			seenNames[phase.Name] = true
 		}
+	}
+}
+
+// checkStructuralErrors surfaces config parse problems (wrong container types)
+// detected in the CLI layer as validation errors.
+func (v *Validator) checkStructuralErrors(config *ConfigData, result *ValidationResult) {
+	for _, msg := range config.StructuralErrors {
+		result.AddIssue(LevelError, "", config.ConfigPath, msg)
 	}
 }
 
