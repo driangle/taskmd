@@ -1,15 +1,30 @@
 ---
 title: "Resolve taskmd task directory from the git worktree root"
 id: "01kzdpvr2"
-status: pending
+status: cancelled
 priority: medium
 type: improvement
 tags: ["cli", "worktree", "correctness"]
 created: "2026-08-07"
 phase: critical-feedback
+cancelled_at: 2026-08-07
 ---
 
 # Resolve taskmd task directory from the git worktree root
+
+> **Cancelled (2026-08-07).** Decision: `taskmd` should **always resolve from the
+> current working directory** — that predictable, cwd-anchored contract is a feature,
+> not a bug. This task proposed overriding cwd with the git worktree root, which
+> directly contradicts that contract. It was also found to be redundant and risky:
+> `initConfig` *already* walks up from cwd and stops at the `.git` boundary, so it
+> already anchors to the worktree root without shelling out to `git`; the proposed
+> auto-anchor buys nothing over that for the motivating bug (see caveat below) while
+> risking regressions to nested/monorepo `.taskmd.yaml`, `--project`, and
+> `default_project` (all intentional "operate outside cwd" paths), plus a brand-new
+> runtime dependency on the `git` binary. The `cd`-away failure it targeted is handled
+> at the skill layer by the guardrail in `[[01kzdpvr1]]` (never `cd` before a taskmd
+> write). If worktree-safety ever needs a CLI-level cure, do it via an explicit
+> harness-provided signal, not by second-guessing cwd.
 
 ## Description
 
