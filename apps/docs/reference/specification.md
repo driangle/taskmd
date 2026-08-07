@@ -130,7 +130,7 @@ phase: "core-cli"
 
 When phases are configured in `.taskmd.yaml`, tasks referencing an undefined phase `id` produce a warning. When no phases config exists, all values are accepted silently.
 
-**`touches`** — List of abstract scope identifiers declaring which code areas a task modifies. Used by the `tracks` command to detect spatial overlap and assign tasks to parallel work tracks. Two tasks that share a scope should not be worked on simultaneously (risk of merge conflicts).
+**`touches`** — List of abstract scope identifiers declaring which code areas a task modifies. Used by the `tracks` command to detect spatial overlap and assign tasks to parallel work tracks. Two tasks that share a scope should not be worked on simultaneously (risk of merge conflicts). Unlike `phase`, there is no `scope` frontmatter field — a task references scopes through this `touches` array. See [Scopes](#scopes) for defining scopes in `.taskmd.yaml`.
 
 ```yaml
 touches:
@@ -307,6 +307,21 @@ phases:
 | `due` | No | Target date in `YYYY-MM-DD` format |
 
 Task `phase` values are matched against the phase `id`. If `id` is omitted, the `name` is used as the key for backwards compatibility. Validation warns on duplicate `id` or `name` values across phases. When no phases config exists, all `phase` values are accepted silently.
+
+## Scopes
+
+Scopes represent spatial groupings — the code areas a task modifies. Unlike phases, there is no `scope` frontmatter field; a task references scopes through the [`touches`](#optional-fields) array.
+
+### Configuration
+
+Scopes are optionally defined in `.taskmd.yaml` as a map of scope identifier to metadata (see the `touches` field above for a full example):
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `paths` | Yes | File or directory paths the scope covers |
+| `description` | No | Human-readable explanation, included in validation messages |
+
+When scopes are configured, `touches` values not found in the config produce a warning. When no scopes config exists, all values are accepted silently.
 
 ## File Organization
 
