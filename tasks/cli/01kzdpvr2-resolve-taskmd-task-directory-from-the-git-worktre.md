@@ -27,9 +27,28 @@ anchor task-directory resolution to the worktree root (`git rev-parse
 registry — or, at minimum, refuse to write to a task directory that lies outside
 the current worktree.
 
+> ⚠️ **Caveat — this does NOT fix the `cd`-away failure that motivated `[[01kzdpvr1]]`.**
+> `git rev-parse --show-toplevel` (and every other signal here — cwd walk-up, the
+> project registry) is evaluated from **taskmd's own process cwd**. The observed bug
+> is `cd /path/to/primary-repo && taskmd set …`: by the time taskmd runs, its cwd is
+> the *primary* checkout, so `--show-toplevel` resolves to the primary root and the
+> write still lands there. The safety check below has the same blind spot — the write
+> to `primary/tasks/` is *inside* the primary worktree, so it is not "outside the
+> current worktree" and is allowed. Once a process has `cd`'d into another checkout,
+> git cannot recover which worktree the caller *meant*; that information is gone.
+> Net: this task hardens resolution for the *milder* cases (cwd in a subdir of the
+> worktree, or an explicit `-d` pointing at a foreign tree) but the `cd`-away case
+> is only cured by the behavioral guardrail in `[[01kzdpvr1]]` ("never `cd` away
+> before running taskmd"). The **only** way to make the CLI itself survive a rogue
+> `cd` is to key resolution off an external worktree signal the harness provides
+> (e.g. an env var set by worktree isolation) rather than cwd-relative git — a
+> larger design, out of scope unless such a signal exists. Do not implement the
+> auto-anchor expecting it to close the reported bug.
+
 Design considerations:
 - `git rev-parse --show-toplevel` returns the current **worktree** root (not the
-  primary checkout), which is exactly the desired anchor.
+  primary checkout) **as seen from taskmd's cwd** — correct only when the caller has
+  not `cd`'d out of the worktree first (see caveat above).
 - Precedence must stay predictable and backward-compatible: an explicit
   `-d/--task-dir`, `--config`, or `--project` should still win over auto-anchoring.
 - Auto-anchor should apply to the implicit/default case (no explicit dir/project),
