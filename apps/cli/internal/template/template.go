@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -62,15 +63,33 @@ func ApplyOverrides(content string, overrides map[string]string) string {
 		return content
 	}
 
+	matched := make(map[string]bool, len(overrides))
 	for i := openIdx + 1; i < closeIdx; i++ {
 		for key, value := range overrides {
 			prefix := key + ":"
 			if strings.HasPrefix(strings.TrimSpace(lines[i]), prefix) {
 				lines[i] = key + ": " + value
+				matched[key] = true
 				break
 			}
 		}
 	}
+
+	// Append overrides that had no matching line so they aren't silently dropped
+	// (e.g. --phase against a template whose frontmatter declares no phase field).
+	appended := make([]string, 0, len(overrides))
+	for key := range overrides {
+		if !matched[key] {
+			appended = append(appended, key)
+		}
+	}
+	sort.Strings(appended)
+
+	insert := make([]string, len(appended))
+	for i, key := range appended {
+		insert[i] = key + ": " + overrides[key]
+	}
+	lines = append(lines[:closeIdx], append(insert, lines[closeIdx:]...)...)
 
 	return strings.Join(lines, "\n")
 }

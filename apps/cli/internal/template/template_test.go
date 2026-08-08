@@ -173,6 +173,50 @@ tags: []
 	}
 }
 
+func TestApplyOverrides_AppendsMissingKeys(t *testing.T) {
+	// Mirrors the real bug: the `feature` template has no `phase:` (or `owner:`)
+	// line, so `taskmd add --template feature --phase mvp` must still inject the
+	// field rather than silently dropping it.
+	content := `---
+title: "Original"
+status: pending
+priority: high
+tags: []
+---
+
+# Original
+`
+	result := ApplyOverrides(content, map[string]string{
+		"phase":    "mvp",
+		"priority": "critical",
+		"owner":    "alice",
+	})
+
+	// Existing key is still replaced in place.
+	if !strings.Contains(result, "priority: critical") {
+		t.Error("expected priority override to critical")
+	}
+	// Missing keys are appended inside the frontmatter block.
+	if !strings.Contains(result, "phase: mvp") {
+		t.Error("expected missing phase key to be appended")
+	}
+	if !strings.Contains(result, "owner: alice") {
+		t.Error("expected missing owner key to be appended")
+	}
+
+	// Appended keys must land inside the frontmatter, before the closing "---".
+	afterOpen := strings.Index(result, "\n") // past the opening "---"
+	closeIdx := strings.Index(result[afterOpen:], "\n---")
+	if closeIdx < 0 {
+		t.Fatalf("could not find closing frontmatter delimiter in:\n%s", result)
+	}
+	closeIdx += afterOpen
+	phaseIdx := strings.Index(result, "phase: mvp")
+	if phaseIdx < 0 || phaseIdx > closeIdx {
+		t.Errorf("phase key must be inside frontmatter (before closing ---), got:\n%s", result)
+	}
+}
+
 func TestApplyOverrides_EmptyOverrides(t *testing.T) {
 	content := `---
 status: pending
