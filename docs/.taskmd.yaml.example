@@ -54,6 +54,14 @@ worklogs: true
 #   # prefix: "dr"          # prefix for prefixed strategy
 #   # length: 6             # length for random/ulid strategies
 
+# Effort vocabulary for the 'effort' task field, ordered lowest to highest.
+# Defaults to [small, medium, large] when omitted; setting it replaces those
+# entirely, so existing task files must use the new values.
+# The order matters: it drives comparison filters (--filter "effort>=m"), the
+# column order of 'board --group-by effort', 'list --sort effort', scoring in
+# 'next', and which value 'next --quick-wins' selects (always the lowest).
+# effort: [xs, s, m, l, xl]
+
 # Scope definitions for the 'touches' field (used by tracks command)
 # scopes:
 #   cli/graph:
