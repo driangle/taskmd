@@ -73,6 +73,7 @@ func runTracks(cmd *cobra.Command, args []string) error {
 		KnownScopes:   knownScopes,
 		ArchivedTasks: archivedTasks,
 		Scope:         tracksScope,
+		Efforts:       resolveEffortScale(),
 	})
 	if err != nil {
 		return err

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/driangle/taskmd/apps/cli/internal/watcher"
+	"github.com/driangle/taskmd/sdk/go/effort"
 )
 
 // PhaseInfo holds phase metadata served to the frontend.
@@ -29,6 +30,9 @@ type Config struct {
 	ReadOnly bool
 	Version  string
 	Phases   []PhaseInfo
+	// Efforts is the project's effort vocabulary. The zero value means the
+	// default small, medium, large.
+	Efforts effort.Scale
 
 	// ListProjects returns registered projects from the global registry.
 	// Nil means multi-project support is disabled.
@@ -124,14 +128,14 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tasks", handleTasks(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}", handleTaskByID(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}/worklog", handleWorklog(s.dp))
-	mux.HandleFunc("PUT /api/tasks/{id}", handleUpdateTask(s.dp, s.config.ReadOnly))
-	mux.HandleFunc("GET /api/board", handleBoard(s.dp, s.config.Phases))
+	mux.HandleFunc("PUT /api/tasks/{id}", handleUpdateTask(s.dp, s.config.ReadOnly, s.config.Efforts))
+	mux.HandleFunc("GET /api/board", handleBoard(s.dp, s.config.Phases, s.config.Efforts))
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))
 	mux.HandleFunc("GET /api/graph/mermaid", handleGraphMermaid(s.dp))
 	mux.HandleFunc("GET /api/stats", handleStats(s.dp))
-	mux.HandleFunc("GET /api/next", handleNext(s.dp))
-	mux.HandleFunc("GET /api/tracks", handleTracks(s.dp))
-	mux.HandleFunc("GET /api/validate", handleValidate(s.dp))
+	mux.HandleFunc("GET /api/next", handleNext(s.dp, s.config.Efforts))
+	mux.HandleFunc("GET /api/tracks", handleTracks(s.dp, s.config.Efforts))
+	mux.HandleFunc("GET /api/validate", handleValidate(s.dp, s.config.Efforts))
 	mux.HandleFunc("GET /api/feed", handleFeed(s.dp))
 	mux.Handle("GET /api/events", s.broker)
 }

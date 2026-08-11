@@ -259,7 +259,7 @@ func TestLiteConformance_Enums(t *testing.T) {
 	}{
 		{"status", validStatusValues},
 		{"priority", validPriorityValues},
-		{"effort", validEffortValues},
+		{"effort", effortValues()},
 		{"type", validTypeValues},
 	}
 

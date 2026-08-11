@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
+	"github.com/spf13/viper"
 )
 
 // The TestColorsEnabled_* and TestGetRenderer_* tests below cannot use
@@ -201,5 +204,63 @@ func TestFormatHeading_Effort(t *testing.T) {
 	}
 	if !strings.Contains(result, "\x1b[") {
 		t.Error("Expected ANSI codes in effort heading")
+	}
+}
+
+// getEffortColor keys off position in the configured vocabulary, so a custom
+// vocabulary still gets green/yellow/red rather than a wall of gray.
+func TestGetEffortColor_UsesConfiguredVocabulary(t *testing.T) {
+	resetCLIState()
+	defer resetCLIState()
+
+	viper.Set("effort", []any{"xs", "s", "m", "l", "xl"})
+	r := lipgloss.NewRenderer(io.Discard)
+
+	tests := []struct {
+		value string
+		want  string
+	}{
+		{"xs", "2"},    // lowest: green
+		{"s", "3"},     // middle: yellow
+		{"l", "3"},     // middle: yellow
+		{"xl", "1"},    // highest: red
+		{"small", "8"}, // outside the vocabulary: still styled, gray
+		{"", "8"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			got := getEffortColor(tt.value, r).GetForeground()
+			if fmt.Sprint(got) != tt.want {
+				t.Errorf("getEffortColor(%q) foreground = %v, want %v", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+// With no configuration the historical small/medium/large colors are unchanged.
+func TestGetEffortColor_DefaultVocabularyUnchanged(t *testing.T) {
+	resetCLIState()
+	defer resetCLIState()
+
+	r := lipgloss.NewRenderer(io.Discard)
+
+	tests := []struct {
+		value string
+		want  string
+	}{
+		{"small", "2"},
+		{"medium", "3"},
+		{"large", "1"},
+		{"unknown", "8"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			got := getEffortColor(tt.value, r).GetForeground()
+			if fmt.Sprint(got) != tt.want {
+				t.Errorf("getEffortColor(%q) foreground = %v, want %v", tt.value, got, tt.want)
+			}
+		})
 	}
 }

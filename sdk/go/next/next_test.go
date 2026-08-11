@@ -1,8 +1,10 @@
 package next
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -165,8 +167,8 @@ func TestScoreTask_LowChainDoesNotOutscoreMediumTask(t *testing.T) {
 	lowTask := &model.Task{ID: "low1", Priority: model.PriorityLow}
 	medTask := &model.Task{ID: "med1", Priority: model.PriorityMedium}
 
-	lowScore, _ := ScoreTask(lowTask, criticalPath, downstreamInfo)
-	medScore, _ := ScoreTask(medTask, map[string]bool{}, downstreamInfo)
+	lowScore, _ := ScoreTask(lowTask, criticalPath, downstreamInfo, effort.Default())
+	medScore, _ := ScoreTask(medTask, map[string]bool{}, downstreamInfo, effort.Default())
 
 	if lowScore >= medScore {
 		t.Errorf("Low-priority task with all-low downstream chain (score=%d) should not outscore standalone medium task (score=%d)",
@@ -182,7 +184,7 @@ func TestScoreTask_MixedChainGetsFullDownstreamBonus(t *testing.T) {
 	}
 
 	task := &model.Task{ID: "low1", Priority: model.PriorityLow}
-	score, _ := ScoreTask(task, map[string]bool{}, downstreamInfo)
+	score, _ := ScoreTask(task, map[string]bool{}, downstreamInfo, effort.Default())
 
 	// Expected: base low (10) + full downstream bonus (1 * 3 * 1.0 = 3) = 13
 	expectedScore := ScorePriorityLow + 1*ScorePerDownstream
@@ -200,7 +202,7 @@ func TestScoreTask_HighChainPreservesExistingBehavior(t *testing.T) {
 	}
 
 	task := &model.Task{ID: "t1", Priority: model.PriorityHigh}
-	score, _ := ScoreTask(task, criticalPath, downstreamInfo)
+	score, _ := ScoreTask(task, criticalPath, downstreamInfo, effort.Default())
 
 	// Expected: high (30) + critical path (15 * 1.0) + downstream (min(9,15) * 1.0 = 9) = 54
 	expectedScore := ScorePriorityHigh + ScoreCriticalPath + min(3*ScorePerDownstream, ScoreDownstreamMax)
@@ -244,8 +246,8 @@ func TestScoreTaskBreakdown_ComponentsSumToScore(t *testing.T) {
 			if criticalPath[tc.task.ID] {
 				cp = criticalPath
 			}
-			components := ScoreTaskBreakdown(tc.task, cp, tc.downstreamInfo)
-			score, _ := ScoreTask(tc.task, cp, tc.downstreamInfo)
+			components := ScoreTaskBreakdown(tc.task, cp, tc.downstreamInfo, effort.Default())
+			score, _ := ScoreTask(tc.task, cp, tc.downstreamInfo, effort.Default())
 
 			sum := 0
 			for _, c := range components {
@@ -267,7 +269,7 @@ func TestScoreTaskBreakdown_ScaledBonusesExposeBaseAndMultiplier(t *testing.T) {
 	}
 	task := &model.Task{ID: "t1", Priority: model.PriorityHigh}
 
-	components := ScoreTaskBreakdown(task, criticalPath, downstreamInfo)
+	components := ScoreTaskBreakdown(task, criticalPath, downstreamInfo, effort.Default())
 
 	var crit, down *ScoreComponent
 	for i := range components {
@@ -302,7 +304,7 @@ func TestScoreTaskBreakdown_ScaledBonusesExposeBaseAndMultiplier(t *testing.T) {
 
 func TestScoreTaskBreakdown_FlatComponentsHaveNoMultiplier(t *testing.T) {
 	task := &model.Task{ID: "t1", Priority: model.PriorityHigh, Effort: model.EffortSmall}
-	components := ScoreTaskBreakdown(task, map[string]bool{}, map[string]DownstreamInfo{})
+	components := ScoreTaskBreakdown(task, map[string]bool{}, map[string]DownstreamInfo{}, effort.Default())
 
 	if len(components) != 2 {
 		t.Fatalf("expected 2 components (priority, effort), got %d: %+v", len(components), components)
@@ -1157,5 +1159,137 @@ func TestRecommend_RootIncludesActionableRootItself(t *testing.T) {
 
 	if len(recs) != 1 || recs[0].ID != "R" {
 		t.Fatalf("Expected root R itself, got %v", recs)
+	}
+}
+
+// --- Configurable effort vocabulary ---
+
+// --quick-wins means "the lowest configured effort", whatever it is called.
+func TestRecommend_QuickWinsUsesLowestConfiguredEffort(t *testing.T) {
+	scale, err := effort.NewScale([]string{"xs", "s", "m", "l", "xl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tasks := []*model.Task{
+		{ID: "001", Title: "Tiny", Status: model.StatusPending, Effort: "xs"},
+		{ID: "002", Title: "Mid", Status: model.StatusPending, Effort: "m"},
+		{ID: "003", Title: "Huge", Status: model.StatusPending, Effort: "xl"},
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, QuickWins: true, Efforts: scale})
+	if err != nil {
+		t.Fatalf("Recommend failed: %v", err)
+	}
+
+	if len(recs) != 1 {
+		t.Fatalf("got %d recommendations, want 1", len(recs))
+	}
+	if recs[0].ID != "001" {
+		t.Errorf("quick win = %q, want %q", recs[0].ID, "001")
+	}
+}
+
+// Under a custom vocabulary every value must still be scored, rather than
+// silently contributing zero because it is not named small or medium.
+func TestScoreTaskBreakdown_CustomVocabularyScoresByPosition(t *testing.T) {
+	scale, err := effort.NewScale([]string{"xs", "s", "m", "l", "xl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tests := []struct {
+		value      string
+		wantPoints int
+		wantLabel  string
+	}{
+		{"xs", 5, "effort: xs"},
+		{"s", 3, "effort: s"},
+		{"m", 2, "effort: m"},
+		{"l", 1, "effort: l"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			task := &model.Task{ID: "001", Title: "T", Effort: model.Effort(tt.value)}
+			components := ScoreTaskBreakdown(task, map[string]bool{}, map[string]DownstreamInfo{}, scale)
+
+			var found *ScoreComponent
+			for i := range components {
+				if components[i].Label == tt.wantLabel {
+					found = &components[i]
+					break
+				}
+			}
+			if found == nil {
+				t.Fatalf("no %q component in %v", tt.wantLabel, components)
+			}
+			if found.Points != tt.wantPoints {
+				t.Errorf("points = %d, want %d", found.Points, tt.wantPoints)
+			}
+		})
+	}
+
+	// The highest value earns nothing, so it contributes no component at all.
+	task := &model.Task{ID: "001", Title: "T", Effort: "xl"}
+	for _, c := range ScoreTaskBreakdown(task, map[string]bool{}, map[string]DownstreamInfo{}, scale) {
+		if c.Label == "effort: xl" {
+			t.Errorf("highest effort should contribute no component, got %+v", c)
+		}
+	}
+}
+
+// Only the lowest configured value carries the "quick win" reason.
+func TestScoreTask_QuickWinReasonFollowsTheVocabulary(t *testing.T) {
+	scale, err := effort.NewScale([]string{"xs", "s", "m"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lowest := &model.Task{ID: "001", Title: "T", Effort: "xs"}
+	_, reasons := ScoreTask(lowest, map[string]bool{}, map[string]DownstreamInfo{}, scale)
+	if !slices.Contains(reasons, "quick win") {
+		t.Errorf("reasons = %v, want them to include %q", reasons, "quick win")
+	}
+
+	middle := &model.Task{ID: "002", Title: "T", Effort: "s"}
+	_, reasons = ScoreTask(middle, map[string]bool{}, map[string]DownstreamInfo{}, scale)
+	if slices.Contains(reasons, "quick win") {
+		t.Errorf("reasons = %v, want them not to include %q", reasons, "quick win")
+	}
+}
+
+// The default vocabulary must score exactly as it did before effort became
+// configurable: small = 5 and a quick win, medium = 2, large = nothing.
+func TestScoreTaskBreakdown_DefaultVocabularyScoringUnchanged(t *testing.T) {
+	tests := []struct {
+		value      model.Effort
+		wantPoints int
+		wantFound  bool
+	}{
+		{model.EffortSmall, ScoreEffortSmall, true},
+		{model.EffortMedium, ScoreEffortMedium, true},
+		{model.EffortLarge, 0, false},
+		{"", 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.value), func(t *testing.T) {
+			task := &model.Task{ID: "001", Title: "T", Effort: tt.value}
+			components := ScoreTaskBreakdown(task, map[string]bool{}, map[string]DownstreamInfo{}, effort.Default())
+
+			found := false
+			for _, c := range components {
+				if c.Label == "effort: "+string(tt.value) {
+					found = true
+					if c.Points != tt.wantPoints {
+						t.Errorf("points = %d, want %d", c.Points, tt.wantPoints)
+					}
+				}
+			}
+			if found != tt.wantFound {
+				t.Errorf("component present = %v, want %v", found, tt.wantFound)
+			}
+		})
 	}
 }

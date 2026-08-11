@@ -127,7 +127,7 @@ taskmd list --sort priority --limit 5
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--filter` | | Filter tasks (repeatable, AND logic); `priority` and `effort` support `>=`, `>`, `<=`, `<` |
+| `--filter` | | Filter tasks (repeatable, AND logic); `priority` and `effort` support `>=`, `>`, `<=`, `<` (effort values come from the [configured vocabulary](/reference/configuration#effort-configuration)) |
 | `--phase` | | Filter tasks by phase name |
 | `--scope` | | Filter by scope; supports wildcards (e.g. `cli`, `cli*`) |
 | `--status` | | Shortcut for `--filter status=<value>` |
@@ -208,7 +208,7 @@ taskmd scores tasks based on:
 - **Priority**: High priority scores higher
 - **Critical path**: Tasks on the critical path score higher
 - **Downstream impact**: Tasks blocking many others score higher
-- **Effort**: Smaller tasks get a boost (quick wins)
+- **Effort**: Smaller tasks get a boost (quick wins); points scale with the value's position in the [configured effort vocabulary](/reference/configuration#effort-configuration)
 - **Phase proximity**: Tasks in phases with nearer due dates score higher
 - **Actionability**: Only tasks with satisfied dependencies
 
@@ -225,7 +225,7 @@ taskmd next --filter priority=high
 # Next small task (quick win)
 taskmd next --filter effort=small --limit 1
 
-# Show only quick wins (effort: small)
+# Show only quick wins (tasks at the lowest configured effort)
 taskmd next --quick-wins
 
 # Show only critical path tasks
@@ -299,7 +299,7 @@ and it composes with the other filters.
 | `--explain` | `false` | Show an itemized score breakdown beneath each recommendation (table format). `score_breakdown` is always present in json/yaml |
 | `--strict-phases` | `false` | Enforce strict phase ordering (earlier phases always rank first) |
 | `--strict-priority` | `false` | Enforce strict priority ordering (higher priority always ranks first; score breaks ties within a tier). With `--strict-phases`, phase is primary and priority secondary |
-| `--quick-wins` | `false` | Show only quick wins (effort: small) |
+| `--quick-wins` | `false` | Show only quick wins (tasks at the lowest configured effort) |
 | `--critical` | `false` | Show only critical path tasks |
 
 

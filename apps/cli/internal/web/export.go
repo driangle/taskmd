@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/driangle/taskmd/sdk/go/board"
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/metrics"
 	"github.com/driangle/taskmd/sdk/go/model"
@@ -26,6 +27,9 @@ type ExportConfig struct {
 	BasePath  string
 	Verbose   bool
 	Version   string
+	// Efforts is the project's effort vocabulary. The zero value means the
+	// default small, medium, large.
+	Efforts effort.Scale
 }
 
 // Export generates a self-contained static site from task data.
@@ -93,6 +97,7 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 
 func generateDataFiles(cfg ExportConfig, tasks []*model.Task, archivedTasks []*model.Task) error {
 	apiDir := filepath.Join(cfg.OutputDir, "api")
+	efforts := cfg.Efforts
 
 	if err := writeJSONFile(apiDir, "config.json", ConfigResponse{
 		ReadOnly: true,
@@ -109,11 +114,11 @@ func generateDataFiles(cfg ExportConfig, tasks []*model.Task, archivedTasks []*m
 		return err
 	}
 
-	if err := generateBoardFiles(filepath.Join(apiDir, "board"), tasks); err != nil {
+	if err := generateBoardFiles(filepath.Join(apiDir, "board"), tasks, efforts); err != nil {
 		return err
 	}
 
-	return generateAnalyticsFiles(apiDir, tasks, archivedTasks)
+	return generateAnalyticsFiles(apiDir, tasks, archivedTasks, efforts)
 }
 
 func generateTaskDetailFiles(tasksDir string, tasks []*model.Task) error {
@@ -163,9 +168,9 @@ func buildWorklogEntries(t *model.Task) []WorklogEntryJSON {
 	return entries
 }
 
-func generateBoardFiles(boardDir string, tasks []*model.Task) error {
+func generateBoardFiles(boardDir string, tasks []*model.Task, efforts effort.Scale) error {
 	for _, groupBy := range []string{"status", "priority", "effort", "type", "group", "tag"} {
-		grouped, err := board.GroupTasks(tasks, groupBy)
+		grouped, err := board.GroupTasks(tasks, groupBy, efforts)
 		if err != nil {
 			return fmt.Errorf("failed to group tasks by %s: %w", groupBy, err)
 		}
@@ -176,7 +181,7 @@ func generateBoardFiles(boardDir string, tasks []*model.Task) error {
 	return nil
 }
 
-func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []*model.Task) error {
+func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []*model.Task, efforts effort.Scale) error {
 	if err := writeJSONFile(apiDir, "graph.json", graph.NewGraph(tasks).ToJSON()); err != nil {
 		return err
 	}
@@ -185,7 +190,7 @@ func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []
 		return err
 	}
 
-	recs, err := next.Recommend(tasks, next.Options{Limit: 5, ArchivedTasks: archivedTasks})
+	recs, err := next.Recommend(tasks, next.Options{Limit: 5, ArchivedTasks: archivedTasks, Efforts: efforts})
 	if err != nil {
 		return fmt.Errorf("failed to generate recommendations: %w", err)
 	}
@@ -193,7 +198,7 @@ func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []
 		return err
 	}
 
-	tracksResult, err := tracks.Assign(tasks, tracks.Options{ArchivedTasks: archivedTasks})
+	tracksResult, err := tracks.Assign(tasks, tracks.Options{ArchivedTasks: archivedTasks, Efforts: efforts})
 	if err != nil {
 		return fmt.Errorf("failed to generate tracks: %w", err)
 	}
@@ -201,7 +206,9 @@ func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []
 		return err
 	}
 
-	return writeJSONFile(apiDir, "validate.json", validator.NewValidator(false).Validate(tasks))
+	v := validator.NewValidator(false)
+	v.SetEffortScale(efforts)
+	return writeJSONFile(apiDir, "validate.json", v.Validate(tasks))
 }
 
 func writeJSONFile(dir, filename string, v any) error {

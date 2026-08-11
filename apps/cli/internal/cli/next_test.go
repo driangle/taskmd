@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 	"github.com/driangle/taskmd/sdk/go/next"
 )
@@ -908,7 +909,7 @@ func TestScoreTask(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, reasons := next.ScoreTask(tt.task, criticalPath, downstreamInfo)
+			score, reasons := next.ScoreTask(tt.task, criticalPath, downstreamInfo, effort.Default())
 			if score != tt.expectedScore {
 				t.Errorf("scoreTask() score = %d, want %d", score, tt.expectedScore)
 			}

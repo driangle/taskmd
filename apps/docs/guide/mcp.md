@@ -139,7 +139,7 @@ Get ranked task recommendations based on priority, dependencies, and critical pa
 | `task_dir` | string | no | Directory to scan (default: `.`) |
 | `limit` | integer | no | Max recommendations (default: 5) |
 | `filters` | string[] | no | Filter expressions, e.g. `["priority=high", "tag=mvp"]` |
-| `quick_wins` | boolean | no | Only show small-effort tasks |
+| `quick_wins` | boolean | no | Only show tasks at the lowest configured effort |
 | `critical` | boolean | no | Only show tasks on the critical path |
 
 **Returns:** JSON array of ranked task recommendations with scores.
@@ -211,7 +211,7 @@ Update fields on a task (status, priority, effort, owner, tags).
 | `task_id` | string | **yes** | Task ID to update |
 | `status` | string | no | `pending`, `in-progress`, `completed`, `blocked`, `cancelled` |
 | `priority` | string | no | `low`, `medium`, `high`, `critical` |
-| `effort` | string | no | `small`, `medium`, `large` |
+| `effort` | string | no | `small`, `medium`, `large` by default; a project's [configured vocabulary](/reference/configuration#effort-configuration) replaces these |
 | `owner` | string | no | Owner/assignee |
 | `tags` | string[] | no | Replace all tags |
 | `add_tags` | string[] | no | Tags to add |

@@ -9,6 +9,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/taskfile"
@@ -20,7 +21,7 @@ type SetInput struct {
 	TaskID   string   `json:"task_id" jsonschema:"required,task ID to update"`
 	Status   string   `json:"status,omitempty" jsonschema:"new status: pending, in-progress, completed, in-review, blocked, cancelled"`
 	Priority string   `json:"priority,omitempty" jsonschema:"new priority: low, medium, high, critical"`
-	Effort   string   `json:"effort,omitempty" jsonschema:"new effort: small, medium, large"`
+	Effort   string   `json:"effort,omitempty" jsonschema:"new effort; values come from the project's .taskmd.yaml, defaulting to small, medium, large"`
 	Owner    string   `json:"owner,omitempty" jsonschema:"new owner/assignee"`
 	Tags     []string `json:"tags,omitempty" jsonschema:"replace all tags with this list"`
 	AddTags  []string `json:"add_tags,omitempty" jsonschema:"tags to add to existing tags"`
@@ -29,21 +30,23 @@ type SetInput struct {
 	RemPRs   []string `json:"rem_prs,omitempty" jsonschema:"PR URLs to remove"`
 }
 
-func registerSetTool(server *gomcp.Server) {
+func registerSetTool(server *gomcp.Server, efforts effort.Scale) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "set",
 		Description: "Update fields on a task (status, priority, effort, owner, tags)",
-	}, handleSet)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input SetInput) (*gomcp.CallToolResult, any, error) {
+		return handleSet(ctx, req, input, efforts)
+	})
 }
 
-func handleSet(_ context.Context, _ *gomcp.CallToolRequest, input SetInput) (*gomcp.CallToolResult, any, error) {
+func handleSet(_ context.Context, _ *gomcp.CallToolRequest, input SetInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
 	if input.TaskID == "" {
 		return nil, nil, fmt.Errorf("task_id is required")
 	}
 
 	req := buildUpdateRequest(input)
 
-	if errs := taskfile.ValidateUpdateRequest(req); len(errs) > 0 {
+	if errs := taskfile.ValidateUpdateRequest(req, efforts); len(errs) > 0 {
 		return nil, nil, fmt.Errorf("validation failed: %s", strings.Join(errs, "; "))
 	}
 

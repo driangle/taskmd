@@ -192,21 +192,46 @@ func printStatsBreakdownByPhase(m *metrics.Metrics) {
 	tw.Flush(os.Stdout)
 }
 
+// effortBreakdownOrder lists the effort values to report, in vocabulary order,
+// followed by any value present in the data but outside the vocabulary (sorted)
+// so unrecognized values are surfaced rather than silently dropped.
+func effortBreakdownOrder(counts map[model.Effort]int) []model.Effort {
+	scale := resolveEffortScale()
+
+	ordered := make([]model.Effort, 0, len(counts))
+	known := make(map[model.Effort]bool, scale.Len())
+	for _, v := range scale.Values() {
+		value := model.Effort(v)
+		known[value] = true
+		ordered = append(ordered, value)
+	}
+
+	var extra []model.Effort
+	for value := range counts {
+		if value != "" && !known[value] {
+			extra = append(extra, value)
+		}
+	}
+	sort.Slice(extra, func(i, j int) bool { return extra[i] < extra[j] })
+
+	return append(ordered, extra...)
+}
+
 func printStatsBreakdownByEffort(m *metrics.Metrics, r *lipgloss.Renderer) {
 	if len(m.TasksByEffort) == 0 {
 		fmt.Println("  (none)")
 		return
 	}
 	tw := NewTableWriter()
-	for _, effort := range []model.Effort{
-		model.EffortSmall, model.EffortMedium, model.EffortLarge,
-	} {
-		if count, ok := m.TasksByEffort[effort]; ok && count > 0 {
-			label := fmt.Sprintf("  %s:", string(effort))
-			colorLabel := fmt.Sprintf("  %s:", formatEffort(string(effort), r))
-			val := fmt.Sprintf("%d", count)
-			tw.AddRow([]string{label, val}, []string{colorLabel, val})
+	for _, value := range effortBreakdownOrder(m.TasksByEffort) {
+		count := m.TasksByEffort[value]
+		if count == 0 {
+			continue
 		}
+		label := fmt.Sprintf("  %s:", string(value))
+		colorLabel := fmt.Sprintf("  %s:", formatEffort(string(value), r))
+		val := fmt.Sprintf("%d", count)
+		tw.AddRow([]string{label, val}, []string{colorLabel, val})
 	}
 	tw.Flush(os.Stdout)
 }

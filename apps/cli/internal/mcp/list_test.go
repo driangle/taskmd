@@ -9,6 +9,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -87,7 +88,7 @@ func setupTestServer(t *testing.T) *gomcp.ClientSession {
 
 	ctx := context.Background()
 
-	server := NewServer("test")
+	server := NewServer("test", effort.Default())
 	client := gomcp.NewClient(&gomcp.Implementation{
 		Name:    "test-client",
 		Version: "1.0",

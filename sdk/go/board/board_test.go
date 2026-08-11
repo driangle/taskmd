@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -78,7 +79,7 @@ func TestGroupTasks_Type(t *testing.T) {
 		{ID: "003", Title: "No type"},
 	}
 
-	result, err := GroupTasks(tasks, "type")
+	result, err := GroupTasks(tasks, "type", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -147,7 +148,7 @@ func TestGroupTasks_Status(t *testing.T) {
 		{ID: "004", Title: "Also Pending", Status: model.StatusPending},
 	}
 
-	result, err := GroupTasks(tasks, "status")
+	result, err := GroupTasks(tasks, "status", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,7 +176,7 @@ func TestGroupTasks_Priority(t *testing.T) {
 		{ID: "003", Title: "High", Priority: model.PriorityHigh},
 	}
 
-	result, err := GroupTasks(tasks, "priority")
+	result, err := GroupTasks(tasks, "priority", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -203,7 +204,7 @@ func TestGroupTasks_Effort(t *testing.T) {
 		{ID: "003", Title: "Medium", Effort: model.EffortMedium},
 	}
 
-	result, err := GroupTasks(tasks, "effort")
+	result, err := GroupTasks(tasks, "effort", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -224,7 +225,7 @@ func TestGroupTasks_Group(t *testing.T) {
 		{ID: "003", Title: "No Group"},
 	}
 
-	result, err := GroupTasks(tasks, "group")
+	result, err := GroupTasks(tasks, "group", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -252,7 +253,7 @@ func TestGroupTasks_Tag(t *testing.T) {
 		{ID: "003", Title: "No tags"},
 	}
 
-	result, err := GroupTasks(tasks, "tag")
+	result, err := GroupTasks(tasks, "tag", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -283,7 +284,7 @@ func TestGroupTasks_Phase(t *testing.T) {
 		{ID: "004", Title: "No phase"},
 	}
 
-	result, err := GroupTasks(tasks, "phase")
+	result, err := GroupTasks(tasks, "phase", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -316,7 +317,7 @@ func TestReorderKeys_PhaseConfigOrder(t *testing.T) {
 		{ID: "004", Title: "No phase"},
 	}
 
-	result, err := GroupTasks(tasks, "phase")
+	result, err := GroupTasks(tasks, "phase", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -347,7 +348,7 @@ func TestReorderKeys_UnknownPhasesAppendedAlphabetically(t *testing.T) {
 		{ID: "003", Phase: "gamma"},
 	}
 
-	result, err := GroupTasks(tasks, "phase")
+	result, err := GroupTasks(tasks, "phase", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -418,14 +419,14 @@ func TestToJSON_OmitsEmptyPhase(t *testing.T) {
 func TestGroupTasks_UnsupportedField(t *testing.T) {
 	tasks := []*model.Task{{ID: "001", Title: "Test"}}
 
-	_, err := GroupTasks(tasks, "invalid-field")
+	_, err := GroupTasks(tasks, "invalid-field", effort.Default())
 	if err == nil {
 		t.Fatal("expected error for unsupported field, got nil")
 	}
 }
 
 func TestGroupTasks_EmptyTasks(t *testing.T) {
-	result, err := GroupTasks([]*model.Task{}, "status")
+	result, err := GroupTasks([]*model.Task{}, "status", effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

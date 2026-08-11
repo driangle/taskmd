@@ -75,16 +75,24 @@ func getPriorityColor(priority string, r *lipgloss.Renderer) lipgloss.Style {
 }
 
 // getEffortColor returns the appropriate color style for an effort level.
-func getEffortColor(effort string, r *lipgloss.Renderer) lipgloss.Style {
-	switch strings.ToLower(effort) {
-	case "small":
+//
+// The effort vocabulary is project-configurable, so the color comes from the
+// value's position in it rather than its name: lowest is green, highest is red,
+// anything between is yellow. Values outside the vocabulary still get a stable
+// gray rather than no styling at all.
+func getEffortColor(value string, r *lipgloss.Renderer) lipgloss.Style {
+	scale := resolveEffortScale()
+	rank := scale.Rank(strings.ToLower(value))
+
+	switch {
+	case rank < 0:
+		return r.NewStyle().Foreground(lipgloss.Color("8")) // Gray
+	case rank == 0:
 		return r.NewStyle().Foreground(lipgloss.Color("2")) // Green
-	case "medium":
-		return r.NewStyle().Foreground(lipgloss.Color("3")) // Yellow
-	case "large":
+	case rank == scale.Len()-1:
 		return r.NewStyle().Foreground(lipgloss.Color("1")) // Red
 	default:
-		return r.NewStyle().Foreground(lipgloss.Color("8")) // Gray
+		return r.NewStyle().Foreground(lipgloss.Color("3")) // Yellow
 	}
 }
 

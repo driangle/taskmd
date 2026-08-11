@@ -7,6 +7,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/next"
 	"github.com/driangle/taskmd/sdk/go/scanner"
 )
@@ -16,18 +17,20 @@ type NextInput struct {
 	TaskDir   string   `json:"task_dir,omitempty" jsonschema:"task directory to scan, defaults to current directory"`
 	Limit     int      `json:"limit,omitempty" jsonschema:"max number of recommendations to return, defaults to 5"`
 	Filters   []string `json:"filters,omitempty" jsonschema:"filter expressions, e.g. priority=high, tag=mvp"`
-	QuickWins bool     `json:"quick_wins,omitempty" jsonschema:"only show small-effort tasks"`
+	QuickWins bool     `json:"quick_wins,omitempty" jsonschema:"only show tasks at the lowest configured effort"`
 	Critical  bool     `json:"critical,omitempty" jsonschema:"only show tasks on the critical path"`
 }
 
-func registerNextTool(server *gomcp.Server) {
+func registerNextTool(server *gomcp.Server, efforts effort.Scale) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "next",
 		Description: "Get ranked task recommendations based on priority, dependencies, and critical path analysis",
-	}, handleNext)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input NextInput) (*gomcp.CallToolResult, any, error) {
+		return handleNext(ctx, req, input, efforts)
+	})
 }
 
-func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput) (*gomcp.CallToolResult, any, error) {
+func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
 	taskDir := input.TaskDir
 	if taskDir == "" {
 		taskDir = "."
@@ -50,6 +53,7 @@ func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput) (*
 		QuickWins:     input.QuickWins,
 		Critical:      input.Critical,
 		ArchivedTasks: archivedTasks,
+		Efforts:       efforts,
 	}
 
 	recs, err := next.Recommend(result.Tasks, opts)

@@ -46,6 +46,8 @@ Description and subtasks go here.
 | `pr` | array | No | List of pull request URLs |
 | `external_id` | string | No | Identifier from an external system (e.g., `"PROJ-123"`, `"42"`) |
 
+The `effort` values above are the defaults; a project can define its own vocabulary — see [Effort](#effort).
+
 ## Frontmatter Schema
 
 <!-- Unknown frontmatter fields are silently ignored by the parser and preserved as-is in the file. -->
@@ -86,7 +88,8 @@ pending → in-progress → in-review → completed
 | `high` | Important for project success |
 | `critical` | Urgent, must address immediately |
 
-**`effort`** — Estimated complexity:
+**`effort`** — Estimated complexity. These are the default values and their
+suggested meanings; a project can define its own vocabulary (see [Effort](#effort)):
 
 | Effort | Typical Duration |
 |--------|------------------|
@@ -278,6 +281,45 @@ The parser automatically derives task IDs from filenames based on these patterns
 - **Random**: 3-8 lowercase alphanumeric chars with at least one digit — `a3f9x2-slug.md` → ID `a3f9x2`
 - **ULID**: Crockford Base32 string (timestamp + random) — `01h5a3mpk2-slug.md` → ID `01h5a3mpk2`
 
+## Effort
+
+The `effort` field defaults to `small`, `medium`, `large`. Projects that size work
+differently — `xs, s, m, l, xl`, Fibonacci points, t-shirt sizes — can define their
+own vocabulary.
+
+### Configuration
+
+`effort` is a list of values in `.taskmd.yaml`, ordered **lowest to highest**:
+
+```yaml
+# .taskmd.yaml
+effort: [xs, s, m, l, xl]
+```
+
+The order is significant, not cosmetic. It determines:
+
+- which values the comparison filters accept and how they rank (`--filter "effort>=m"`)
+- the column order when grouping by effort (`taskmd board --group-by effort`) and the
+  sort order of `taskmd list --sort effort`
+- effort scoring in `taskmd next`, where points scale with position: the lowest value
+  earns the most and the highest earns none
+- which value `taskmd next --quick-wins` selects — always the lowest configured value
+
+When the key is absent, the default `small`, `medium`, `large` applies and behavior is
+unchanged. An empty `effort:` with no value is also treated as absent.
+
+Each item is an effort value. Object items are reserved for future per-value metadata;
+today only strings are accepted.
+
+### Validation
+
+The configured vocabulary replaces the default entirely — it is not additive. A project
+configuring `[xs, s, m, l, xl]` accepts those five values (plus an unset `effort`) and
+reports `medium` as invalid.
+
+The configuration itself is rejected when it is not a list, when it is empty, when an
+entry is blank, when a value is duplicated, or when an item is not a string.
+
 ## Phases
 
 Phases represent time-based groupings such as sprints, iterations, or releases. Each task can belong to at most one phase via the `phase` frontmatter field.
@@ -367,7 +409,7 @@ A valid taskmd file **must**:
 
 1. Have YAML frontmatter enclosed in `---` delimiters
 2. Include required fields: `id`, `title`
-3. Use valid enum values for `status`, `priority`, `effort`, `type`
+3. Use valid enum values for `status`, `priority`, `effort`, `type` (the `effort` set is [configurable](#effort))
 4. Have unique IDs across the project
 5. Reference only existing tasks in `dependencies`
 6. Have no circular dependency chains

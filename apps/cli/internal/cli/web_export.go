@@ -64,5 +64,6 @@ func runWebExport(_ *cobra.Command, _ []string) error {
 		BasePath:  webExportBasePath,
 		Verbose:   flags.Verbose,
 		Version:   FullVersion(),
+		Efforts:   resolveEffortScale(),
 	})
 }

@@ -35,6 +35,6 @@ func init() {
 }
 
 func runMcp(_ *cobra.Command, _ []string) error {
-	server := taskmcp.NewServer(Version)
+	server := taskmcp.NewServer(Version, resolveEffortScale())
 	return server.Run(context.Background(), &gomcp.StdioTransport{})
 }

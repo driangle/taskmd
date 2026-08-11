@@ -18,7 +18,7 @@ func TestSuggestValue(t *testing.T) {
 		{"complted -> completed", "complted", validStatusValues, "completed"},
 		{"hig -> high", "hig", validPriorityValues, "high"},
 		{"medim -> medium", "medim", validPriorityValues, "medium"},
-		{"smal -> small", "smal", validEffortValues, "small"},
+		{"smal -> small", "smal", effortValues(), "small"},
 		{"totally wrong", "zzzzzzzzz", validStatusValues, ""},
 		{"case insensitive", "PENDING", validStatusValues, "pending"},
 	}

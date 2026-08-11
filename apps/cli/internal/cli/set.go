@@ -63,7 +63,7 @@ func init() {
 	setCmd.Flags().StringVar(&setTaskID, "task-id", "", "task ID to update (required)")
 	setCmd.Flags().StringVar(&setStatus, "status", "", "new status (pending, in-progress, completed, in-review, blocked, cancelled)")
 	setCmd.Flags().StringVar(&setPriority, "priority", "", "new priority (low, medium, high, critical)")
-	setCmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large)")
+	setCmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large; configurable per project)")
 	setCmd.Flags().StringVar(&setType, "type", "", "work type (feature, bug, improvement, chore, docs)")
 	setCmd.Flags().StringVar(&setOwner, "owner", "", "owner/assignee of the task")
 	setCmd.Flags().StringVar(&setParent, "parent", "", "parent task ID (use empty string to clear)")

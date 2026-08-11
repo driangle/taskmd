@@ -137,7 +137,7 @@ A valid task file must satisfy all of the following:
 
 1. **Frontmatter present** -- YAML block between opening `---` and closing `---`
 2. **Required fields** -- Both `id` and `title` must be present
-3. **Valid enums** -- `status`, `priority`, `effort`, and `type` must use values from their respective allowed lists
+3. **Valid enums** -- `status`, `priority`, `effort`, and `type` must use values from their respective allowed lists. The `effort` values above are defaults; a project may define its own ordered vocabulary via `effort:` in `.taskmd.yaml`, which replaces them entirely
 4. **Unique IDs** -- No two task files may share the same `id`
 5. **Valid dependencies** -- Every ID in `dependencies` must correspond to an existing task
 6. **No circular dependencies** -- Following the dependency chain must not lead back to the same task
@@ -164,7 +164,7 @@ To determine the next task to work on:
 2. **Exclude** tasks with unmet dependencies (any dependency whose status is not `completed`)
 3. **Sort** by the following criteria in order:
    - Priority: `critical` > `high` > `medium` > `low`
-   - Effort: `small` first, then `medium`, then `large`
+   - Effort: lowest first — `small`, then `medium`, then `large` by default
    - Created date: oldest first
 
 The first task in the sorted list is the recommended next task.

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
@@ -145,7 +146,7 @@ func TestConformance_FilterStatus(t *testing.T) {
 	var exp expectedFilter
 	loadJSON(t, "../../../../tests/conformance/expected/filter/status-pending.json", &exp)
 
-	filtered, err := filter.Apply(tasks, []string{exp.Filter})
+	filtered, err := filter.Apply(tasks, []string{exp.Filter}, effort.Default())
 	if err != nil {
 		t.Fatalf("filter: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestConformance_FilterTag(t *testing.T) {
 	var exp expectedFilter
 	loadJSON(t, "../../../../tests/conformance/expected/filter/tag-api.json", &exp)
 
-	filtered, err := filter.Apply(tasks, []string{exp.Filter})
+	filtered, err := filter.Apply(tasks, []string{exp.Filter}, effort.Default())
 	if err != nil {
 		t.Fatalf("filter: %v", err)
 	}

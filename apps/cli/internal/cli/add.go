@@ -62,7 +62,7 @@ func init() {
 	rootCmd.AddCommand(addCmd)
 
 	addCmd.Flags().StringVar(&addPriority, "priority", "medium", "task priority (low, medium, high, critical)")
-	addCmd.Flags().StringVar(&addEffort, "effort", "", "task effort (small, medium, large)")
+	addCmd.Flags().StringVar(&addEffort, "effort", "", "task effort (small, medium, large; configurable per project)")
 	addCmd.Flags().StringVar(&addTags, "tags", "", "comma-separated tags")
 	addCmd.Flags().StringVar(&addStatus, "status", "pending", "task status (pending, in-progress, completed, blocked, cancelled)")
 	addCmd.Flags().StringVar(&addOwner, "owner", "", "task owner/assignee")
@@ -79,7 +79,7 @@ func init() {
 		return validPriorityValues, cobra.ShellCompDirectiveNoFileComp
 	})
 	_ = addCmd.RegisterFlagCompletionFunc("effort", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return validEffortValues, cobra.ShellCompDirectiveNoFileComp
+		return effortValues(), cobra.ShellCompDirectiveNoFileComp
 	})
 	_ = addCmd.RegisterFlagCompletionFunc("status", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return validStatusValues, cobra.ShellCompDirectiveNoFileComp
@@ -251,8 +251,8 @@ func validateAddEnums() error {
 	if !contains(validStatusValues, addStatus) {
 		return invalidValueError("status", addStatus, validStatusValues)
 	}
-	if addEffort != "" && !contains(validEffortValues, addEffort) {
-		return invalidValueError("effort", addEffort, validEffortValues)
+	if efforts := effortValues(); addEffort != "" && !contains(efforts, addEffort) {
+		return invalidValueError("effort", addEffort, efforts)
 	}
 	return nil
 }

@@ -48,6 +48,7 @@ Command-line flags always override config file values.
 | `id.prefix` | string | `""` | Prefix for `prefixed` strategy |
 | `id.length` | integer | `6` | Length of generated IDs (used by `random` and `ulid` strategies) |
 | `id.padding` | integer | `3` | Zero-padding width for `sequential` strategy |
+| `effort` | string[] | `[small, medium, large]` | Ordered effort vocabulary, lowest to highest ([details](#effort-configuration)) |
 | `scopes` | map | — | Scope-to-path mappings for the `touches` field ([details](#scopes-configuration)) |
 | `phases` | array | `[]` | Phase definitions with metadata ([details](#phases-configuration)) |
 | `projects` | array | `[]` | Registered projects for multi-project workflows ([details](#projects-configuration)) (global config only) |
@@ -317,6 +318,43 @@ Each phase entry has the following fields:
 
 - When phases are configured, any `phase` value in a task that does not match a configured phase name produces a warning.
 - When no phases config exists, all `phase` values are accepted silently.
+
+## Effort Configuration {#effort-configuration}
+
+The `effort` key defines the values the `effort` frontmatter field may take. It replaces
+the built-in `small`, `medium`, `large` entirely — it is not additive.
+
+```yaml
+# .taskmd.yaml
+effort: [xs, s, m, l, xl]
+```
+
+Values are listed **lowest to highest**, and the order is significant:
+
+| Behavior | How the order is used |
+|----------|----------------------|
+| Comparison filters | `--filter "effort>=m"` ranks values by position |
+| `board --group-by effort` | Column order follows the configured order |
+| `list --sort effort` | Sorts lowest first; unset values sort last |
+| `next` scoring | Points scale with position — the lowest value earns the most, the highest earns none |
+| `next --quick-wins` | Selects tasks at the lowest configured value |
+
+**Behavior:**
+
+- When no `effort` config exists, the default `small`, `medium`, `large` applies and
+  nothing changes. A bare `effort:` with no value is treated the same way.
+- When configured, `taskmd validate` reports any task using a value outside the list,
+  and `add`/`set` reject one.
+- The config itself is rejected when it is not a list, is empty, contains a blank entry,
+  contains duplicates, or contains a non-string item.
+- Items are effort values as strings. Object items are reserved for future per-value
+  metadata.
+
+::: warning Changing an existing project
+The configured vocabulary replaces the default, so existing task files using
+`small`/`medium`/`large` become invalid. Update them in the same change, or keep the
+old values in the list.
+:::
 
 ## Projects Configuration {#projects-configuration}
 

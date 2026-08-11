@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/driangle/taskmd/sdk/go/effort"
 )
 
 func createTestFile(t *testing.T, content string) string {
@@ -261,14 +263,14 @@ func TestValidateUpdateRequest_Valid(t *testing.T) {
 		Status:   strPtr("completed"),
 		Priority: strPtr("high"),
 		Effort:   strPtr("small"),
-	})
+	}, effort.Default())
 	if len(errs) > 0 {
 		t.Errorf("expected no errors, got: %v", errs)
 	}
 }
 
 func TestValidateUpdateRequest_InvalidStatus(t *testing.T) {
-	errs := ValidateUpdateRequest(UpdateRequest{Status: strPtr("invalid")})
+	errs := ValidateUpdateRequest(UpdateRequest{Status: strPtr("invalid")}, effort.Default())
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
 	}
@@ -278,7 +280,7 @@ func TestValidateUpdateRequest_InvalidStatus(t *testing.T) {
 }
 
 func TestValidateUpdateRequest_InvalidPriority(t *testing.T) {
-	errs := ValidateUpdateRequest(UpdateRequest{Priority: strPtr("urgent")})
+	errs := ValidateUpdateRequest(UpdateRequest{Priority: strPtr("urgent")}, effort.Default())
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
 	}
@@ -288,7 +290,7 @@ func TestValidateUpdateRequest_InvalidPriority(t *testing.T) {
 }
 
 func TestValidateUpdateRequest_InvalidEffort(t *testing.T) {
-	errs := ValidateUpdateRequest(UpdateRequest{Effort: strPtr("huge")})
+	errs := ValidateUpdateRequest(UpdateRequest{Effort: strPtr("huge")}, effort.Default())
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
 	}
@@ -298,7 +300,7 @@ func TestValidateUpdateRequest_InvalidEffort(t *testing.T) {
 }
 
 func TestValidateUpdateRequest_InvalidType(t *testing.T) {
-	errs := ValidateUpdateRequest(UpdateRequest{Type: strPtr("task")})
+	errs := ValidateUpdateRequest(UpdateRequest{Type: strPtr("task")}, effort.Default())
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
 	}
@@ -309,7 +311,7 @@ func TestValidateUpdateRequest_InvalidType(t *testing.T) {
 
 func TestValidateUpdateRequest_ValidType(t *testing.T) {
 	for _, typ := range []string{"feature", "bug", "improvement", "chore", "docs"} {
-		errs := ValidateUpdateRequest(UpdateRequest{Type: strPtr(typ)})
+		errs := ValidateUpdateRequest(UpdateRequest{Type: strPtr(typ)}, effort.Default())
 		if len(errs) != 0 {
 			t.Errorf("expected no errors for type %q, got: %v", typ, errs)
 		}
@@ -320,14 +322,14 @@ func TestValidateUpdateRequest_MultipleErrors(t *testing.T) {
 	errs := ValidateUpdateRequest(UpdateRequest{
 		Status: strPtr("bad"),
 		Effort: strPtr("bad"),
-	})
+	}, effort.Default())
 	if len(errs) != 2 {
 		t.Fatalf("expected 2 errors, got %d: %v", len(errs), errs)
 	}
 }
 
 func TestValidateUpdateRequest_NilFieldsSkipped(t *testing.T) {
-	errs := ValidateUpdateRequest(UpdateRequest{})
+	errs := ValidateUpdateRequest(UpdateRequest{}, effort.Default())
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for empty request, got: %v", errs)
 	}

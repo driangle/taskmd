@@ -6,4 +6,9 @@
 //
 // Supported fields include status, priority, effort, type, group, tags,
 // and assignee.
+//
+// The effort vocabulary is project-configurable, so Apply takes an
+// [github.com/driangle/taskmd/sdk/go/effort.Scale] that supplies both the
+// accepted values and their order. Pass the zero Scale for the default
+// small, medium, large.
 package filter

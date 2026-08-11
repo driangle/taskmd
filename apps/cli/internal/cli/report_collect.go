@@ -33,7 +33,7 @@ type reportData struct {
 func collectReportData(tasks []*model.Task, groupBy string, includeGraph bool) (*reportData, error) {
 	m := metrics.Calculate(tasks)
 
-	grouped, err := board.GroupTasks(tasks, groupBy)
+	grouped, err := board.GroupTasks(tasks, groupBy, resolveEffortScale())
 	if err != nil {
 		return nil, err
 	}

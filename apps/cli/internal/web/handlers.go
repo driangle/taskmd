@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/driangle/taskmd/sdk/go/board"
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/feed"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/metrics"
@@ -186,7 +187,7 @@ func handleTaskByID(dp *DataProvider) http.HandlerFunc {
 	}
 }
 
-func handleBoard(dp *DataProvider, phases []PhaseInfo) http.HandlerFunc {
+func handleBoard(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
 		phases := effectivePhases(r, phases)
@@ -201,7 +202,7 @@ func handleBoard(dp *DataProvider, phases []PhaseInfo) http.HandlerFunc {
 			groupBy = "status"
 		}
 
-		grouped, err := board.GroupTasks(tasks, groupBy)
+		grouped, err := board.GroupTasks(tasks, groupBy, efforts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -262,7 +263,7 @@ func handleStats(dp *DataProvider) http.HandlerFunc {
 	}
 }
 
-func handleNext(dp *DataProvider) http.HandlerFunc {
+func handleNext(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
 		tasks, err := getFilteredTasks(dp, r)
@@ -290,6 +291,7 @@ func handleNext(dp *DataProvider) http.HandlerFunc {
 			Limit:         limit,
 			Filters:       filters,
 			ArchivedTasks: archivedTasks,
+			Efforts:       efforts,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -300,7 +302,7 @@ func handleNext(dp *DataProvider) http.HandlerFunc {
 	}
 }
 
-func handleTracks(dp *DataProvider) http.HandlerFunc {
+func handleTracks(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
 		tasks, err := getFilteredTasks(dp, r)
@@ -322,6 +324,7 @@ func handleTracks(dp *DataProvider) http.HandlerFunc {
 			Filters:       filters,
 			ArchivedTasks: archivedTasks,
 			Scope:         scope,
+			Efforts:       efforts,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -338,7 +341,7 @@ func handleTracks(dp *DataProvider) http.HandlerFunc {
 	}
 }
 
-func handleValidate(dp *DataProvider) http.HandlerFunc {
+func handleValidate(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
 		tasks, err := getFilteredTasks(dp, r)
@@ -348,6 +351,7 @@ func handleValidate(dp *DataProvider) http.HandlerFunc {
 		}
 
 		v := validator.NewValidator(false)
+		v.SetEffortScale(efforts)
 		result := v.Validate(tasks)
 		writeJSON(w, result)
 	}
@@ -387,7 +391,7 @@ func findTaskByID(tasks []*model.Task, id string) *model.Task {
 	return nil
 }
 
-func handleUpdateTask(dp *DataProvider, readonly bool) http.HandlerFunc {
+func handleUpdateTask(dp *DataProvider, readonly bool, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
 		if readonly {
@@ -409,7 +413,7 @@ func handleUpdateTask(dp *DataProvider, readonly bool) http.HandlerFunc {
 
 		req := toUpdateRequest(body)
 
-		if errs := taskfile.ValidateUpdateRequest(req); len(errs) > 0 {
+		if errs := taskfile.ValidateUpdateRequest(req, efforts); len(errs) > 0 {
 			writeError(w, http.StatusBadRequest, "validation failed", errs)
 			return
 		}

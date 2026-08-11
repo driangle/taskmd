@@ -73,6 +73,17 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	// Cobra short-circuits to the help renderer before OnInitialize runs, so
+	// config-derived usage text (the --effort vocabulary) would print stale
+	// defaults. Load config and refresh it here instead. Subcommands inherit
+	// this help func from the root.
+	defaultHelp := rootCmd.HelpFunc()
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		initConfig()
+		refreshEffortUsage(cmd)
+		defaultHelp(cmd, args)
+	})
+
 	// Set version template with detailed info
 	versionTemplate := fmt.Sprintf("taskmd version %s\n  Git commit: %s\n  Built:      %s\n", Version, GitCommit, BuildDate)
 	rootCmd.SetVersionTemplate(versionTemplate)

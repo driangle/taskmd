@@ -3,6 +3,7 @@ package tracks
 import (
 	"sort"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/model"
 	"github.com/driangle/taskmd/sdk/go/next"
@@ -42,6 +43,9 @@ type Options struct {
 	KnownScopes   map[string]bool
 	ArchivedTasks []*model.Task
 	Scope         string
+	// Efforts is the project's effort vocabulary. The zero value means the
+	// default small, medium, large.
+	Efforts effort.Scale
 }
 
 type scored struct {
@@ -51,7 +55,7 @@ type scored struct {
 
 // Assign groups actionable tasks into parallel tracks based on scope overlap.
 func Assign(tasks []*model.Task, opts Options) (*Result, error) {
-	items, err := scoreActionable(tasks, opts.Filters, opts.ArchivedTasks)
+	items, err := scoreActionable(tasks, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -126,11 +130,11 @@ func assignScope(items []scored, allTasks []*model.Task, scope string, warnings 
 	return result
 }
 
-func scoreActionable(tasks []*model.Task, filters []string, archivedTasks []*model.Task) ([]scored, error) {
+func scoreActionable(tasks []*model.Task, opts Options) ([]scored, error) {
 	taskMap := next.BuildTaskMap(tasks)
 
 	// Merge archived tasks for dependency resolution only.
-	for _, at := range archivedTasks {
+	for _, at := range opts.ArchivedTasks {
 		if _, exists := taskMap[at.ID]; !exists {
 			taskMap[at.ID] = at
 		}
@@ -141,9 +145,9 @@ func scoreActionable(tasks []*model.Task, filters []string, archivedTasks []*mod
 	downstreamInfo := next.ComputeDownstreamInfo(tasks)
 
 	candidates := tasks
-	if len(filters) > 0 {
+	if len(opts.Filters) > 0 {
 		var err error
-		candidates, err = filter.Apply(candidates, filters)
+		candidates, err = filter.Apply(candidates, opts.Filters, opts.Efforts)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +156,7 @@ func scoreActionable(tasks []*model.Task, filters []string, archivedTasks []*mod
 	var items []scored
 	for _, t := range candidates {
 		if next.IsActionable(t, taskMap, childrenMap) {
-			s, _ := next.ScoreTask(t, criticalPath, downstreamInfo)
+			s, _ := next.ScoreTask(t, criticalPath, downstreamInfo, opts.Efforts)
 			items = append(items, scored{task: t, score: s})
 		}
 	}

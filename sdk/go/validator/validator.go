@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -71,6 +72,9 @@ type ConfigData struct {
 	ConfigPath       string
 	Workflow         string
 	ID               *IDConfig
+	// Effort holds the configured effort vocabulary, lowest to highest.
+	// Nil means the key was absent and the default vocabulary applies.
+	Effort []string
 }
 
 // PhaseConfig holds the configuration for a single phase entry.
@@ -99,11 +103,18 @@ type ScopeConfig struct {
 type Validator struct {
 	strict      bool
 	externalIDs map[string]bool // IDs known to exist but not subject to validation (e.g. archived tasks)
+	efforts     effort.Scale    // zero value is the default effort vocabulary
 }
 
 // NewValidator creates a new validator
 func NewValidator(strict bool) *Validator {
 	return &Validator{strict: strict}
+}
+
+// SetEffortScale sets the project's effort vocabulary, used to validate the
+// effort field. When unset, the default small, medium, large applies.
+func (v *Validator) SetEffortScale(efforts effort.Scale) {
+	v.efforts = efforts
 }
 
 // SetExternalIDs sets task IDs that are known to exist externally (e.g. in archive).
@@ -175,13 +186,6 @@ func (v *Validator) checkInvalidFieldValues(tasks []*model.Task, result *Validat
 		"":                     true, // Empty is allowed (will default)
 	}
 
-	validEfforts := map[model.Effort]bool{
-		model.EffortSmall:  true,
-		model.EffortMedium: true,
-		model.EffortLarge:  true,
-		"":                 true, // Empty is allowed (will default)
-	}
-
 	validTypes := map[model.TaskType]bool{
 		model.TypeFeature:     true,
 		model.TypeBug:         true,
@@ -202,9 +206,10 @@ func (v *Validator) checkInvalidFieldValues(tasks []*model.Task, result *Validat
 				fmt.Sprintf("invalid priority: '%s' (valid values: low, medium, high, critical)", task.Priority))
 		}
 
-		if !validEfforts[task.Effort] {
+		// Empty effort is allowed (will default).
+		if task.Effort != "" && !v.efforts.Contains(string(task.Effort)) {
 			result.AddIssue(LevelError, task.ID, task.FilePath,
-				fmt.Sprintf("invalid effort: '%s' (valid values: small, medium, large)", task.Effort))
+				fmt.Sprintf("invalid effort: '%s' (valid values: %s)", task.Effort, v.efforts))
 		}
 
 		if !validTypes[task.Type] {
@@ -378,6 +383,7 @@ func (v *Validator) ValidateConfig(config *ConfigData) *ValidationResult {
 	v.checkWorkflowValue(config, result)
 	v.checkIDConfig(config, result)
 	v.checkPhaseConfig(config, result)
+	v.checkEffortConfig(config, result)
 
 	return result
 }
@@ -415,6 +421,18 @@ func (v *Validator) checkIDConfig(config *ConfigData, result *ValidationResult) 
 	if id.Padding < 0 {
 		result.AddIssue(LevelError, "", config.ConfigPath,
 			fmt.Sprintf("id padding must not be negative, got %d", id.Padding))
+	}
+}
+
+// checkEffortConfig validates the configured effort vocabulary. The rules live in
+// effort.NewScale, so the config and the runtime vocabulary can never disagree.
+func (v *Validator) checkEffortConfig(config *ConfigData, result *ValidationResult) {
+	if config.Effort == nil {
+		return
+	}
+	if _, err := effort.NewScale(config.Effort); err != nil {
+		result.AddIssue(LevelError, "", config.ConfigPath,
+			fmt.Sprintf("invalid effort config: %s", err))
 	}
 }
 
@@ -493,16 +511,17 @@ func scopeLabel(name, description string) string {
 }
 
 var knownConfigKeys = map[string]bool{
-	"dir":        true,
-	"task-dir":   true,
-	"web":        true,
-	"scopes":     true,
-	"sync":       true,
-	"ignore":     true,
-	"workflow":   true,
-	"todos":      true,
-	"id":         true,
-	"phases":     true,
+	"dir":      true,
+	"task-dir": true,
+	"web":      true,
+	"scopes":   true,
+	"sync":     true,
+	"ignore":   true,
+	"workflow": true,
+	"todos":    true,
+	"id":       true,
+	"phases":   true,
+	"effort":   true,
 }
 
 // checkUnknownConfigKeys warns about unrecognized top-level config keys.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -17,8 +18,11 @@ type GroupResult struct {
 
 // GroupTasks groups tasks by the specified field.
 //
+// efforts supplies the project's effort vocabulary, which sets the column order
+// when grouping by effort. Pass effort.Scale{} for the default vocabulary.
+//
 //nolint:gocognit,gocyclo,funlen // TODO: refactor to reduce complexity
-func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
+func GroupTasks(tasks []*model.Task, field string, efforts effort.Scale) (*GroupResult, error) {
 	groups := make(map[string][]*model.Task)
 
 	switch field {
@@ -57,7 +61,7 @@ func GroupTasks(tasks []*model.Task, field string) (*GroupResult, error) {
 			groups[key] = append(groups[key], t)
 		}
 		return &GroupResult{
-			Keys:   orderedKeys(groups, effortOrder()),
+			Keys:   orderedKeys(groups, efforts.Values()),
 			Groups: groups,
 		}, nil
 
@@ -190,14 +194,6 @@ func priorityOrder() []string {
 		string(model.PriorityHigh),
 		string(model.PriorityMedium),
 		string(model.PriorityLow),
-	}
-}
-
-func effortOrder() []string {
-	return []string{
-		string(model.EffortSmall),
-		string(model.EffortMedium),
-		string(model.EffortLarge),
 	}
 }
 

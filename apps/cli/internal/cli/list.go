@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -270,6 +271,15 @@ func applyListFiltersAndSort(tasks []*model.Task) ([]*model.Task, error) {
 	return tasks, nil
 }
 
+// effortSortRank orders an effort value by its position in the project's
+// vocabulary. Unset and unrecognized values sort last, after every known value.
+func effortSortRank(scale effort.Scale, value model.Effort) int {
+	if rank := scale.Rank(string(value)); rank >= 0 {
+		return rank
+	}
+	return scale.Len()
+}
+
 // sortTasks sorts tasks by the specified field
 func sortTasks(tasks []*model.Task, sortField string) error {
 	switch sortField {
@@ -296,13 +306,9 @@ func sortTasks(tasks []*model.Task, sortField string) error {
 			return priorityOrder[tasks[i].Priority] < priorityOrder[tasks[j].Priority]
 		})
 	case "effort":
-		effortOrder := map[model.Effort]int{
-			model.EffortSmall:  0,
-			model.EffortMedium: 1,
-			model.EffortLarge:  2,
-		}
+		scale := resolveEffortScale()
 		sort.Slice(tasks, func(i, j int) bool {
-			return effortOrder[tasks[i].Effort] < effortOrder[tasks[j].Effort]
+			return effortSortRank(scale, tasks[i].Effort) < effortSortRank(scale, tasks[j].Effort)
 		})
 	case "created", "created_at":
 		sort.Slice(tasks, func(i, j int) bool {

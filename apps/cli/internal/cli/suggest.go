@@ -13,8 +13,11 @@ var validStatusValues = []string{"pending", "in-progress", "completed", "in-revi
 // validPriorityValues lists all valid priority values.
 var validPriorityValues = []string{"low", "medium", "high", "critical"}
 
-// validEffortValues lists all valid effort values.
-var validEffortValues = []string{"small", "medium", "large"}
+// effortValues returns the project's configured effort vocabulary, lowest to
+// highest. Unlike the other enums, effort is project-configurable.
+func effortValues() []string {
+	return resolveEffortScale().Values()
+}
 
 // validTypeValues lists all valid task type values.
 var validTypeValues = []string{"feature", "bug", "improvement", "chore", "docs"}
@@ -56,8 +59,8 @@ func validateSetEnums(req taskfile.UpdateRequest) error {
 	if req.Priority != nil && !contains(validPriorityValues, *req.Priority) {
 		return invalidValueError("priority", *req.Priority, validPriorityValues)
 	}
-	if req.Effort != nil && !contains(validEffortValues, *req.Effort) {
-		return invalidValueError("effort", *req.Effort, validEffortValues)
+	if efforts := effortValues(); req.Effort != nil && !contains(efforts, *req.Effort) {
+		return invalidValueError("effort", *req.Effort, efforts)
 	}
 	if req.Type != nil && !contains(validTypeValues, *req.Type) {
 		return invalidValueError("type", *req.Type, validTypeValues)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
@@ -18,10 +19,17 @@ const (
 	ScoreCriticalPath     = 15
 	ScorePerDownstream    = 3
 	ScoreDownstreamMax    = 15
-	ScoreEffortSmall      = 5
-	ScoreEffortMedium     = 2
-	ScorePhaseBase        = 25
-	ScorePhaseDecay       = 5
+	// ScoreEffortMax is the score awarded to the lowest effort value in the
+	// project's vocabulary. Higher values earn proportionally less, down to
+	// zero for the highest. See effort.Scale.Points.
+	ScoreEffortMax = 5
+	// ScoreEffortSmall and ScoreEffortMedium are the points the default
+	// three-value vocabulary awards to small and medium effort. Retained as
+	// named constants for callers and tests; both derive from ScoreEffortMax.
+	ScoreEffortSmall  = ScoreEffortMax
+	ScoreEffortMedium = ScoreEffortMax / 2
+	ScorePhaseBase    = 25
+	ScorePhaseDecay   = 5
 )
 
 // ScoreComponent is a single itemized contribution to a task's score.
@@ -65,6 +73,9 @@ type Options struct {
 	PhaseOrder     []string
 	StrictPhases   bool
 	StrictPriority bool
+	// Efforts is the project's effort vocabulary. The zero value means the
+	// default small, medium, large.
+	Efforts effort.Scale
 }
 
 type scoredTask struct {
@@ -103,6 +114,7 @@ func Recommend(tasks []*model.Task, opts Options) ([]Recommendation, error) {
 		phaseOrder:     opts.PhaseOrder,
 		strictPhases:   opts.StrictPhases,
 		strictPriority: opts.StrictPriority,
+		efforts:        opts.Efforts,
 	}, criticalPath, downstreamInfo)
 
 	limit := min(opts.Limit, len(scored))
@@ -184,7 +196,7 @@ func filterActionable(
 	candidates := tasks
 	if len(opts.Filters) > 0 {
 		var err error
-		candidates, err = filter.Apply(candidates, opts.Filters)
+		candidates, err = filter.Apply(candidates, opts.Filters, opts.Efforts)
 		if err != nil {
 			return nil, fmt.Errorf("filter error: %w", err)
 		}
@@ -218,7 +230,7 @@ func filterActionable(
 		}
 	}
 
-	return applySpecialFilters(actionable, criticalPath, opts.QuickWins, opts.Critical), nil
+	return applySpecialFilters(actionable, criticalPath, opts.QuickWins, opts.Critical, opts.Efforts), nil
 }
 
 // rootReachableSet returns the set of task IDs reachable from root: root's
@@ -248,6 +260,7 @@ type sortOptions struct {
 	phaseOrder     []string
 	strictPhases   bool
 	strictPriority bool
+	efforts        effort.Scale
 }
 
 func scoreAndSort(
@@ -260,7 +273,7 @@ func scoreAndSort(
 
 	scored := make([]scoredTask, len(tasks))
 	for i, task := range tasks {
-		comps, r := buildScore(task, criticalPath, downstreamInfo)
+		comps, r := buildScore(task, criticalPath, downstreamInfo, opts.efforts)
 		if pc, pr := buildPhaseScore(task, opts.phaseOrder); pc != nil {
 			comps = append(comps, *pc)
 			r = append(r, pr)
@@ -399,8 +412,9 @@ func ScoreTask(
 	task *model.Task,
 	criticalPath map[string]bool,
 	downstreamInfo map[string]DownstreamInfo,
+	efforts effort.Scale,
 ) (int, []string) {
-	components, reasons := buildScore(task, criticalPath, downstreamInfo)
+	components, reasons := buildScore(task, criticalPath, downstreamInfo, efforts)
 	return sumComponents(components), reasons
 }
 
@@ -411,8 +425,9 @@ func ScoreTaskBreakdown(
 	task *model.Task,
 	criticalPath map[string]bool,
 	downstreamInfo map[string]DownstreamInfo,
+	efforts effort.Scale,
 ) []ScoreComponent {
-	components, _ := buildScore(task, criticalPath, downstreamInfo)
+	components, _ := buildScore(task, criticalPath, downstreamInfo, efforts)
 	return components
 }
 
@@ -423,6 +438,7 @@ func buildScore(
 	task *model.Task,
 	criticalPath map[string]bool,
 	downstreamInfo map[string]DownstreamInfo,
+	efforts effort.Scale,
 ) ([]ScoreComponent, []string) {
 	components := make([]ScoreComponent, 0, 4)
 	reasons := make([]string, 0)
@@ -461,7 +477,7 @@ func buildScore(
 		reasons = append(reasons, fmt.Sprintf("unblocks %d %s", dc, noun))
 	}
 
-	if effortComp, effortReason, ok := effortComponent(task); ok {
+	if effortComp, effortReason, ok := effortComponent(task, efforts); ok {
 		components = append(components, effortComp)
 		if effortReason != "" {
 			reasons = append(reasons, effortReason)
@@ -487,16 +503,22 @@ func priorityComponent(task *model.Task) (ScoreComponent, string) {
 }
 
 // effortComponent returns the effort score component and its legacy reason.
-// The bool is false when the effort contributes no points (large/unset).
-func effortComponent(task *model.Task) (ScoreComponent, string, bool) {
-	switch task.Effort {
-	case model.EffortSmall:
-		return ScoreComponent{Label: "effort: small", Points: ScoreEffortSmall}, "quick win", true
-	case model.EffortMedium:
-		return ScoreComponent{Label: "effort: medium", Points: ScoreEffortMedium}, "", true
-	default:
+// Points scale with the effort's position in the project's vocabulary, so the
+// lowest value is the quick win regardless of what it is called. The bool is
+// false when the effort contributes no points (highest value, unset, or a value
+// outside the vocabulary).
+func effortComponent(task *model.Task, efforts effort.Scale) (ScoreComponent, string, bool) {
+	value := string(task.Effort)
+	points, ok := efforts.Points(value, ScoreEffortMax)
+	if !ok {
 		return ScoreComponent{}, "", false
 	}
+
+	reason := ""
+	if value == efforts.Lowest() {
+		reason = "quick win"
+	}
+	return ScoreComponent{Label: "effort: " + value, Points: points}, reason, true
 }
 
 // sumComponents returns the total points across all components.
@@ -745,13 +767,15 @@ func applySpecialFilters(
 	actionable []*model.Task,
 	criticalPath map[string]bool,
 	quickWins, critical bool,
+	efforts effort.Scale,
 ) []*model.Task {
 	result := actionable
 
 	if quickWins {
+		lowest := efforts.Lowest()
 		var filtered []*model.Task
 		for _, task := range result {
-			if task.Effort == model.EffortSmall {
+			if string(task.Effort) == lowest {
 				filtered = append(filtered, task)
 			}
 		}

@@ -95,7 +95,7 @@ func init() {
 	nextCmd.Flags().StringVar(&nextFormat, "format", "table", "output format (table, json, yaml)")
 	nextCmd.Flags().IntVar(&nextLimit, "limit", 5, "maximum number of recommendations")
 	nextCmd.Flags().StringArrayVar(&nextFilters, "filter", []string{}, "filter tasks (e.g., --filter tag=cli)")
-	nextCmd.Flags().BoolVar(&nextQuickWins, "quick-wins", false, "show only quick wins (effort: small)")
+	nextCmd.Flags().BoolVar(&nextQuickWins, "quick-wins", false, "show only quick wins (tasks at the lowest configured effort)")
 	nextCmd.Flags().BoolVar(&nextCritical, "critical", false, "show only critical path tasks")
 	nextCmd.Flags().StringVar(&nextScope, "scope", "", "filter by scope; supports wildcards (e.g. cli, cli*)")
 	nextCmd.Flags().BoolVar(&nextExact, "exact", false, "disable dependency expansion for --scope (only direct matches)")
@@ -140,6 +140,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 		PhaseOrder:     phaseOrder,
 		StrictPhases:   nextStrictPhases,
 		StrictPriority: nextStrictPriority,
+		Efforts:        resolveEffortScale(),
 	})
 	if err != nil {
 		return err
@@ -234,6 +235,7 @@ func recommendForProject(entry GlobalProjectEntry) ([]Recommendation, error) {
 		Phase:          nextPhase,
 		StrictPhases:   nextStrictPhases,
 		StrictPriority: nextStrictPriority,
+		Efforts:        resolveEffortScale(),
 	})
 }
 

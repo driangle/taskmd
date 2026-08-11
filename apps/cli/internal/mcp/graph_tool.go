@@ -7,6 +7,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
@@ -21,14 +22,16 @@ type GraphInput struct {
 	Filters       []string `json:"filters,omitempty" jsonschema:"filter expressions, e.g. status=pending, priority=high"`
 }
 
-func registerGraphTool(server *gomcp.Server) {
+func registerGraphTool(server *gomcp.Server, efforts effort.Scale) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "graph",
 		Description: "Get the task dependency graph as JSON with nodes, edges, and cycle detection",
-	}, handleGraph)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input GraphInput) (*gomcp.CallToolResult, any, error) {
+		return handleGraph(ctx, req, input, efforts)
+	})
 }
 
-func handleGraph(_ context.Context, _ *gomcp.CallToolRequest, input GraphInput) (*gomcp.CallToolResult, any, error) {
+func handleGraph(_ context.Context, _ *gomcp.CallToolRequest, input GraphInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
 	taskDir := input.TaskDir
 	if taskDir == "" {
 		taskDir = "."
@@ -43,7 +46,7 @@ func handleGraph(_ context.Context, _ *gomcp.CallToolRequest, input GraphInput) 
 	tasks := result.Tasks
 
 	if len(input.Filters) > 0 {
-		tasks, err = filter.Apply(tasks, input.Filters)
+		tasks, err = filter.Apply(tasks, input.Filters, efforts)
 		if err != nil {
 			return nil, nil, fmt.Errorf("filter error: %w", err)
 		}

@@ -89,6 +89,7 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 		ReadOnly:       viper.GetBool("web.readonly"),
 		Version:        FullVersion(),
 		Phases:         parsePhasesForWeb(),
+		Efforts:        resolveEffortScale(),
 		ListProjects:   buildListProjects(),
 		ResolveProject: buildResolveProject(),
 	})

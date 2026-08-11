@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -48,12 +49,6 @@ var validPriorities = map[string]bool{
 	string(model.PriorityCritical): true,
 }
 
-var validEfforts = map[string]bool{
-	string(model.EffortSmall):  true,
-	string(model.EffortMedium): true,
-	string(model.EffortLarge):  true,
-}
-
 var validTypes = map[string]bool{
 	string(model.TypeFeature):     true,
 	string(model.TypeBug):         true,
@@ -63,7 +58,10 @@ var validTypes = map[string]bool{
 }
 
 // ValidateUpdateRequest checks enum fields and returns a list of error strings.
-func ValidateUpdateRequest(req UpdateRequest) []string {
+//
+// efforts supplies the project's effort vocabulary; pass effort.Scale{} for the
+// default small, medium, large.
+func ValidateUpdateRequest(req UpdateRequest, efforts effort.Scale) []string {
 	var errs []string
 	if req.Status != nil && !validStatuses[*req.Status] {
 		errs = append(errs, fmt.Sprintf("invalid status: %q", *req.Status))
@@ -71,8 +69,8 @@ func ValidateUpdateRequest(req UpdateRequest) []string {
 	if req.Priority != nil && !validPriorities[*req.Priority] {
 		errs = append(errs, fmt.Sprintf("invalid priority: %q", *req.Priority))
 	}
-	if req.Effort != nil && !validEfforts[*req.Effort] {
-		errs = append(errs, fmt.Sprintf("invalid effort: %q", *req.Effort))
+	if req.Effort != nil && !efforts.Contains(*req.Effort) {
+		errs = append(errs, fmt.Sprintf("invalid effort: %q (valid values: %s)", *req.Effort, efforts))
 	}
 	if req.Type != nil && !validTypes[*req.Type] {
 		errs = append(errs, fmt.Sprintf("invalid type: %q", *req.Type))

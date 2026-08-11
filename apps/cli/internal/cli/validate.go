@@ -91,6 +91,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	// Scan archive directories for task IDs to avoid false-positive dependency errors
 	v := validator.NewValidator(validateStrict)
+	v.SetEffortScale(resolveEffortScale())
 	if externalIDs := collectArchivedIDs(taskScanner); len(externalIDs) > 0 {
 		v.SetExternalIDs(externalIDs)
 	}
@@ -265,6 +266,16 @@ func loadConfigForValidation() *validator.ConfigData {
 		config.Phases = parsePhasesConfig(viper.Get("phases"))
 	}
 
+	// A bare `effort:` with no value is reported by viper as absent, so it means
+	// "unset" and the default vocabulary applies. Every other form reaches the
+	// validator: `effort: []` arrives as a non-nil empty list and is rejected
+	// there rather than silently falling back to the default.
+	if viper.InConfig(effortConfigKey) {
+		values, errs := parseEffortConfig(viper.Get(effortConfigKey))
+		config.Effort = values
+		config.StructuralErrors = append(config.StructuralErrors, errs...)
+	}
+
 	return config
 }
 
@@ -358,6 +369,8 @@ func yamlContainerKind(v any) string {
 	switch v.(type) {
 	case []any:
 		return "list"
+	case map[string]any:
+		return "mapping"
 	case string:
 		return "string"
 	case int, int64, float64, bool:

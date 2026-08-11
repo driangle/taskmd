@@ -8,6 +8,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/model"
 	"github.com/driangle/taskmd/sdk/go/scanner"
@@ -20,14 +21,16 @@ type ListInput struct {
 	Sort    string   `json:"sort,omitempty" jsonschema:"sort field: id, title, status, priority, effort, created"`
 }
 
-func registerListTool(server *gomcp.Server) {
+func registerListTool(server *gomcp.Server, efforts effort.Scale) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "list",
 		Description: "List and filter tasks in a taskmd project",
-	}, handleList)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input ListInput) (*gomcp.CallToolResult, any, error) {
+		return handleList(ctx, req, input, efforts)
+	})
 }
 
-func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput) (*gomcp.CallToolResult, any, error) {
+func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
 	taskDir := input.TaskDir
 	if taskDir == "" {
 		taskDir = "."
@@ -42,14 +45,14 @@ func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput) (*
 	tasks := result.Tasks
 
 	if len(input.Filters) > 0 {
-		tasks, err = filter.Apply(tasks, input.Filters)
+		tasks, err = filter.Apply(tasks, input.Filters, efforts)
 		if err != nil {
 			return nil, nil, fmt.Errorf("filter error: %w", err)
 		}
 	}
 
 	if input.Sort != "" {
-		if err := sortTasks(tasks, input.Sort); err != nil {
+		if err := sortTasks(tasks, input.Sort, efforts); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -64,7 +67,16 @@ func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput) (*
 	}, nil, nil
 }
 
-func sortTasks(tasks []*model.Task, field string) error {
+// effortRank orders an effort value by its position in the project's vocabulary.
+// Unset and unrecognized values sort last, after every known value.
+func effortRank(efforts effort.Scale, value model.Effort) int {
+	if rank := efforts.Rank(string(value)); rank >= 0 {
+		return rank
+	}
+	return efforts.Len()
+}
+
+func sortTasks(tasks []*model.Task, field string, efforts effort.Scale) error {
 	switch field {
 	case "id":
 		sort.Slice(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })
@@ -81,12 +93,9 @@ func sortTasks(tasks []*model.Task, field string) error {
 		}
 		sort.Slice(tasks, func(i, j int) bool { return order[tasks[i].Priority] < order[tasks[j].Priority] })
 	case "effort":
-		order := map[model.Effort]int{
-			model.EffortSmall:  0,
-			model.EffortMedium: 1,
-			model.EffortLarge:  2,
-		}
-		sort.Slice(tasks, func(i, j int) bool { return order[tasks[i].Effort] < order[tasks[j].Effort] })
+		sort.Slice(tasks, func(i, j int) bool {
+			return effortRank(efforts, tasks[i].Effort) < effortRank(efforts, tasks[j].Effort)
+		})
 	case "created":
 		sort.Slice(tasks, func(i, j int) bool { return tasks[i].Created.Before(tasks[j].Created.Time) })
 	default:

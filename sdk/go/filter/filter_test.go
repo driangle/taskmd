@@ -1,8 +1,10 @@
 package filter
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -13,7 +15,7 @@ func TestApply_OwnerFilter(t *testing.T) {
 		{ID: "003", Title: "Task C", Owner: ""},
 	}
 
-	filtered, err := Apply(tasks, []string{"owner=alice"})
+	filtered, err := Apply(tasks, []string{"owner=alice"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -33,7 +35,7 @@ func TestApply_MultipleFilters(t *testing.T) {
 		{ID: "003", Title: "Task C", Status: model.StatusCompleted, Owner: "alice"},
 	}
 
-	filtered, err := Apply(tasks, []string{"status=pending", "owner=alice"})
+	filtered, err := Apply(tasks, []string{"status=pending", "owner=alice"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -49,7 +51,7 @@ func TestApply_MultipleFilters(t *testing.T) {
 func TestApply_InvalidFilterFormat(t *testing.T) {
 	tasks := []*model.Task{{ID: "001"}}
 
-	_, err := Apply(tasks, []string{"badfilter"})
+	_, err := Apply(tasks, []string{"badfilter"}, effort.Default())
 	if err == nil {
 		t.Fatal("expected error for invalid filter format")
 	}
@@ -63,7 +65,7 @@ func TestApply_TypeFilter(t *testing.T) {
 		{ID: "004", Title: "No type"},
 	}
 
-	filtered, err := Apply(tasks, []string{"type=bug"})
+	filtered, err := Apply(tasks, []string{"type=bug"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,7 +85,7 @@ func TestApply_GroupWildcardFilter(t *testing.T) {
 		{ID: "003", Title: "Task C", Group: "web/board"},
 	}
 
-	filtered, err := Apply(tasks, []string{"group=cli/*"})
+	filtered, err := Apply(tasks, []string{"group=cli/*"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +105,7 @@ func TestApply_TouchesWildcardFilter(t *testing.T) {
 		{ID: "003", Title: "Task C", Touches: []string{"docs"}},
 	}
 
-	filtered, err := Apply(tasks, []string{"touches=web/*"})
+	filtered, err := Apply(tasks, []string{"touches=web/*"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +124,7 @@ func TestApply_GroupExactStillWorks(t *testing.T) {
 		{ID: "002", Title: "Task B", Group: "web"},
 	}
 
-	filtered, err := Apply(tasks, []string{"group=cli"})
+	filtered, err := Apply(tasks, []string{"group=cli"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -141,7 +143,7 @@ func TestApply_ParentFilter(t *testing.T) {
 	}
 
 	t.Run("filter by parent ID", func(t *testing.T) {
-		filtered, err := Apply(tasks, []string{"parent=001"})
+		filtered, err := Apply(tasks, []string{"parent=001"}, effort.Default())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -151,7 +153,7 @@ func TestApply_ParentFilter(t *testing.T) {
 	})
 
 	t.Run("filter parent=true", func(t *testing.T) {
-		filtered, err := Apply(tasks, []string{"parent=true"})
+		filtered, err := Apply(tasks, []string{"parent=true"}, effort.Default())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -161,7 +163,7 @@ func TestApply_ParentFilter(t *testing.T) {
 	})
 
 	t.Run("filter parent=false", func(t *testing.T) {
-		filtered, err := Apply(tasks, []string{"parent=false"})
+		filtered, err := Apply(tasks, []string{"parent=false"}, effort.Default())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -198,7 +200,7 @@ func TestApply_PriorityComparison(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filtered, err := Apply(tasks, []string{tt.expr})
+			filtered, err := Apply(tasks, []string{tt.expr}, effort.Default())
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -235,7 +237,7 @@ func TestApply_EffortComparison(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filtered, err := Apply(tasks, []string{tt.expr})
+			filtered, err := Apply(tasks, []string{tt.expr}, effort.Default())
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -265,7 +267,7 @@ func TestApply_ComparisonErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Apply(tasks, []string{tt.expr})
+			_, err := Apply(tasks, []string{tt.expr}, effort.Default())
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -280,7 +282,7 @@ func TestApply_ComparisonCombinedWithEquality(t *testing.T) {
 		{ID: "003", Status: model.StatusCompleted, Priority: model.PriorityHigh},
 	}
 
-	filtered, err := Apply(tasks, []string{"status=pending", "priority>=high"})
+	filtered, err := Apply(tasks, []string{"status=pending", "priority>=high"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -312,7 +314,7 @@ func TestParseExpr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := parseExpr(tt.expr)
+			c, err := parseExpr(tt.expr, effort.Default())
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error")
@@ -338,7 +340,7 @@ func TestApply_PhaseFilter(t *testing.T) {
 	}
 
 	t.Run("exact match", func(t *testing.T) {
-		filtered, err := Apply(tasks, []string{"phase=v0.2"})
+		filtered, err := Apply(tasks, []string{"phase=v0.2"}, effort.Default())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -351,7 +353,7 @@ func TestApply_PhaseFilter(t *testing.T) {
 	})
 
 	t.Run("no match", func(t *testing.T) {
-		filtered, err := Apply(tasks, []string{"phase=v1.0"})
+		filtered, err := Apply(tasks, []string{"phase=v1.0"}, effort.Default())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -402,7 +404,7 @@ func TestApply_EmptyValueAliasesNone(t *testing.T) {
 func TestApply_SentinelCombined(t *testing.T) {
 	// phase=none AND owner=any narrows to task 003 (no phase, has owner).
 	assertFilterIDs(t, sentinelTasks(), "phase=none", []string{"003"})
-	filtered, err := Apply(sentinelTasks(), []string{"phase=none", "owner=any"})
+	filtered, err := Apply(sentinelTasks(), []string{"phase=none", "owner=any"}, effort.Default())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -440,17 +442,17 @@ func TestApply_ParentTrueFalseAliases(t *testing.T) {
 // task IDs match wantIDs (order-sensitive; input order is preserved by Apply).
 func assertFilterIDs(t *testing.T, tasks []*model.Task, expr string, wantIDs []string) {
 	t.Helper()
-	filtered, err := Apply(tasks, []string{expr})
+	filtered, err := Apply(tasks, []string{expr}, effort.Default())
 	if err != nil {
-		t.Fatalf("Apply(%q) unexpected error: %v", expr, err)
+		t.Fatalf("Apply(%q, effort.Default()) unexpected error: %v", expr, err)
 	}
 	got := ids(filtered)
 	if len(got) != len(wantIDs) {
-		t.Fatalf("Apply(%q) = %v, want %v", expr, got, wantIDs)
+		t.Fatalf("Apply(%q, effort.Default()) = %v, want %v", expr, got, wantIDs)
 	}
 	for i := range wantIDs {
 		if got[i] != wantIDs[i] {
-			t.Fatalf("Apply(%q) = %v, want %v", expr, got, wantIDs)
+			t.Fatalf("Apply(%q, effort.Default()) = %v, want %v", expr, got, wantIDs)
 		}
 	}
 }
@@ -461,4 +463,94 @@ func ids(tasks []*model.Task) []string {
 		out[i] = task.ID
 	}
 	return out
+}
+
+// --- Configurable effort vocabulary ---
+
+func TestApply_CustomEffortVocabulary(t *testing.T) {
+	t.Parallel()
+
+	scale, err := effort.NewScale([]string{"xs", "s", "m", "l", "xl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tasks := []*model.Task{
+		{ID: "001", Effort: "xs"},
+		{ID: "002", Effort: "m"},
+		{ID: "003", Effort: "xl"},
+	}
+
+	tests := []struct {
+		name    string
+		expr    string
+		wantIDs []string
+	}{
+		{"equality on a custom value", "effort=xs", []string{"001"}},
+		{"greater than", "effort>s", []string{"002", "003"}},
+		{"greater or equal", "effort>=m", []string{"002", "003"}},
+		{"less than", "effort<m", []string{"001"}},
+		{"less or equal", "effort<=m", []string{"001", "002"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := Apply(tasks, []string{tt.expr}, scale)
+			if err != nil {
+				t.Fatalf("Apply(%q) failed: %v", tt.expr, err)
+			}
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("Apply(%q) returned %d tasks, want %d", tt.expr, len(got), len(tt.wantIDs))
+			}
+			for i, id := range tt.wantIDs {
+				if got[i].ID != id {
+					t.Errorf("result[%d].ID = %q, want %q", i, got[i].ID, id)
+				}
+			}
+		})
+	}
+}
+
+// A comparison against a value outside the configured vocabulary must be an
+// error naming the configured values, not a silent empty result.
+func TestApply_OrdinalErrorListsConfiguredEffortValues(t *testing.T) {
+	t.Parallel()
+
+	scale, err := effort.NewScale([]string{"xs", "s", "m"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = Apply(nil, []string{"effort>small"}, scale)
+	if err == nil {
+		t.Fatal("expected an error for a value outside the vocabulary")
+	}
+	if !strings.Contains(err.Error(), "xs, s, m") {
+		t.Errorf("error = %q, want it to list the configured values", err.Error())
+	}
+}
+
+// Priority ordering is not configurable and must be unaffected by the effort scale.
+func TestApply_PriorityOrderingUnaffectedByEffortScale(t *testing.T) {
+	t.Parallel()
+
+	scale, err := effort.NewScale([]string{"xs", "s"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tasks := []*model.Task{
+		{ID: "001", Priority: model.PriorityLow},
+		{ID: "002", Priority: model.PriorityCritical},
+	}
+
+	got, err := Apply(tasks, []string{"priority>=high"}, scale)
+	if err != nil {
+		t.Fatalf("Apply failed: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "002" {
+		t.Errorf("got %v, want only task 002", got)
+	}
 }

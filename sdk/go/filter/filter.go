@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -15,10 +16,21 @@ type Criteria struct {
 	Value string
 }
 
-// ordinalFields maps field names to their ordered values (lowest to highest).
-var ordinalFields = map[string][]string{
-	"priority": {"low", "medium", "high", "critical"},
-	"effort":   {"small", "medium", "large"},
+// priorityRanks holds the priority values in order (lowest to highest).
+var priorityRanks = []string{"low", "medium", "high", "critical"}
+
+// ordinalRanks returns the ordered values for an ordinal field, or nil when the
+// field does not support ordering. The effort vocabulary is project-configurable,
+// so it comes from the caller's scale rather than a fixed list.
+func ordinalRanks(field string, efforts effort.Scale) []string {
+	switch field {
+	case "priority":
+		return priorityRanks
+	case "effort":
+		return efforts.Values()
+	default:
+		return nil
+	}
 }
 
 // Presence sentinel values recognized uniformly across equality filters:
@@ -32,10 +44,14 @@ const (
 )
 
 // Apply applies multiple filter expressions to tasks (AND logic).
-func Apply(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {
+//
+// efforts supplies the project's effort vocabulary, which determines the values
+// accepted by effort comparisons such as "effort>small". Pass effort.Scale{} for
+// the default vocabulary.
+func Apply(tasks []*model.Task, filterExprs []string, efforts effort.Scale) ([]*model.Task, error) {
 	filters := make([]Criteria, 0, len(filterExprs))
 	for _, expr := range filterExprs {
-		c, err := parseExpr(expr)
+		c, err := parseExpr(expr, efforts)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +60,7 @@ func Apply(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {
 
 	var filtered []*model.Task
 	for _, task := range tasks {
-		if matchesAll(task, filters) {
+		if matchesAll(task, filters, efforts) {
 			filtered = append(filtered, task)
 		}
 	}
@@ -53,7 +69,7 @@ func Apply(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {
 }
 
 // parseExpr parses a filter expression like "field=value", "field>=value", etc.
-func parseExpr(expr string) (Criteria, error) {
+func parseExpr(expr string, efforts effort.Scale) (Criteria, error) {
 	// Check for two-char operators first, then single-char.
 	for _, op := range []string{">=", "<=", ">", "<"} {
 		idx := strings.Index(expr, op)
@@ -63,8 +79,8 @@ func parseExpr(expr string) (Criteria, error) {
 			if value == "" {
 				return Criteria{}, fmt.Errorf("invalid filter format (missing value): %s", expr)
 			}
-			ranks, ok := ordinalFields[field]
-			if !ok {
+			ranks := ordinalRanks(field, efforts)
+			if ranks == nil {
 				return Criteria{}, fmt.Errorf("operator %q is not supported for field %q (only priority and effort support ordering)", op, field)
 			}
 			if !slices.Contains(ranks, value) {
@@ -85,29 +101,29 @@ func parseExpr(expr string) (Criteria, error) {
 	}, nil
 }
 
-func matchesAll(task *model.Task, filters []Criteria) bool {
+func matchesAll(task *model.Task, filters []Criteria, efforts effort.Scale) bool {
 	for _, f := range filters {
-		if !matchesCriteria(task, f) {
+		if !matchesCriteria(task, f, efforts) {
 			return false
 		}
 	}
 	return true
 }
 
-func matchesCriteria(task *model.Task, c Criteria) bool {
+func matchesCriteria(task *model.Task, c Criteria, efforts effort.Scale) bool {
 	if c.Op != "=" {
-		return matchesOrdinal(task, c)
+		return matchesOrdinal(task, c, efforts)
 	}
 	return matchesEquality(task, c.Field, c.Value)
 }
 
 // matchesOrdinal handles >, >=, <, <= for ordinal fields.
-func matchesOrdinal(task *model.Task, c Criteria) bool {
+func matchesOrdinal(task *model.Task, c Criteria, efforts effort.Scale) bool {
 	v, ok := getFieldValue(task, c.Field)
 	if !ok || v == "" {
 		return false
 	}
-	ranks := ordinalFields[c.Field]
+	ranks := ordinalRanks(c.Field, efforts)
 	taskRank := slices.Index(ranks, v)
 	filterRank := slices.Index(ranks, c.Value)
 	if taskRank < 0 || filterRank < 0 {

@@ -10,9 +10,10 @@ import (
 // filterCriteria represents a single filter condition (kept for test compat).
 type filterCriteria = filter.Criteria
 
-// applyFilters delegates to the shared filter package.
+// applyFilters delegates to the shared filter package, supplying the project's
+// configured effort vocabulary so effort comparisons accept its values.
 func applyFilters(tasks []*model.Task, filterExprs []string) ([]*model.Task, error) {
-	return filter.Apply(tasks, filterExprs)
+	return filter.Apply(tasks, filterExprs, resolveEffortScale())
 }
 
 // FilterShortcuts holds the common shortcut filter parameters shared across commands.
@@ -67,7 +68,7 @@ func matchesAllFilters(task *model.Task, filters []filterCriteria) bool {
 // matchesFilter is kept for backward-compatible tests.
 func matchesFilter(task *model.Task, field, value string) bool {
 	// Test a single-filter list via the shared package
-	result, err := filter.Apply([]*model.Task{task}, []string{field + "=" + value})
+	result, err := filter.Apply([]*model.Task{task}, []string{field + "=" + value}, resolveEffortScale())
 	if err != nil {
 		return false
 	}

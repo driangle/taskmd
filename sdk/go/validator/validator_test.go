@@ -1,8 +1,10 @@
 package validator
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -1511,5 +1513,132 @@ func TestValidateConfig_PhasesIsKnownKey(t *testing.T) {
 		for _, issue := range result.Issues {
 			t.Logf("  Issue: [%s] %s", issue.Level, issue.Message)
 		}
+	}
+}
+
+// --- Configurable effort vocabulary ---
+
+// With a custom vocabulary the configured values must validate and the built-in
+// ones must not, so a project switching vocabularies gets told about stale files.
+func TestValidator_CustomEffortScale(t *testing.T) {
+	scale, err := effort.NewScale([]string{"xs", "s", "m", "l", "xl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		value    model.Effort
+		wantErrs int
+	}{
+		{"configured value accepted", "xs", 0},
+		{"highest configured value accepted", "xl", 0},
+		{"empty still allowed", "", 0},
+		{"default vocabulary rejected", "medium", 1},
+		{"unknown value rejected", "enormous", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := NewValidator(false)
+			v.SetEffortScale(scale)
+
+			result := v.Validate([]*model.Task{{ID: "001", Title: "T", Effort: tt.value}})
+
+			if result.Errors != tt.wantErrs {
+				t.Errorf("Errors = %d, want %d", result.Errors, tt.wantErrs)
+				for _, issue := range result.Issues {
+					t.Logf("  Issue: [%s] %s", issue.Level, issue.Message)
+				}
+			}
+		})
+	}
+}
+
+// The error message must name the configured values, not the built-in ones,
+// otherwise it tells the user to use values their project rejects.
+func TestValidator_InvalidEffortMessageListsConfiguredValues(t *testing.T) {
+	scale, err := effort.NewScale([]string{"xs", "s", "m"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	v := NewValidator(false)
+	v.SetEffortScale(scale)
+
+	result := v.Validate([]*model.Task{{ID: "001", Title: "T", Effort: "large"}})
+
+	if result.Errors != 1 {
+		t.Fatalf("Errors = %d, want 1", result.Errors)
+	}
+	msg := result.Issues[0].Message
+	if !strings.Contains(msg, "valid values: xs, s, m") {
+		t.Errorf("message = %q, want it to list the configured values", msg)
+	}
+}
+
+// Without configuration the default vocabulary applies unchanged.
+func TestValidator_DefaultEffortScaleUnchanged(t *testing.T) {
+	v := NewValidator(false)
+
+	for _, value := range []model.Effort{"small", "medium", "large", ""} {
+		result := v.Validate([]*model.Task{{ID: "001", Title: "T", Effort: value}})
+		if result.Errors != 0 {
+			t.Errorf("effort %q: Errors = %d, want 0", value, result.Errors)
+		}
+	}
+
+	result := v.Validate([]*model.Task{{ID: "001", Title: "T", Effort: "xs"}})
+	if result.Errors != 1 {
+		t.Errorf("effort \"xs\": Errors = %d, want 1", result.Errors)
+	}
+}
+
+func TestValidateConfig_Effort(t *testing.T) {
+	tests := []struct {
+		name       string
+		values     []string
+		wantErrs   int
+		wantErrSub string
+	}{
+		{name: "absent", values: nil, wantErrs: 0},
+		{name: "valid vocabulary", values: []string{"xs", "s", "m"}, wantErrs: 0},
+		{name: "single value", values: []string{"only"}, wantErrs: 0},
+		{name: "empty list", values: []string{}, wantErrs: 1, wantErrSub: "at least one value"},
+		{name: "duplicates", values: []string{"s", "m", "s"}, wantErrs: 1, wantErrSub: "duplicate effort value"},
+		{name: "blank entry", values: []string{"s", ""}, wantErrs: 1, wantErrSub: "is empty"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := NewValidator(false)
+			config := &ConfigData{Effort: tt.values, ConfigPath: ".taskmd.yaml"}
+
+			result := v.ValidateConfig(config)
+
+			if result.Errors != tt.wantErrs {
+				t.Fatalf("Errors = %d, want %d (issues: %v)", result.Errors, tt.wantErrs, result.Issues)
+			}
+			if tt.wantErrSub != "" && !strings.Contains(result.Issues[0].Message, tt.wantErrSub) {
+				t.Errorf("message = %q, want it to contain %q", result.Issues[0].Message, tt.wantErrSub)
+			}
+		})
+	}
+}
+
+// The effort key must be recognized, or every configured project would also get
+// an "unknown config key" warning.
+func TestValidateConfig_EffortIsAKnownKey(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{
+		TopKeys:    []string{"effort"},
+		Effort:     []string{"xs", "s"},
+		ConfigPath: ".taskmd.yaml",
+	}
+
+	result := v.ValidateConfig(config)
+
+	if result.Warnings != 0 {
+		t.Errorf("Warnings = %d, want 0 (issues: %v)", result.Warnings, result.Issues)
 	}
 }

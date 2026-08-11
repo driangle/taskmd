@@ -7,6 +7,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/validator"
 )
@@ -32,14 +33,16 @@ type validateIssue struct {
 	Message  string `json:"message"`
 }
 
-func registerValidateTool(server *gomcp.Server) {
+func registerValidateTool(server *gomcp.Server, efforts effort.Scale) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "validate",
 		Description: "Validate task files for correctness, checking required fields, enum values, dependencies, and cycles",
-	}, handleValidate)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input ValidateInput) (*gomcp.CallToolResult, any, error) {
+		return handleValidate(ctx, req, input, efforts)
+	})
 }
 
-func handleValidate(_ context.Context, _ *gomcp.CallToolRequest, input ValidateInput) (*gomcp.CallToolResult, any, error) {
+func handleValidate(_ context.Context, _ *gomcp.CallToolRequest, input ValidateInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
 	taskDir := input.TaskDir
 	if taskDir == "" {
 		taskDir = "."
@@ -52,6 +55,7 @@ func handleValidate(_ context.Context, _ *gomcp.CallToolRequest, input ValidateI
 	}
 
 	v := validator.NewValidator(input.Strict)
+	v.SetEffortScale(efforts)
 	vr := v.Validate(result.Tasks)
 
 	out := buildValidateOutput(vr)

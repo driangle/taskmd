@@ -64,7 +64,7 @@ func runBoard(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	grouped, err := board.GroupTasks(tasks, boardGroupBy)
+	grouped, err := board.GroupTasks(tasks, boardGroupBy, resolveEffortScale())
 	if err != nil {
 		return err
 	}

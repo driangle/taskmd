@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/driangle/taskmd/sdk/go/board"
+	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/metrics"
 	"github.com/driangle/taskmd/sdk/go/next"
 	"github.com/driangle/taskmd/sdk/go/search"
@@ -198,7 +199,7 @@ func TestHandleBoard(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/board?groupBy=status", nil)
 	rec := httptest.NewRecorder()
 
-	handleBoard(dp, nil)(rec, req)
+	handleBoard(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -221,7 +222,7 @@ func TestHandleBoardDefaultGroupBy(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/board", nil)
 	rec := httptest.NewRecorder()
 
-	handleBoard(dp, nil)(rec, req)
+	handleBoard(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -235,7 +236,7 @@ func TestHandleBoardInvalidGroupBy(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/board?groupBy=invalid", nil)
 	rec := httptest.NewRecorder()
 
-	handleBoard(dp, nil)(rec, req)
+	handleBoard(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
@@ -265,7 +266,7 @@ func TestHandleBoardPhaseGrouping_ConfigOrder(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/board?groupBy=phase", nil)
 	rec := httptest.NewRecorder()
 
-	handleBoard(dp, phases)(rec, req)
+	handleBoard(dp, phases, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -301,7 +302,7 @@ func TestHandleBoardPhaseGrouping_NilPhases(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	// No phases configured — should still work with alphabetical order
-	handleBoard(dp, nil)(rec, req)
+	handleBoard(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -413,7 +414,7 @@ func TestHandleValidate(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/validate", nil)
 	rec := httptest.NewRecorder()
 
-	handleValidate(dp)(rec, req)
+	handleValidate(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -436,7 +437,7 @@ func TestHandleUpdateTask_Success(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -466,7 +467,7 @@ func TestHandleUpdateTask_EmptyID(t *testing.T) {
 	// Don't set path value to simulate empty ID
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
@@ -482,7 +483,7 @@ func TestHandleUpdateTask_NotFound(t *testing.T) {
 	req.SetPathValue("id", "999")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", rec.Code)
@@ -498,7 +499,7 @@ func TestHandleUpdateTask_InvalidStatus(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
@@ -522,7 +523,7 @@ func TestHandleUpdateTask_InvalidJSON(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
@@ -538,7 +539,7 @@ func TestHandleUpdateTask_Title(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -559,7 +560,7 @@ func TestHandleUpdateTask_Body(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -584,7 +585,7 @@ func TestHandleUpdateTask_Tags(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -613,7 +614,7 @@ func TestHandleUpdateTask_Type(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -634,7 +635,7 @@ func TestHandleUpdateTask_InvalidType(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
@@ -659,7 +660,7 @@ func TestHandleUpdateTask_PartialUpdate(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, false)(rec, req)
+	handleUpdateTask(dp, false, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -734,7 +735,7 @@ func TestHandleUpdateTask_ReadOnly(t *testing.T) {
 	req.SetPathValue("id", "001")
 	rec := httptest.NewRecorder()
 
-	handleUpdateTask(dp, true)(rec, req)
+	handleUpdateTask(dp, true, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
@@ -758,7 +759,7 @@ func TestHandleNext(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp)(rec, req)
+	handleNext(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -794,7 +795,7 @@ func TestHandleNext_WithLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/next?limit=1", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp)(rec, req)
+	handleNext(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -828,7 +829,7 @@ priority: high
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp)(rec, req)
+	handleNext(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -864,7 +865,7 @@ priority: medium
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp)(rec, req)
+	handleNext(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -928,7 +929,7 @@ func fetchTracksResult(t *testing.T, dp *DataProvider, query string) tracks.Resu
 	req := httptest.NewRequest(http.MethodGet, "/api/tracks"+query, nil)
 	rec := httptest.NewRecorder()
 
-	handleTracks(dp)(rec, req)
+	handleTracks(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -994,7 +995,7 @@ func TestHandleTracks_WithFilters(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/tracks?filter=priority%3Dhigh", nil)
 	rec := httptest.NewRecorder()
 
-	handleTracks(dp)(rec, req)
+	handleTracks(dp, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -1508,7 +1509,7 @@ func TestHandleBoard_WithProject(t *testing.T) {
 		return "", nil, ErrProjectNotFound
 	}, false)
 
-	handler := setupProjectMiddleware(resolver, handleBoard(defaultDP, defaultPhases))
+	handler := setupProjectMiddleware(resolver, handleBoard(defaultDP, defaultPhases, effort.Default()))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/board?project=proj-a", nil)
 	rec := httptest.NewRecorder()
