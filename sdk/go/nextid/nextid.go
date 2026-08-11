@@ -175,10 +175,25 @@ func GenerateRandom(existingIDs []string, length int) (string, error) {
 // crockfordBase32 is the Crockford Base32 alphabet (lowercase).
 const crockfordBase32 = "0123456789abcdefghjkmnpqrstvwxyz"
 
+const (
+	// ulidTimestampChars is how many characters encode the 48-bit timestamp.
+	ulidTimestampChars = 10
+	// ulidMinRandomChars is how many random characters a shortened ULID keeps.
+	// Each character carries 5 bits, so 4 chars ≈ 1M values per timestamp bucket —
+	// enough for collision retries to succeed instead of regenerating the same string.
+	ulidMinRandomChars = 4
+	// ulidMaxAttempts bounds the collision-retry loop.
+	ulidMaxAttempts = 100
+	// ulidRetryBudget bounds the total time spent waiting for the timestamp
+	// component to advance between colliding attempts.
+	ulidRetryBudget = 500 * time.Millisecond
+)
+
 // GenerateULID produces a ULID: 48-bit millisecond timestamp + 80-bit crypto random,
 // encoded as 26 Crockford Base32 characters (lowercase). When length > 0 and < 26,
-// the result is truncated to that length. It retries on collision with existingIDs
-// (max 100 attempts).
+// the result is shortened to that length by dropping low-order timestamp characters
+// and trailing random characters, always keeping some randomness. It retries on
+// collision with existingIDs (max 100 attempts).
 func GenerateULID(existingIDs []string, length int) (string, error) {
 	if length <= 0 || length > 26 {
 		length = 26
@@ -189,7 +204,13 @@ func GenerateULID(existingIDs []string, length int) (string, error) {
 		existing[id] = struct{}{}
 	}
 
-	for attempt := 0; attempt < 100; attempt++ {
+	// A shortened ULID only changes over time once its coarsest timestamp
+	// character advances, so waiting between colliding attempts is what actually
+	// widens the search space. Capped so a saturated ID space still fails fast.
+	tick := ulidTimestampTick(length)
+	budget := ulidRetryBudget
+
+	for attempt := 0; attempt < ulidMaxAttempts; attempt++ {
 		id, err := encodeULID(length)
 		if err != nil {
 			return "", err
@@ -197,9 +218,39 @@ func GenerateULID(existingIDs []string, length int) (string, error) {
 		if _, taken := existing[id]; !taken {
 			return id, nil
 		}
+		if budget > 0 {
+			wait := min(tick, budget)
+			time.Sleep(wait)
+			budget -= wait
+		}
 	}
 
-	return "", fmt.Errorf("failed to generate unique ULID after 100 attempts")
+	return "", fmt.Errorf("failed to generate unique ULID of length %d after %d attempts "+
+		"(%d existing IDs); increase id.length in your config", length, ulidMaxAttempts, len(existingIDs))
+}
+
+// ulidTimestampWidth returns how many leading timestamp characters a ULID of the
+// given length keeps. Shortening always keeps the leading timestamp characters so
+// IDs stay roughly time-ordered, but never at the cost of all randomness.
+func ulidTimestampWidth(length int) int {
+	if length >= ulidTimestampChars+ulidMinRandomChars {
+		return ulidTimestampChars
+	}
+	return max(1, length-ulidMinRandomChars)
+}
+
+// ulidTimestampTick returns how long the timestamp portion of a ULID of the given
+// length stays constant. Each dropped timestamp character costs 5 bits of
+// millisecond resolution.
+func ulidTimestampTick(length int) time.Duration {
+	dropped := ulidTimestampChars - ulidTimestampWidth(length)
+	ms := int64(1) << (5 * dropped)
+	// Clamp: with many dropped characters the tick is hours, which would overflow
+	// a Duration and is far beyond anything worth waiting for anyway.
+	if ms > int64(ulidRetryBudget/time.Millisecond) {
+		return ulidRetryBudget
+	}
+	return time.Duration(ms) * time.Millisecond
 }
 
 // encodeULID generates a single ULID string of the given length.
@@ -254,7 +305,8 @@ func encodeULID(length int) (string, error) {
 	buf[24] = crockfordBase32[(lo>>5)&0x1F]
 	buf[25] = crockfordBase32[lo&0x1F]
 
-	return string(buf[:length]), nil
+	tsWidth := ulidTimestampWidth(length)
+	return string(buf[:tsWidth]) + string(buf[ulidTimestampChars:ulidTimestampChars+length-tsWidth]), nil
 }
 
 // formatID assembles a prefix with a zero-padded number.

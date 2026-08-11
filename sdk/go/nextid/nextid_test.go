@@ -425,3 +425,67 @@ func TestGenerateULID_OrderedBatch(t *testing.T) {
 		}
 	}
 }
+
+// TestGenerateULID_ShortLengthBatch guards the bug where shortened ULIDs were
+// pure timestamp: generating several IDs back-to-back at a short length used to
+// exhaust all retries on identical strings.
+func TestGenerateULID_ShortLengthBatch(t *testing.T) {
+	for _, length := range []int{5, 8, 9, 12} {
+		var ids []string
+		for i := range 20 {
+			id, err := GenerateULID(ids, length)
+			if err != nil {
+				t.Fatalf("length %d, iteration %d: unexpected error: %v", length, i, err)
+			}
+			if len(id) != length {
+				t.Fatalf("length %d: got id %q of length %d", length, id, len(id))
+			}
+			ids = append(ids, id)
+		}
+	}
+}
+
+func TestGenerateULID_ShortLengthHasRandomness(t *testing.T) {
+	// At length 9 the last characters must vary within a single timestamp tick.
+	seen := make(map[string]struct{})
+	for range 50 {
+		id, err := GenerateULID(nil, 9)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		seen[id] = struct{}{}
+	}
+	if len(seen) < 40 {
+		t.Errorf("expected mostly distinct IDs, got %d unique out of 50", len(seen))
+	}
+}
+
+func TestGenerateULID_ShortLengthKeepsTimePrefix(t *testing.T) {
+	// The leading characters still encode time, so IDs stay coarsely ordered.
+	a, err := GenerateULID(nil, 9)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	b, err := GenerateULID(nil, 9)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a[:ulidTimestampWidth(9)] != b[:ulidTimestampWidth(9)] {
+		t.Errorf("timestamp prefixes differ within the same tick: %q vs %q", a, b)
+	}
+}
+
+func TestGenerateULID_ExhaustedSpaceFailsFast(t *testing.T) {
+	// A saturated space must still return an error rather than sleeping forever.
+	existing := []string{}
+	for _, c := range crockfordBase32 {
+		existing = append(existing, string(c))
+	}
+	start := time.Now()
+	if _, err := GenerateULID(existing, 1); err == nil {
+		t.Fatal("expected error for exhausted 1-character space")
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("took %v, expected fast failure", elapsed)
+	}
+}
