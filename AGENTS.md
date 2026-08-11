@@ -475,18 +475,58 @@ Three guards keep the pin honest:
 
 | Guard | When | Behavior |
 |-------|------|----------|
-| `scripts/check-sdk-pin.sh --staged` | pre-commit hook | Warns on the commit that *introduces* SDK changes (a pseudo-version can't reference an unpushed commit), then **blocks** any later commit that leaves the pin stale |
+| `scripts/check-sdk-pin.sh --staged` | pre-commit hook | Warns on the commit that *introduces* SDK changes (the pin can't reference an unpushed commit), then **blocks** any later commit that leaves the pin stale |
 | `make check-sdk-pin` / CI `sdk-pin` job | pushes to main | Any drift is an error; also builds with `GOWORK=off` to exercise the real `go install` path |
-| `scripts/release.sh` | every release | Runs `go get sdk/go@HEAD && go mod tidy`, then verifies the `GOWORK=off` build before tagging |
+| `scripts/release.sh` | every release | Tags and pushes `sdk/go` when it changed, repoints the pin at that version, and verifies the `GOWORK=off` build before tagging the CLI |
 
-**Workflow when you change `sdk/go`:** commit the SDK change, push it, then bump the pin:
+### Versioning: two independent modules, two tags
+
+`apps/cli` and `sdk/go` version **independently**, because the SDK's version numbers
+have to mean something to people importing the library:
+
+| Tag | Module | When |
+|-----|--------|------|
+| `vX.Y.Z` | the CLI / repo release | every release |
+| `sdk/go/vX.Y.Z` | `github.com/driangle/taskmd/sdk/go` | only when `sdk/go` changed |
+
+The `sdk/go/` prefix is not decoration — Go requires a module in a subdirectory to be
+tagged with its directory path, or the tag is invisible to `go get`.
+
+`apps/cli/go.mod` pins a **released** SDK version (`v0.4.0`), not a pseudo-version
+(`v0.0.0-20260811122305-775ccf445961`). Both work, but a pseudo-version is an opaque
+commit pointer that no reviewer can evaluate — which is how the pin went stale twice.
+
+The SDK is pre-1.0, so under semver a breaking API change is a **minor** bump
+(`v0.4.0` → `v0.5.0`), not a major one. Going to `v1.0.0` would promise stability;
+going to `v2.0.0` or beyond would additionally require the major version in the import
+path (`github.com/driangle/taskmd/sdk/go/v2`) and a repo-wide import rewrite.
+
+**Module versions are immutable.** Once a tag is pushed and the Go module proxy has
+fetched it, that version is fixed forever — you cannot retag it. Pick the next number
+instead.
+
+### Workflow when you change `sdk/go`
+
+During development, `go.work` means you change `sdk/go` and `apps/cli` together and
+everything just builds — no pin bump needed per commit. The pre-commit hook will remind
+you that the pin is behind, and block unrelated commits until it is resolved.
+
+The pin is normally repointed **at release time** by `scripts/release.sh`:
 
 ```bash
-cd apps/cli && go get github.com/driangle/taskmd/sdk/go@HEAD && go mod tidy
-GOWORK=off go build ./cmd/taskmd    # verify
+./scripts/release.sh 0.3.1 --sdk-version 0.4.1 --notes-file notes.md
 ```
 
-The push must come first — a pseudo-version references a commit hash, which has to exist on the remote.
+If `sdk/go` changed and you omit `--sdk-version`, the script stops and tells you.
+If `sdk/go` did not change, omit it and no SDK tag is created.
+
+To repoint the pin by hand between releases, the SDK tag must already be pushed:
+
+```bash
+git tag -a sdk/go/v0.4.1 -m "sdk/go v0.4.1" && git push origin sdk/go/v0.4.1
+cd apps/cli && go get github.com/driangle/taskmd/sdk/go@v0.4.1 && go mod tidy
+GOWORK=off go build ./cmd/taskmd    # verify
+```
 
 ### Commit Messages
 

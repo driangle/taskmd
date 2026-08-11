@@ -26,7 +26,7 @@
 # Modes
 # -----
 #   --staged  (pre-commit) Tolerates the commit that *introduces* SDK changes,
-#             because a pseudo-version cannot reference an unpushed commit.
+#             because the pin cannot reference a commit that is not pushed yet.
 #             Blocks any later commit that leaves the pin stale, so the bump
 #             cannot be forgotten — which is exactly how #8 slipped through.
 #
@@ -46,7 +46,9 @@ SDK_DIR="sdk/go"
 CLI_PACKAGE="github.com/driangle/taskmd/apps/cli/cmd/taskmd"
 
 # The bump command shown in every failure message.
-BUMP_CMD="cd apps/cli && go get $SDK_MODULE@HEAD && go mod tidy"
+# Shown in failure messages. Releases go through scripts/release.sh, which tags
+# sdk/go and repoints the pin; this is the manual equivalent.
+BUMP_CMD="cd apps/cli && go get $SDK_MODULE@<version> && go mod tidy   # tag sdk/go/v<version> first"
 
 if [ ! -f "$GO_MOD" ]; then
     echo "check-sdk-pin: $GO_MOD not found, skipping"
@@ -60,9 +62,9 @@ if [ -z "$PINNED" ]; then
     exit 0
 fi
 
-# Resolve the pin to a git ref.
-#   pseudo-version  vX.Y.Z-<timestamp>-<12-hex>  -> the commit hash
-#   released tag    vX.Y.Z                       -> the sdk/go/vX.Y.Z tag
+# Resolve the pin to a git ref. Both pin forms are supported:
+#   released version  vX.Y.Z                       -> the sdk/go/vX.Y.Z tag (preferred)
+#   pseudo-version    vX.Y.Z-<timestamp>-<12-hex>  -> the commit hash
 case "$PINNED" in
     *-*-*)
         REF="${PINNED##*-}"

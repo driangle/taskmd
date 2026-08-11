@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/driangle/taskmd/sdk/go v0.0.0-20260811122305-775ccf445961
+	github.com/driangle/taskmd/sdk/go v0.4.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/modelcontextprotocol/go-sdk v1.4.1

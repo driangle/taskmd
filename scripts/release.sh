@@ -19,6 +19,7 @@ SKIP_CHECKS=false
 NO_PUSH=false
 VERSION=""
 NOTES_FILE=""
+SDK_VERSION=""
 
 # Help message
 usage() {
@@ -36,6 +37,9 @@ OPTIONS:
     -d, --dry-run       Run without making any changes (validation only)
     -n, --no-push       Create tag locally but don't push (for testing)
     --notes-file FILE   Path to a file containing release notes (required for GitHub release)
+    --sdk-version VER   Version for the sdk/go module, tagged as sdk/go/vVER.
+                        Required when sdk/go has changed since its last tag.
+                        Omit when sdk/go is unchanged (no SDK tag is created).
     --skip-checks       Skip git status and branch checks (use with caution)
 
 EXAMPLES:
@@ -43,17 +47,27 @@ EXAMPLES:
     $(basename "$0") v1.2.3 --notes-file notes.md    # Create release v1.2.3
     $(basename "$0") --dry-run 0.0.2                  # Test release process without changes
     $(basename "$0") --no-push 0.0.1                  # Create tag locally only
+    $(basename "$0") 0.3.1 --sdk-version 0.4.1 --notes-file notes.md
+                                                      # CLI v0.3.1 + sdk/go/v0.4.1
 
 PROCESS:
-    1. Validate git repository state (clean working directory)
-    2. Validate version format (semantic versioning)
-    3. Update version in package.json files
-    4. Commit version changes
-    5. Create annotated git tag
-    6. Push changes and tag to GitHub
-    7. Monitor GitHub Actions release workflow
-    8. Apply release notes to the GitHub release
-    9. Report success with release URL
+     1. Validate git repository state (clean working directory)
+     2. Validate version format (semantic versioning)
+     3. Update version in package.json files
+     4. Tag and push sdk/go (only when it changed; see --sdk-version)
+     5. Point apps/cli/go.mod at the SDK version and verify the external build
+     6. Commit version changes
+     7. Create annotated git tag
+     8. Push changes and tag to GitHub
+     9. Monitor GitHub Actions release workflow
+    10. Apply release notes to the GitHub release
+    11. Report success with release URL
+
+VERSIONING:
+    apps/cli and sdk/go are separate Go modules and version independently.
+    The CLI is tagged vX.Y.Z; the SDK is tagged sdk/go/vX.Y.Z and only when
+    its code changed. apps/cli/go.mod pins a released SDK version, so external
+    `go install` keeps working. See "The sdk/go pin" in AGENTS.md.
 
 REQUIREMENTS:
     - git (with GitHub remote configured)
@@ -111,6 +125,13 @@ parse_args() {
                     error_exit "--notes-file requires a file path argument"
                 fi
                 NOTES_FILE="$2"
+                shift 2
+                ;;
+            --sdk-version)
+                if [[ -z "${2:-}" ]]; then
+                    error_exit "--sdk-version requires a version argument"
+                fi
+                SDK_VERSION="$2"
                 shift 2
                 ;;
             --skip-checks)
@@ -333,33 +354,116 @@ update_versions() {
     fi
 }
 
-# Sync apps/cli's sdk/go pin to the current SDK state.
+# Return the most recent sdk/go tag, or empty if the module was never tagged.
+latest_sdk_tag() {
+    git tag -l 'sdk/go/v*' --sort=-v:refname | head -n 1
+}
+
+# Report whether sdk/go changed since its last tag.
+sdk_changed_since_last_tag() {
+    local last_tag
+    last_tag=$(latest_sdk_tag)
+
+    if [[ -z "$last_tag" ]]; then
+        return 0   # never tagged: treat as changed
+    fi
+
+    ! git diff --quiet "$last_tag" HEAD -- sdk/go
+}
+
+# Tag and push sdk/go when it changed.
 #
-# apps/cli and sdk/go are separate modules. go.work makes in-repo builds use the
-# local SDK, which hides a stale pin — but `go install .../cmd/taskmd@...` reads
-# apps/cli/go.mod and fails to compile against an old SDK. That shipped once
-# already (issue #8, fixed by hand in PR #9); this makes it automatic.
-sync_sdk_pin() {
-    log_step "Syncing sdk/go pin in apps/cli/go.mod"
+# apps/cli and sdk/go are separate modules with independent versions. The SDK is
+# only tagged when its code moved, so its version numbers keep their semver
+# meaning for anyone importing the library.
+#
+# The tag has to exist on the remote before apps/cli can pin it, which is why
+# this runs — and pushes — before the pin bump and the CLI tag.
+release_sdk_module() {
+    local last_tag
+    last_tag=$(latest_sdk_tag)
 
-    (
-        cd apps/cli
-        go get github.com/driangle/taskmd/sdk/go@HEAD
-        go mod tidy
-    )
-
-    if [[ -z $(git status --porcelain apps/cli/go.mod apps/cli/go.sum) ]]; then
-        log_success "sdk/go pin already current"
+    if ! sdk_changed_since_last_tag; then
+        log_success "sdk/go unchanged since ${last_tag:-(untagged)}, no SDK release needed"
+        if [[ -n "$SDK_VERSION" ]]; then
+            log_warning "--sdk-version $SDK_VERSION given but sdk/go has not changed; ignoring"
+            SDK_VERSION=""
+        fi
         return
     fi
 
-    log_success "Bumped sdk/go pin"
+    if [[ -z "$SDK_VERSION" ]]; then
+        log_error "sdk/go has changed since ${last_tag:-its last release}:"
+        git diff --stat "${last_tag:-HEAD}" HEAD -- sdk/go | tail -n 5
+        log_error ""
+        log_error "Pass --sdk-version X.Y.Z to release it. Pre-1.0, a breaking API"
+        log_error "change is a minor bump; additions and fixes are a patch bump."
+        exit 1
+    fi
+
+    local sdk_clean="${SDK_VERSION#v}"
+    local sdk_tag="sdk/go/v$sdk_clean"
+
+    if git rev-parse --verify --quiet "refs/tags/$sdk_tag" >/dev/null; then
+        error_exit "Tag $sdk_tag already exists. Module versions are immutable once published; pick a new version."
+    fi
+
+    log_step "Tagging sdk/go as $sdk_tag"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[dry-run] would create and push $sdk_tag"
+        return
+    fi
+
+    git tag -a "$sdk_tag" -m "sdk/go v$sdk_clean
+
+Release of the Go SDK module (github.com/driangle/taskmd/sdk/go)."
+    log_success "Created tag $sdk_tag"
+
+    if [[ "$NO_PUSH" == "true" ]]; then
+        log_warning "--no-push: $sdk_tag not pushed, so the go.mod pin cannot resolve it yet"
+        return
+    fi
+
+    git push origin "$sdk_tag"
+    log_success "Pushed tag $sdk_tag"
+}
+
+# Point apps/cli/go.mod at the released SDK version.
+#
+# go.work makes in-repo builds use the local sdk/go, hiding a stale pin. External
+# `go install` reads go.mod instead, so a stale pin ships a CLI that will not
+# compile for anyone outside the repo (issue #8, PR #9).
+sync_sdk_pin() {
+    log_step "Syncing sdk/go pin in apps/cli/go.mod"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[dry-run] would pin sdk/go to ${SDK_VERSION:-its current version}"
+        return
+    fi
+
+    if [[ -n "$SDK_VERSION" ]]; then
+        local sdk_clean="${SDK_VERSION#v}"
+        (
+            cd apps/cli
+            go get "github.com/driangle/taskmd/sdk/go@v$sdk_clean"
+            go mod tidy
+        )
+        log_success "Pinned sdk/go to v$sdk_clean"
+    else
+        log_success "sdk/go unchanged, pin left as is"
+    fi
 }
 
 # Verify the CLI builds the way an external `go install` would: without the
 # workspace, resolving sdk/go from the pin instead of the in-repo copy.
 verify_external_build() {
     log_step "Verifying CLI builds without go.work (simulates go install)"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[dry-run] skipping external build check"
+        return
+    fi
 
     if (cd apps/cli && GOWORK=off go build -o /dev/null ./cmd/taskmd); then
         log_success "External build OK"
@@ -602,6 +706,7 @@ main() {
 
     {
         update_versions "$clean_version"
+        release_sdk_module
         sync_sdk_pin
         verify_external_build
         commit_version_changes "$clean_version"
