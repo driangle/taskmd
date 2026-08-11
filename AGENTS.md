@@ -452,7 +452,41 @@ git config core.hooksPath .githooks
 ```
 
 **Active hooks:**
-- **pre-commit**: Runs `taskmd validate` to check task files before each commit. The commit is blocked if validation fails.
+- **pre-commit**: Runs `taskmd validate` to check task files, `make check-lite` (compile + lint), and `scripts/check-sdk-pin.sh` (see below). The commit is blocked if any of them fail.
+
+### The sdk/go pin
+
+`apps/cli` and `sdk/go` are **separate Go modules**. `go.work` makes in-repo builds
+resolve `sdk/go` locally, so a stale `sdk/go` pin in `apps/cli/go.mod` is invisible
+during development. External consumers have no workspace:
+
+```bash
+go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
+```
+
+reads `apps/cli/go.mod`, so if the CLI uses SDK symbols added after the pinned
+commit, that install fails to compile. This shipped once already — see
+[issue #8](https://github.com/driangle/taskmd/issues/8) and
+[PR #9](https://github.com/driangle/taskmd/pull/9). There are no `apps/cli/vX.Y.Z`
+tags, so `@latest` resolves to **main HEAD**: drift breaks users as soon as it lands
+on main, not at release time.
+
+Three guards keep the pin honest:
+
+| Guard | When | Behavior |
+|-------|------|----------|
+| `scripts/check-sdk-pin.sh --staged` | pre-commit hook | Warns on the commit that *introduces* SDK changes (a pseudo-version can't reference an unpushed commit), then **blocks** any later commit that leaves the pin stale |
+| `make check-sdk-pin` / CI `sdk-pin` job | pushes to main | Any drift is an error; also builds with `GOWORK=off` to exercise the real `go install` path |
+| `scripts/release.sh` | every release | Runs `go get sdk/go@HEAD && go mod tidy`, then verifies the `GOWORK=off` build before tagging |
+
+**Workflow when you change `sdk/go`:** commit the SDK change, push it, then bump the pin:
+
+```bash
+cd apps/cli && go get github.com/driangle/taskmd/sdk/go@HEAD && go mod tidy
+GOWORK=off go build ./cmd/taskmd    # verify
+```
+
+The push must come first — a pseudo-version references a commit hash, which has to exist on the remote.
 
 ### Commit Messages
 

@@ -296,3 +296,32 @@ jobs:
         run: |
           docker stop taskmd-test 2>/dev/null || true
           docker rm taskmd-test 2>/dev/null || true
+
+  # Guards the external `go install` path, which reads apps/cli/go.mod instead of
+  # go.work and therefore breaks when the sdk/go pin falls behind the in-repo SDK.
+  # See issue #8 / PR #9. Runs only on main: a PR that changes sdk/go and apps/cli
+  # together cannot satisfy this, because a pseudo-version cannot reference an
+  # unpushed commit. On main the SDK commit exists, so the pin must point at it.
+  sdk-pin:
+    name: SDK pin freshness
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the check diffs against the pinned commit
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Check sdk/go pin is not stale
+        run: ./scripts/check-sdk-pin.sh --strict
+
+      - name: Build CLI without the workspace (simulates `go install`)
+        working-directory: apps/cli
+        env:
+          GOWORK: off
+        run: go build ./cmd/taskmd

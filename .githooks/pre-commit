@@ -17,3 +17,11 @@ if [ $? -ne 0 ]; then
     echo "check-lite failed. Fix the issues above before committing."
     exit 1
 fi
+
+# Ensure apps/cli's sdk/go pin has not fallen behind the in-repo SDK.
+# go.work hides a stale pin locally; external `go install` does not. See issue #8.
+./scripts/check-sdk-pin.sh --staged
+if [ $? -ne 0 ]; then
+    echo "check-sdk-pin failed. Bump the pin as shown above before committing."
+    exit 1
+fi

@@ -333,13 +333,50 @@ update_versions() {
     fi
 }
 
+# Sync apps/cli's sdk/go pin to the current SDK state.
+#
+# apps/cli and sdk/go are separate modules. go.work makes in-repo builds use the
+# local SDK, which hides a stale pin — but `go install .../cmd/taskmd@...` reads
+# apps/cli/go.mod and fails to compile against an old SDK. That shipped once
+# already (issue #8, fixed by hand in PR #9); this makes it automatic.
+sync_sdk_pin() {
+    log_step "Syncing sdk/go pin in apps/cli/go.mod"
+
+    (
+        cd apps/cli
+        go get github.com/driangle/taskmd/sdk/go@HEAD
+        go mod tidy
+    )
+
+    if [[ -z $(git status --porcelain apps/cli/go.mod apps/cli/go.sum) ]]; then
+        log_success "sdk/go pin already current"
+        return
+    fi
+
+    log_success "Bumped sdk/go pin"
+}
+
+# Verify the CLI builds the way an external `go install` would: without the
+# workspace, resolving sdk/go from the pin instead of the in-repo copy.
+verify_external_build() {
+    log_step "Verifying CLI builds without go.work (simulates go install)"
+
+    if (cd apps/cli && GOWORK=off go build -o /dev/null ./cmd/taskmd); then
+        log_success "External build OK"
+    else
+        log_error "CLI does not build with GOWORK=off — the sdk/go pin is stale."
+        log_error "External 'go install' would fail for this release."
+        exit 1
+    fi
+}
+
 # Commit version changes
 commit_version_changes() {
     local version="$1"
 
     log_step "Committing version changes"
 
-    git add package.json apps/web/package.json apps/vscode/package.json apps/cli/internal/cli/root.go claude-code-plugin/.claude-plugin/plugin.json 2>/dev/null || true
+    git add package.json apps/web/package.json apps/vscode/package.json apps/cli/internal/cli/root.go claude-code-plugin/.claude-plugin/plugin.json apps/cli/go.mod apps/cli/go.sum 2>/dev/null || true
 
     if [[ -z $(git diff --cached --name-only) ]]; then
         log_warning "No version changes to commit"
@@ -565,6 +602,8 @@ main() {
 
     {
         update_versions "$clean_version"
+        sync_sdk_pin
+        verify_external_build
         commit_version_changes "$clean_version"
         create_git_tag "$clean_version"
 
