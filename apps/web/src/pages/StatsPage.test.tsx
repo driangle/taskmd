@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { DEFAULT_EFFORTS } from "../components/tasks/TaskTable/constants.ts";
 import { StatsPage } from "./StatsPage.tsx";
 import { createStats, createTask } from "../test-utils/index.ts";
 
@@ -41,7 +42,7 @@ const mockUseConfig = vi.mocked(useConfig);
 describe("StatsPage", () => {
   beforeEach(() => {
     mockUseTasks.mockReturnValue({ data: undefined } as ReturnType<typeof useTasks>);
-    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0.0" } as ReturnType<typeof useConfig>);
+    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0.0", efforts: DEFAULT_EFFORTS } as ReturnType<typeof useConfig>);
   });
 
   it("renders loading state", () => {
@@ -127,6 +128,7 @@ describe("StatsPage", () => {
       ],
       readonly: false,
       version: "1.0.0",
+      efforts: DEFAULT_EFFORTS,
     } as ReturnType<typeof useConfig>);
     mockUseTasks.mockReturnValue({
       data: [

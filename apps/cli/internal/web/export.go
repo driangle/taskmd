@@ -102,6 +102,7 @@ func generateDataFiles(cfg ExportConfig, tasks []*model.Task, archivedTasks []*m
 	if err := writeJSONFile(apiDir, "config.json", ConfigResponse{
 		ReadOnly: true,
 		Version:  cfg.Version,
+		Efforts:  efforts.Values(),
 	}); err != nil {
 		return err
 	}

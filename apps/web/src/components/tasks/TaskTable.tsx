@@ -9,7 +9,8 @@ import { useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Task } from "../../api/types.ts";
 import { usePhase } from "../../hooks/use-phase.tsx";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "./TaskTable/constants.ts";
+import { useConfig } from "../../hooks/use-config.ts";
+import { STATUSES, PRIORITIES, TYPES } from "./TaskTable/constants.ts";
 import { FilterBar } from "./TaskTable/FilterBar.tsx";
 import { createTaskColumns } from "./TaskTable/columns.tsx";
 import { toggleInSet } from "./TaskTable/utils.ts";
@@ -25,10 +26,12 @@ interface TaskTableProps {
   initialEffort?: string[];
   initialTypes?: string[];
   initialPhases?: string[];
+  project?: string | null;
 }
 
-export function TaskTable({ tasks, initialTags, initialStatuses, initialPriorities, initialEffort, initialTypes, initialPhases }: TaskTableProps) {
+export function TaskTable({ tasks, initialTags, initialStatuses, initialPriorities, initialEffort, initialTypes, initialPhases, project }: TaskTableProps) {
   const [, setSearchParams] = useSearchParams();
+  const { efforts } = useConfig(project);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
@@ -43,8 +46,15 @@ export function TaskTable({ tasks, initialTags, initialStatuses, initialPrioriti
   const [selectedTags, setSelectedTags] = useState<Set<string>>(
     () => new Set(initialTags),
   );
-  const [selectedEffort, setSelectedEffort] = useState<Set<string>>(
-    () => initialEffort && initialEffort.length > 0 ? new Set(initialEffort) : new Set(EFFORTS),
+  // `null` means "all efforts", resolved against the live vocabulary below. The
+  // config can arrive after first render (static exports fetch it), so freezing
+  // a Set of the fallback vocabulary here would strand the wrong values.
+  const [selectedEffortOrAll, setSelectedEffort] = useState<Set<string> | null>(
+    () => initialEffort && initialEffort.length > 0 ? new Set(initialEffort) : null,
+  );
+  const selectedEffort = useMemo(
+    () => selectedEffortOrAll ?? new Set(efforts),
+    [selectedEffortOrAll, efforts],
   );
   const [selectedPhases, setSelectedPhases] = useState<Set<string>>(
     () => initialPhases && initialPhases.length > 0 ? new Set(initialPhases) : new Set<string>(),
@@ -64,7 +74,7 @@ export function TaskTable({ tasks, initialTags, initialStatuses, initialPrioriti
   const showPhase = !globalPhase && !(selectedPhases.size === 1);
 
   const filterState = { selectedStatuses, selectedPriorities, selectedTypes, selectedTags, selectedEffort, selectedPhases, globalFilter };
-  const hasActiveFilters = checkActiveFilters(filterState);
+  const hasActiveFilters = checkActiveFilters(filterState, efforts);
 
   const syncFiltersToUrl = useCallback(
     (updates: { tag?: Set<string>; status?: Set<string>; priority?: Set<string>; effort?: Set<string>; type?: Set<string>; phase?: Set<string> }) => {
@@ -89,7 +99,7 @@ export function TaskTable({ tasks, initialTags, initialStatuses, initialPrioriti
     setSelectedPriorities(new Set(PRIORITIES));
     setSelectedTypes(new Set(TYPES));
     setSelectedTags(new Set());
-    setSelectedEffort(new Set(EFFORTS));
+    setSelectedEffort(null);
     setSelectedPhases(new Set());
     syncFiltersToUrl({ tag: new Set(), status: new Set(), priority: new Set(), effort: new Set(), type: new Set(), phase: new Set() });
     setGlobalFilter("");
@@ -104,9 +114,9 @@ export function TaskTable({ tasks, initialTags, initialStatuses, initialPrioriti
   }, [syncFiltersToUrl]);
 
   const filteredTasks = useMemo(
-    () => applyFilters(tasks, filterState),
+    () => applyFilters(tasks, filterState, efforts),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filterState is derived from these individual deps
-    [tasks, selectedStatuses, selectedPriorities, selectedTypes, selectedTags, selectedEffort, selectedPhases, globalFilter],
+    [tasks, selectedStatuses, selectedPriorities, selectedTypes, selectedTags, selectedEffort, selectedPhases, globalFilter, efforts],
   );
 
   const taskStatusMap = useMemo(
@@ -162,16 +172,16 @@ export function TaskTable({ tasks, initialTags, initialStatuses, initialPrioriti
           setSelectedPriorities(new Set(PRIORITIES));
           syncFiltersToUrl({ priority: new Set() });
         }}
+        efforts={efforts}
         selectedEffort={selectedEffort}
-        onToggleEffort={(e) =>
-          setSelectedEffort((prev) => {
-            const next = toggleInSet(prev, e);
-            syncFiltersToUrl({ effort: next.size === EFFORTS.length ? new Set() : next });
-            return next;
-          })
-        }
+        onToggleEffort={(e) => {
+          const next = toggleInSet(selectedEffort, e);
+          const isAll = next.size === efforts.length;
+          setSelectedEffort(isAll ? null : next);
+          syncFiltersToUrl({ effort: isAll ? new Set() : next });
+        }}
         onSelectAllEffort={() => {
-          setSelectedEffort(new Set(EFFORTS));
+          setSelectedEffort(null);
           syncFiltersToUrl({ effort: new Set() });
         }}
         selectedTypes={selectedTypes}

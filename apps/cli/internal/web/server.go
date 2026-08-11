@@ -214,6 +214,7 @@ func (s *Server) buildIndexHTML(staticFS fs.FS) []byte {
 		ReadOnly: s.config.ReadOnly,
 		Version:  s.config.Version,
 		Phases:   phases,
+		Efforts:  s.config.Efforts.Values(),
 	}
 	cfgJSON, err := json.Marshal(cfg)
 	if err != nil {

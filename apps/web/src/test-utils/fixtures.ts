@@ -15,6 +15,7 @@ import type {
   TrackTask,
   TracksResult,
 } from "../api/types.ts";
+import { DEFAULT_EFFORTS } from "../components/tasks/TaskTable/constants.ts";
 
 // --- Task ---
 
@@ -214,11 +215,19 @@ export function createTracksResult(overrides: Partial<TracksResult> = {}): Track
 
 // --- Config ---
 
-export function createConfig(overrides: Partial<{ readonly: boolean; version: string; phases: { id: string; name: string; description: string }[] }> = {}) {
+export function createConfig(
+  overrides: Partial<{
+    readonly: boolean;
+    version: string;
+    phases: { id: string; name: string; description: string }[];
+    efforts: string[];
+  }> = {},
+) {
   return {
     readonly: false,
     version: "1.0.0",
     phases: [],
+    efforts: DEFAULT_EFFORTS,
     ...overrides,
   };
 }

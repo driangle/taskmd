@@ -1,14 +1,14 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import {
   STATUSES,
   PRIORITIES,
-  EFFORTS,
   TYPES,
   STATUS_COLORS,
   PRIORITY_COLORS,
-  EFFORT_COLORS,
   TYPE_COLORS,
 } from "../tasks/TaskTable/constants.ts";
+import { useEffortBadges } from "../tasks/TaskTable/effort-colors.ts";
 import { toggleInSet } from "../tasks/TaskTable/utils.ts";
 import { TagAutocomplete } from "./TagAutocomplete.tsx";
 
@@ -21,11 +21,13 @@ interface PillRowProps {
   items: string[];
   selected: Set<string>;
   colors: Record<string, string>;
+  /** Inline styles for values Tailwind cannot class ahead of time (custom effort vocabularies). */
+  styles?: Record<string, CSSProperties>;
   onToggle: (value: string) => void;
   onSelectAll: () => void;
 }
 
-function PillRow({ label, items, selected, colors, onToggle, onSelectAll }: PillRowProps) {
+function PillRow({ label, items, selected, colors, styles, onToggle, onSelectAll }: PillRowProps) {
   const allSelected = selected.size === items.length;
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -48,8 +50,9 @@ function PillRow({ label, items, selected, colors, onToggle, onSelectAll }: Pill
           <button
             key={item}
             onClick={() => onToggle(item)}
+            style={active ? styles?.[item] : undefined}
             className={`min-h-[44px] sm:min-h-0 inline-flex items-center px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
-              active ? (colors[item] ?? "") : INACTIVE_PILL
+              active ? (colors[item] ?? "font-medium") : INACTIVE_PILL
             }`}
           >
             {item}
@@ -66,6 +69,8 @@ export interface BoardFilterBarProps {
   onStatusesChange: (next: Set<string>) => void;
   selectedPriorities: Set<string>;
   onPrioritiesChange: (next: Set<string>) => void;
+  /** The project's configured effort vocabulary. */
+  efforts: string[];
   selectedEfforts: Set<string>;
   onEffortsChange: (next: Set<string>) => void;
   selectedTypes: Set<string>;
@@ -81,6 +86,7 @@ export function BoardFilterBar({
   onStatusesChange,
   selectedPriorities,
   onPrioritiesChange,
+  efforts,
   selectedEfforts,
   onEffortsChange,
   selectedTypes,
@@ -90,18 +96,19 @@ export function BoardFilterBar({
   availableTags,
 }: BoardFilterBarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const effortBadges = useEffortBadges(efforts);
 
   const hasActiveFilters =
     (groupBy !== "status" && selectedStatuses.size !== STATUSES.length) ||
     (groupBy !== "priority" && selectedPriorities.size !== PRIORITIES.length) ||
-    (groupBy !== "effort" && selectedEfforts.size !== EFFORTS.length) ||
+    (groupBy !== "effort" && selectedEfforts.size !== efforts.length) ||
     (groupBy !== "type" && selectedTypes.size !== TYPES.length) ||
     selectedTags.size > 0;
 
   function handleClearFilters() {
     onStatusesChange(new Set(STATUSES));
     onPrioritiesChange(new Set(PRIORITIES));
-    onEffortsChange(new Set(EFFORTS));
+    onEffortsChange(new Set(efforts));
     onTypesChange(new Set(TYPES));
     onTagsChange(new Set());
   }
@@ -162,11 +169,12 @@ export function BoardFilterBar({
           {groupBy !== "effort" && (
             <PillRow
               label="Effort"
-              items={EFFORTS}
+              items={efforts}
               selected={selectedEfforts}
-              colors={EFFORT_COLORS}
+              colors={effortBadges.colors}
+              styles={effortBadges.styles}
               onToggle={(e) => onEffortsChange(toggleInSet(selectedEfforts, e))}
-              onSelectAll={() => onEffortsChange(new Set(EFFORTS))}
+              onSelectAll={() => onEffortsChange(new Set(efforts))}
             />
           )}
           {groupBy !== "type" && (

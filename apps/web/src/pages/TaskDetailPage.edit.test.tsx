@@ -47,7 +47,7 @@ vi.mock("../hooks/use-worklog.ts", () => ({
 }));
 
 vi.mock("../hooks/use-config.ts", () => ({
-  useConfig: () => ({ readonly: false }),
+  useConfig: () => ({ readonly: false, efforts: ["small", "medium", "large"] }),
 }));
 
 vi.mock("../hooks/use-project.ts", () => ({

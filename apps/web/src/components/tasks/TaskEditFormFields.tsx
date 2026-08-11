@@ -1,7 +1,6 @@
 import {
   STATUSES,
   PRIORITIES,
-  EFFORTS,
   TYPES,
 } from "./TaskTable/constants.ts";
 
@@ -14,6 +13,8 @@ interface FieldGridProps {
   onPriorityChange: (v: string) => void;
   effort: string;
   onEffortChange: (v: string) => void;
+  /** The project's configured effort vocabulary. */
+  efforts: string[];
   taskType: string;
   onTaskTypeChange: (v: string) => void;
   inputClasses: string;
@@ -22,7 +23,7 @@ interface FieldGridProps {
 export function FieldGrid({
   status, onStatusChange,
   priority, onPriorityChange,
-  effort, onEffortChange,
+  effort, onEffortChange, efforts,
   taskType, onTaskTypeChange,
   inputClasses,
 }: FieldGridProps) {
@@ -55,7 +56,7 @@ export function FieldGrid({
         </label>
         <select id="field-effort" value={effort} onChange={(e) => onEffortChange(e.target.value)} className={inputClasses}>
           <option value="">-</option>
-          {EFFORTS.map((e) => (
+          {efforts.map((e) => (
             <option key={e} value={e}>{e}</option>
           ))}
         </select>

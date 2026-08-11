@@ -40,6 +40,7 @@ export function TasksPage() {
       initialEffort={initialEffort}
       initialTypes={initialTypes}
       initialPhases={initialPhases}
+      project={project}
     />
   );
 }

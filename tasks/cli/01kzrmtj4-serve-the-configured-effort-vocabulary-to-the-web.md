@@ -1,12 +1,13 @@
 ---
 id: "01kzrmtj4"
 title: "Serve the configured effort vocabulary to the web UI"
-status: pending
+status: completed
 priority: low
 effort: small
 dependencies: ["01kzqwfns"]
 tags: ["web", "effort", "config"]
 created_at: 2026-08-11
+completed_at: 2026-08-11
 ---
 
 # Serve the configured effort vocabulary to the web UI
@@ -31,15 +32,15 @@ expose it over the API and consume it in the frontend.
 
 ## Tasks
 
-- [ ] Add the effort vocabulary to the `/api/config` response
+- [x] Add the effort vocabulary to the `/api/config` response
       (`configResponse` in `apps/cli/internal/web/handlers.go`, which already
       carries `phases`), and to the static export's `config.json`
-- [ ] Replace the `EFFORTS` constant with a value read from the config API,
+- [x] Replace the `EFFORTS` constant with a value read from the config API,
       keeping the current values as the fallback when the key is absent
-- [ ] Update `TaskTable.tsx` (filter checkboxes, `selectAll` reset, URL sync) and
+- [x] Update `TaskTable.tsx` (filter checkboxes, `selectAll` reset, URL sync) and
       `TaskEditFormFields.tsx` (dropdown) to use it
-- [ ] Update the web test fixtures in `apps/web/src/test-utils/fixtures.ts`
-- [ ] Add a frontend test covering a project with a custom vocabulary
+- [x] Update the web test fixtures in `apps/web/src/test-utils/fixtures.ts`
+- [x] Add a frontend test covering a project with a custom vocabulary
 
 ## Acceptance Criteria
 

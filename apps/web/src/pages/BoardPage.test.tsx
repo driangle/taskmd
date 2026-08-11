@@ -48,7 +48,7 @@ vi.mock("../hooks/use-project.ts", () => ({
 }));
 
 vi.mock("../hooks/use-config.ts", () => ({
-  useConfig: () => ({ readonly: mockReadonly, phases: mockPhases }),
+  useConfig: () => ({ readonly: mockReadonly, phases: mockPhases, efforts: ["small", "medium", "large"] }),
 }));
 
 vi.mock("../api/client.ts", () => ({

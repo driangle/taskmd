@@ -10,7 +10,7 @@ import { BoardFilterBar } from "../components/board/BoardFilterBar.tsx";
 import { LoadingState } from "../components/shared/LoadingState.tsx";
 import { ErrorState } from "../components/shared/ErrorState.tsx";
 import type { BoardGroup } from "../api/types.ts";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "../components/tasks/TaskTable/constants.ts";
+import { STATUSES, PRIORITIES, TYPES } from "../components/tasks/TaskTable/constants.ts";
 
 const baseGroupByOptions = ["status", "priority", "effort", "type", "group", "tag"];
 
@@ -25,7 +25,7 @@ export function BoardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { phase } = usePhase();
   const { project } = useProject();
-  const { readonly, phases } = useConfig(project);
+  const { readonly, phases, efforts } = useConfig(project);
   const groupByOptions = useMemo(
     () => phases.length > 0 ? [...baseGroupByOptions, "phase"] : baseGroupByOptions,
     [phases],
@@ -38,7 +38,13 @@ export function BoardPage() {
 
   const [selectedStatuses, setSelectedStatuses] = useState(() => new Set(STATUSES));
   const [selectedPriorities, setSelectedPriorities] = useState(() => new Set(PRIORITIES));
-  const [selectedEfforts, setSelectedEfforts] = useState(() => new Set(EFFORTS));
+  // `null` means "all efforts"; the vocabulary can arrive after first render
+  // (static exports fetch the config), so it is resolved at render time.
+  const [selectedEffortsOrAll, setSelectedEfforts] = useState<Set<string> | null>(null);
+  const selectedEfforts = useMemo(
+    () => selectedEffortsOrAll ?? new Set(efforts),
+    [selectedEffortsOrAll, efforts],
+  );
   const [selectedTypes, setSelectedTypes] = useState(() => new Set(TYPES));
   const [selectedTags, setSelectedTags] = useState<Set<string>>(() => new Set());
 
@@ -128,6 +134,7 @@ export function BoardPage() {
           onStatusesChange={setSelectedStatuses}
           selectedPriorities={selectedPriorities}
           onPrioritiesChange={setSelectedPriorities}
+          efforts={efforts}
           selectedEfforts={selectedEfforts}
           onEffortsChange={setSelectedEfforts}
           selectedTypes={selectedTypes}

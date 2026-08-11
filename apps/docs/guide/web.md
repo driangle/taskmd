@@ -67,7 +67,7 @@ Visual board with tasks organized in columns.
 |----------|---------|----------|
 | Status | pending, in-progress, completed, blocked, cancelled | Standard kanban workflow |
 | Priority | critical, high, medium, low | Prioritization planning |
-| Effort | small, medium, large | Capacity planning |
+| Effort | small, medium, large (or your configured `effort:` vocabulary) | Capacity planning |
 | Type | feature, bug, chore, docs, test | Work type classification |
 | Group | Task groups (cli, web, docs...) | Team-based views |
 | Tag | One per unique tag | Feature-based organization |
@@ -229,9 +229,12 @@ The Board page includes interactive pill-based filters for narrowing displayed t
 
 - **Status** — pending, in-progress, completed, blocked, cancelled
 - **Priority** — critical, high, medium, low
-- **Effort** — small, medium, large
+- **Effort** — small, medium, large, or the vocabulary set by `effort:` in `.taskmd.yaml`
 - **Type** — feature, bug, chore, docs, test
 - **Tags** — autocomplete dropdown with all available tags
+
+The effort pills, and the effort dropdown in the task edit form, follow the project's
+configured vocabulary. Custom values are colored on a generated low-to-high ramp.
 
 Multiple values can be selected per category. The filter row automatically hides the field being used for grouping (e.g., status filters are hidden when grouping by status).
 
@@ -310,7 +313,7 @@ The web server exposes a JSON API you can access directly. All endpoints return 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/projects` | List registered projects (for multi-project setups) |
-| `GET` | `/api/config` | Server config (read-only status, version) |
+| `GET` | `/api/config` | Server config (read-only status, version, phases, effort vocabulary) |
 | `GET` | `/api/events` | Server-Sent Events stream for live reload |
 
 ### Examples

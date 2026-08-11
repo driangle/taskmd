@@ -1,47 +1,7 @@
 import { useState } from "react";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES, STATUS_COLORS, PRIORITY_COLORS, EFFORT_COLORS, TYPE_COLORS, getPhaseColor } from "./constants.ts";
-
-const INACTIVE_STYLE = "bg-gray-50 border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:bg-gray-800/50 dark:border-gray-700 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400";
-
-function FilterRow({ label, items, selected, colors, onToggle, onSelectAll }: {
-  label: string;
-  items: readonly string[];
-  selected: Set<string>;
-  colors: Record<string, string>;
-  onToggle: (item: string) => void;
-  onSelectAll: () => void;
-}) {
-  const allSelected = selected.size === items.length;
-  return (
-    <div className="flex items-center gap-2 flex-wrap" data-arrow-nav>
-      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{label}:</span>
-      <button
-        onClick={onSelectAll}
-        className={`min-h-[44px] sm:min-h-0 inline-flex items-center px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
-          allSelected
-            ? "bg-gray-200 text-gray-700 font-medium ring-1 ring-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:ring-gray-500"
-            : INACTIVE_STYLE
-        }`}
-      >
-        all
-      </button>
-      {items.map((item) => {
-        const active = selected.has(item);
-        return (
-          <button
-            key={item}
-            onClick={() => onToggle(item)}
-            className={`min-h-[44px] sm:min-h-0 inline-flex items-center px-2.5 py-1 text-xs rounded-full transition-colors duration-150 ${
-              active ? colors[item] : INACTIVE_STYLE
-            }`}
-          >
-            {item}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+import { STATUSES, PRIORITIES, TYPES, STATUS_COLORS, PRIORITY_COLORS, TYPE_COLORS, getPhaseColor } from "./constants.ts";
+import { useEffortBadges } from "./effort-colors.ts";
+import { FilterRow, INACTIVE_STYLE } from "./FilterRow.tsx";
 
 export interface FilterBarProps {
   globalFilter: string;
@@ -52,6 +12,8 @@ export interface FilterBarProps {
   selectedPriorities: Set<string>;
   onTogglePriority: (priority: string) => void;
   onSelectAllPriorities: () => void;
+  /** The project's configured effort vocabulary. */
+  efforts: string[];
   selectedEffort: Set<string>;
   onToggleEffort: (effort: string) => void;
   onSelectAllEffort: () => void;
@@ -76,6 +38,7 @@ export function FilterBar({
   selectedPriorities,
   onTogglePriority,
   onSelectAllPriorities,
+  efforts,
   selectedEffort,
   onToggleEffort,
   onSelectAllEffort,
@@ -91,6 +54,7 @@ export function FilterBar({
   hasActiveFilters,
 }: FilterBarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const effortBadges = useEffortBadges(efforts);
 
   return (
     <div className="mb-4 space-y-3">
@@ -154,9 +118,10 @@ export function FilterBar({
           />
           <FilterRow
             label="Effort"
-            items={EFFORTS}
+            items={efforts}
             selected={selectedEffort}
-            colors={EFFORT_COLORS}
+            colors={effortBadges.colors}
+            styles={effortBadges.styles}
             onToggle={onToggleEffort}
             onSelectAll={onSelectAllEffort}
           />

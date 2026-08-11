@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { DEFAULT_EFFORTS } from "../tasks/TaskTable/constants.ts";
 
 vi.mock("../../hooks/use-config.ts", () => ({
   useConfig: vi.fn(),
@@ -24,7 +25,7 @@ describe("DesktopNav", () => {
   }
 
   it("renders all 8 navigation tabs when no phases configured", () => {
-    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0" });
+    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0", efforts: DEFAULT_EFFORTS });
     renderDesktopNav();
     for (const label of baseTabLabels) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
@@ -37,6 +38,7 @@ describe("DesktopNav", () => {
       phases: [{ id: "p1", name: "Phase 1", description: "" }],
       readonly: false,
       version: "1.0",
+      efforts: DEFAULT_EFFORTS,
     });
     renderDesktopNav();
     expect(screen.getByRole("link", { name: "Phases" })).toBeInTheDocument();
@@ -44,7 +46,7 @@ describe("DesktopNav", () => {
   });
 
   it("renders tabs with correct paths", () => {
-    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0" });
+    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0", efforts: DEFAULT_EFFORTS });
     renderDesktopNav();
     expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("href", "/tasks");
     expect(screen.getByRole("link", { name: "Next Up" })).toHaveAttribute("href", "/next");
@@ -100,7 +102,7 @@ describe("MobileMenu", () => {
   }
 
   it("renders all 8 navigation tabs when no phases configured", () => {
-    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0" });
+    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0", efforts: DEFAULT_EFFORTS });
     renderMobileMenu();
     for (const label of baseTabLabels) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
@@ -112,13 +114,14 @@ describe("MobileMenu", () => {
       phases: [{ id: "p1", name: "Phase 1", description: "" }],
       readonly: false,
       version: "1.0",
+      efforts: DEFAULT_EFFORTS,
     });
     renderMobileMenu();
     expect(screen.getByRole("link", { name: "Phases" })).toBeInTheDocument();
   });
 
   it("renders Docs and GitHub external links", () => {
-    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0" });
+    mockUseConfig.mockReturnValue({ phases: [], readonly: false, version: "1.0", efforts: DEFAULT_EFFORTS });
     renderMobileMenu();
     expect(screen.getByText(/Docs/)).toBeInTheDocument();
     expect(screen.getByText(/GitHub/)).toBeInTheDocument();

@@ -89,6 +89,28 @@ describe("applyFilters", () => {
     expect(result.map((t) => t.id)).toEqual(["001"]);
   });
 
+  it("treats a full custom vocabulary as no effort filter", () => {
+    const efforts = ["xs", "s", "m", "l", "xl"];
+    const custom = [
+      makeTask({ id: "101", effort: "xs" }),
+      makeTask({ id: "102", effort: "xl" }),
+    ];
+    const filters = { ...defaultFilterState(efforts), selectedEffort: new Set(efforts) };
+    const result = applyFilters(custom, filters, efforts);
+    expect(result.map((t) => t.id)).toEqual(["101", "102"]);
+  });
+
+  it("filters by a value from a custom vocabulary", () => {
+    const efforts = ["xs", "s", "m", "l", "xl"];
+    const custom = [
+      makeTask({ id: "101", effort: "xs" }),
+      makeTask({ id: "102", effort: "xl" }),
+    ];
+    const filters = { ...defaultFilterState(efforts), selectedEffort: new Set(["xl"]) };
+    const result = applyFilters(custom, filters, efforts);
+    expect(result.map((t) => t.id)).toEqual(["102"]);
+  });
+
   it("applies intersection of multiple filters (status AND priority AND type)", () => {
     const filters = {
       ...defaultFilterState(),

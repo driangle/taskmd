@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PhaseSelector } from "./PhaseSelector.tsx";
+import { DEFAULT_EFFORTS } from "../tasks/TaskTable/constants.ts";
 
 const mockSetPhase = vi.fn();
 
@@ -37,6 +38,7 @@ describe("PhaseSelector", () => {
       phases: [],
       readonly: false,
       version: "1.0",
+      efforts: DEFAULT_EFFORTS,
     });
     const { container } = render(<PhaseSelector />);
     expect(container.innerHTML).toBe("");
@@ -50,6 +52,7 @@ describe("PhaseSelector", () => {
       ],
       readonly: false,
       version: "1.0",
+      efforts: DEFAULT_EFFORTS,
     });
     render(<PhaseSelector />);
 
@@ -66,6 +69,7 @@ describe("PhaseSelector", () => {
       ],
       readonly: false,
       version: "1.0",
+      efforts: DEFAULT_EFFORTS,
     });
     render(<PhaseSelector />);
 
@@ -80,6 +84,7 @@ describe("PhaseSelector", () => {
       ],
       readonly: false,
       version: "1.0",
+      efforts: DEFAULT_EFFORTS,
     });
     render(<PhaseSelector />);
 

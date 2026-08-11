@@ -1,6 +1,11 @@
 export const STATUSES = ["pending", "in-progress", "in-review", "completed", "blocked", "cancelled"];
 export const PRIORITIES = ["critical", "high", "medium", "low"];
-export const EFFORTS = ["small", "medium", "large"];
+/**
+ * Fallback effort vocabulary, used when the server does not report one.
+ * The live vocabulary comes from `/api/config` via `useConfig()` — see
+ * `effort-colors.ts` for how custom vocabularies are colored.
+ */
+export const DEFAULT_EFFORTS = ["small", "medium", "large"];
 export const TYPES = ["feature", "bug", "improvement", "chore", "docs"];
 
 export const STATUS_COLORS: Record<string, string> = {

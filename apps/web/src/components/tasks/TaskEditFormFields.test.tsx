@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FieldGrid, MetadataFields } from "./TaskEditFormFields.tsx";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "./TaskTable/constants.ts";
+import { STATUSES, PRIORITIES, DEFAULT_EFFORTS, TYPES } from "./TaskTable/constants.ts";
 
 function optionValues(select: HTMLElement): string[] {
   return Array.from((select as HTMLSelectElement).options).map((o) => o.value);
@@ -17,6 +17,7 @@ describe("FieldGrid", () => {
       onPriorityChange: vi.fn(),
       effort: "small",
       onEffortChange: vi.fn(),
+      efforts: DEFAULT_EFFORTS,
       taskType: "feature",
       onTaskTypeChange: vi.fn(),
       inputClasses: "test-input",
@@ -65,8 +66,15 @@ describe("FieldGrid", () => {
   it("renders effort options with empty default", () => {
     renderFieldGrid();
     const select = screen.getByLabelText("Effort") as HTMLSelectElement;
-    expect(optionValues(select)).toEqual(["", ...EFFORTS]);
+    expect(optionValues(select)).toEqual(["", ...DEFAULT_EFFORTS]);
     expect(select.options[0].textContent).toBe("-");
+  });
+
+  it("renders exactly the configured effort vocabulary", () => {
+    const efforts = ["xs", "s", "m", "l", "xl"];
+    renderFieldGrid({ efforts });
+    const select = screen.getByLabelText("Effort") as HTMLSelectElement;
+    expect(optionValues(select)).toEqual(["", ...efforts]);
   });
 
   it("renders type options with empty default", () => {

@@ -28,6 +28,9 @@ type ConfigResponse struct {
 	ReadOnly bool        `json:"readonly"`
 	Version  string      `json:"version"`
 	Phases   []PhaseInfo `json:"phases"`
+	// Efforts is the project's effort vocabulary, lowest to highest. The web UI
+	// uses it to populate the effort filter and the edit-form dropdown.
+	Efforts []string `json:"efforts"`
 }
 
 func handleProjects(listFn func() ([]ProjectEntry, error)) http.HandlerFunc {
@@ -62,6 +65,7 @@ func handleConfig(cfg Config) http.HandlerFunc {
 			ReadOnly: cfg.ReadOnly,
 			Version:  cfg.Version,
 			Phases:   p,
+			Efforts:  cfg.Efforts.Values(),
 		})
 	}
 }

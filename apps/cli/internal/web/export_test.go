@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/driangle/taskmd/sdk/go/effort"
 )
 
 // mockStaticFS creates a minimal embedded FS for testing.
@@ -215,6 +218,48 @@ func TestExport_ConfigJSON(t *testing.T) {
 
 	if config.Version != "test-1.0.0" {
 		t.Errorf("expected version 'test-1.0.0', got %q", config.Version)
+	}
+
+	want := []string{"small", "medium", "large"}
+	if !reflect.DeepEqual(config.Efforts, want) {
+		t.Errorf("expected default efforts %v, got %v", want, config.Efforts)
+	}
+}
+
+// The exported site must carry the same effort vocabulary the live server serves,
+// so an exported site's pickers match the server's.
+func TestExport_ConfigJSON_CustomEfforts(t *testing.T) {
+	taskDir := createTestTaskDir(t)
+	outDir := filepath.Join(t.TempDir(), "export")
+
+	scale, err := effort.NewScale([]string{"xs", "s", "m", "l", "xl"})
+	if err != nil {
+		t.Fatalf("NewScale failed: %v", err)
+	}
+
+	if err := exportWithMockFS(t, ExportConfig{
+		OutputDir: outDir,
+		ScanDir:   taskDir,
+		BasePath:  "/",
+		Version:   "test-1.0.0",
+		Efforts:   scale,
+	}); err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "api", "config.json"))
+	if err != nil {
+		t.Fatalf("failed to read config.json: %v", err)
+	}
+
+	var config ConfigResponse
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("invalid JSON in config.json: %v", err)
+	}
+
+	want := []string{"xs", "s", "m", "l", "xl"}
+	if !reflect.DeepEqual(config.Efforts, want) {
+		t.Errorf("expected efforts %v, got %v", want, config.Efforts)
 	}
 }
 

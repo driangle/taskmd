@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { DEFAULT_EFFORTS } from "../components/tasks/TaskTable/constants.ts";
 
 vi.mock("../hooks/use-config.ts", () => ({ useConfig: vi.fn() }));
 vi.mock("../hooks/use-project.ts", () => ({
@@ -22,6 +23,7 @@ describe("PhasesPage", () => {
     mockUseConfig.mockReturnValue({
       readonly: false,
       version: "1.0.0",
+      efforts: DEFAULT_EFFORTS,
       phases: [],
     });
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FilterBar, type FilterBarProps } from "./FilterBar.tsx";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "./constants.ts";
+import { STATUSES, PRIORITIES, DEFAULT_EFFORTS, TYPES } from "./constants.ts";
 
 function buildDefaultProps(overrides: Partial<FilterBarProps> = {}): FilterBarProps {
   return {
@@ -13,7 +13,8 @@ function buildDefaultProps(overrides: Partial<FilterBarProps> = {}): FilterBarPr
     selectedPriorities: new Set(PRIORITIES),
     onTogglePriority: vi.fn(),
     onSelectAllPriorities: vi.fn(),
-    selectedEffort: new Set(EFFORTS),
+    efforts: DEFAULT_EFFORTS,
+    selectedEffort: new Set(DEFAULT_EFFORTS),
     onToggleEffort: vi.fn(),
     onSelectAllEffort: vi.fn(),
     selectedTypes: new Set(TYPES),

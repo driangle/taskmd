@@ -1,13 +1,19 @@
 import { Link } from "react-router-dom";
 import type { TrackTask } from "../../api/types.ts";
 import { PriorityBadge } from "../tasks/TaskTable/Badges.tsx";
-import { EFFORT_COLORS } from "../tasks/TaskTable/constants.ts";
+import { useEffortBadges } from "../tasks/TaskTable/effort-colors.ts";
+import { useConfig } from "../../hooks/use-config.ts";
+import { useProject } from "../../hooks/use-project.ts";
 
 interface TrackCardProps {
   task: TrackTask;
 }
 
 export function TrackCard({ task }: TrackCardProps) {
+  const { project } = useProject();
+  const { efforts } = useConfig(project);
+  const effortBadges = useEffortBadges(efforts);
+
   return (
     <div className="p-3 bg-white rounded border border-gray-100 shadow-sm dark:bg-gray-800/50 dark:border-gray-700">
       <div className="flex items-start justify-between gap-2">
@@ -26,7 +32,12 @@ export function TrackCard({ task }: TrackCardProps) {
         {task.priority && <PriorityBadge priority={task.priority} />}
         {task.effort && (
           <span
-            className={`px-2 py-0.5 text-xs font-medium rounded-full ${EFFORT_COLORS[task.effort] ?? "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"}`}
+            style={effortBadges.styles[task.effort]}
+            className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+              effortBadges.styles[task.effort]
+                ? ""
+                : (effortBadges.colors[task.effort] ?? "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400")
+            }`}
           >
             {task.effort}
           </span>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { hasActiveFilters, defaultFilterState } from "./filters.ts";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "./constants.ts";
+import { STATUSES, PRIORITIES, DEFAULT_EFFORTS, TYPES } from "./constants.ts";
 
 describe("hasActiveFilters", () => {
   it("returns false for default filter state", () => {
@@ -32,6 +32,17 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(filters)).toBe(true);
   });
 
+  it("is inactive when a full custom vocabulary is selected", () => {
+    const efforts = ["xs", "s", "m", "l", "xl"];
+    expect(hasActiveFilters(defaultFilterState(efforts), efforts)).toBe(false);
+  });
+
+  it("is active when a custom vocabulary is partly selected", () => {
+    const efforts = ["xs", "s", "m", "l", "xl"];
+    const filters = { ...defaultFilterState(efforts), selectedEffort: new Set(["xs"]) };
+    expect(hasActiveFilters(filters, efforts)).toBe(true);
+  });
+
   it("returns true when global filter has text", () => {
     const filters = { ...defaultFilterState(), globalFilter: "search" };
     expect(hasActiveFilters(filters)).toBe(true);
@@ -43,7 +54,7 @@ describe("hasActiveFilters", () => {
       selectedPriorities: new Set(PRIORITIES),
       selectedTypes: new Set(TYPES),
       selectedTags: new Set<string>(),
-      selectedEffort: new Set(EFFORTS),
+      selectedEffort: new Set(DEFAULT_EFFORTS),
       selectedPhases: new Set<string>(),
       globalFilter: "",
     };
@@ -73,7 +84,7 @@ describe("defaultFilterState", () => {
   });
 
   it("has all efforts selected", () => {
-    expect(defaultFilterState().selectedEffort).toEqual(new Set(EFFORTS));
+    expect(defaultFilterState().selectedEffort).toEqual(new Set(DEFAULT_EFFORTS));
   });
 
   it("has empty global filter", () => {

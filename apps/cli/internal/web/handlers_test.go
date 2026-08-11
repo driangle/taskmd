@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -723,6 +724,43 @@ func TestHandleConfig_ReadOnly(t *testing.T) {
 	}
 	if !resp.ReadOnly {
 		t.Error("expected readonly to be true")
+	}
+}
+
+func TestHandleConfig_Efforts_DefaultVocabulary(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+
+	handleConfig(Config{})(rec, req)
+
+	var resp ConfigResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	want := []string{"small", "medium", "large"}
+	if !reflect.DeepEqual(resp.Efforts, want) {
+		t.Errorf("expected efforts %v, got %v", want, resp.Efforts)
+	}
+}
+
+func TestHandleConfig_Efforts_CustomVocabulary(t *testing.T) {
+	scale, err := effort.NewScale([]string{"xs", "s", "m", "l", "xl"})
+	if err != nil {
+		t.Fatalf("NewScale failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+
+	handleConfig(Config{Efforts: scale})(rec, req)
+
+	var resp ConfigResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	want := []string{"xs", "s", "m", "l", "xl"}
+	if !reflect.DeepEqual(resp.Efforts, want) {
+		t.Errorf("expected efforts %v, got %v", want, resp.Efforts)
 	}
 }
 

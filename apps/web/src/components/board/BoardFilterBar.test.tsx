@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BoardFilterBar, BoardFilterBarProps } from "./BoardFilterBar.tsx";
-import { STATUSES, PRIORITIES, EFFORTS, TYPES } from "../tasks/TaskTable/constants.ts";
+import { STATUSES, PRIORITIES, DEFAULT_EFFORTS, TYPES } from "../tasks/TaskTable/constants.ts";
 
 vi.mock("./TagAutocomplete.tsx", () => ({
   TagAutocomplete: () => <div data-testid="tag-autocomplete" />,
@@ -14,7 +14,8 @@ function defaultProps(overrides: Partial<BoardFilterBarProps> = {}): BoardFilter
     onStatusesChange: vi.fn(),
     selectedPriorities: new Set(PRIORITIES),
     onPrioritiesChange: vi.fn(),
-    selectedEfforts: new Set(EFFORTS),
+    efforts: DEFAULT_EFFORTS,
+    selectedEfforts: new Set(DEFAULT_EFFORTS),
     onEffortsChange: vi.fn(),
     selectedTypes: new Set(TYPES),
     onTypesChange: vi.fn(),
@@ -155,7 +156,7 @@ describe("BoardFilterBar", () => {
 
     expect(onStatusesChange).toHaveBeenCalledWith(new Set(STATUSES));
     expect(onPrioritiesChange).toHaveBeenCalledWith(new Set(PRIORITIES));
-    expect(onEffortsChange).toHaveBeenCalledWith(new Set(EFFORTS));
+    expect(onEffortsChange).toHaveBeenCalledWith(new Set(DEFAULT_EFFORTS));
     expect(onTypesChange).toHaveBeenCalledWith(new Set(TYPES));
     expect(onTagsChange).toHaveBeenCalledWith(new Set());
   });

@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { fetcher } from "../api/client.ts";
+import { DEFAULT_EFFORTS } from "../components/tasks/TaskTable/constants.ts";
 
 export interface PhaseInfo {
   id: string;
@@ -11,6 +12,8 @@ interface AppConfig {
   readonly: boolean;
   version: string;
   phases: PhaseInfo[];
+  /** Project's effort vocabulary. Absent on servers older than this key. */
+  efforts?: string[];
 }
 
 declare global {
@@ -36,5 +39,6 @@ export function useConfig(project?: string | null) {
     readonly: data?.readonly ?? false,
     version: data?.version ?? "",
     phases: data?.phases ?? [],
+    efforts: data?.efforts?.length ? data.efforts : DEFAULT_EFFORTS,
   };
 }

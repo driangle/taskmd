@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Task, TaskUpdateRequest } from "../../api/types.ts";
+import { useConfig } from "../../hooks/use-config.ts";
+import { useProject } from "../../hooks/use-project.ts";
 import { FieldGrid, MetadataFields } from "./TaskEditFormFields.tsx";
 
 interface TaskEditFormProps {
@@ -10,6 +12,8 @@ interface TaskEditFormProps {
 }
 
 export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProps) {
+  const { project } = useProject();
+  const { efforts } = useConfig(project);
   const [title, setTitle] = useState(task.title);
   const [status, setStatus] = useState(task.status);
   const [priority, setPriority] = useState(task.priority);
@@ -86,7 +90,7 @@ export function TaskEditForm({ task, onSave, onCancel, error }: TaskEditFormProp
       <FieldGrid
         status={status} onStatusChange={setStatus}
         priority={priority} onPriorityChange={setPriority}
-        effort={effort} onEffortChange={setEffort}
+        effort={effort} onEffortChange={setEffort} efforts={efforts}
         taskType={taskType} onTaskTypeChange={setTaskType}
         inputClasses={inputClasses}
       />
