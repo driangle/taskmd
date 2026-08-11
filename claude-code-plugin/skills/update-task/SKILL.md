@@ -22,6 +22,7 @@ The user's query is in `$ARGUMENTS` (e.g. "set task 042 to high priority and in-
 3. **Determine how to apply each update**:
 
    ### Fields supported by `taskmd set` (use CLI):
+   - `--title` — new title; also updates the matching `#` heading in the task body. Add `--rename` to move the file to `<id>-<new-slug>.md` (the file otherwise keeps its old name, which is harmless — tasks resolve by ID).
    - `--status` — pending, in-progress, completed, in-review, blocked, cancelled
    - `--priority` — low, medium, high, critical
    - `--effort` — small, medium, large
@@ -31,6 +32,7 @@ The user's query is in `$ARGUMENTS` (e.g. "set task 042 to high priority and in-
    - `--phase` — phase ID (must match a phase id in `.taskmd.yaml`; empty string to clear). If the phase doesn't exist in `.taskmd.yaml`, add it there first (see `add-task` skill for the phases config format).
    - `--add-tag` / `--remove-tag` — add or remove tags (repeatable)
    - `--add-pr` / `--remove-pr` — add or remove PR URLs (repeatable)
+   - `--depends-on` — replace dependencies (comma-separated IDs, e.g. `010,015`; empty string to clear)
 
    Build a single `taskmd set <ID>` command with all applicable flags:
    ```bash
@@ -38,8 +40,6 @@ The user's query is in `$ARGUMENTS` (e.g. "set task 042 to high priority and in-
    ```
 
    ### Fields NOT supported by `taskmd set` (edit file directly):
-   - **title** — edit the `title:` line in the task file's frontmatter
-   - **depends-on** — edit the `depends-on:` list in the frontmatter
    - **custom frontmatter fields** — edit the frontmatter directly
    - **description / subtasks / acceptance criteria** — edit the markdown body
 

@@ -383,6 +383,9 @@ Where `ID` is the task ID and `descriptive-title` is a lowercase hyphen-separate
 
 The ID prefix may be omitted if the `id` field in frontmatter is the sole identifier.
 
+The slug is descriptive only — tasks are resolved by ID, so a slug that no longer matches
+the `title` field is valid and does not need fixing.
+
 ### Directory Structure
 
 Tasks can be organized into subdirectories for grouping:

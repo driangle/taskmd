@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 
 var (
 	setTaskID        string
+	setTitle         string
+	setRename        bool
 	setStatus        string
 	setPriority      string
 	setEffort        string
@@ -40,12 +43,19 @@ var setCmd = &cobra.Command{
 	Use:        "set [task-id]",
 	SuggestFor: []string{"edit", "modify", "change", "update"},
 	Short:      "Set a task's frontmatter fields",
-	Long: `Set modifies frontmatter fields (status, priority, effort, tags) of a task file.
+	Long: `Set modifies frontmatter fields (title, status, priority, effort, tags) of a task file.
 
 The task is identified by a positional argument or --task-id (exact match only).
 
+--title updates the frontmatter title and the matching "# " heading in the body.
+The file itself is left where it is unless you also pass --rename, which moves it
+to <id>-<new-slug>.md — renaming is opt-in because the old path may be referenced
+by git history, links, or bookmarks.
+
 Examples:
   taskmd set cli-049 --status completed
+  taskmd set cli-049 --title "A better name"
+  taskmd set cli-049 --title "A better name" --rename
   taskmd set cli-049 --priority high --effort large
   taskmd set cli-049 --done
   taskmd set cli-049 --add-tag backend --add-tag api
@@ -61,6 +71,8 @@ func init() {
 	rootCmd.AddCommand(setCmd)
 
 	setCmd.Flags().StringVar(&setTaskID, "task-id", "", "task ID to update (required)")
+	setCmd.Flags().StringVar(&setTitle, "title", "", "new title (also updates the body's \"# \" heading)")
+	setCmd.Flags().BoolVar(&setRename, "rename", false, "with --title, also rename the file to <id>-<new-slug>.md")
 	setCmd.Flags().StringVar(&setStatus, "status", "", "new status (pending, in-progress, completed, in-review, blocked, cancelled)")
 	setCmd.Flags().StringVar(&setPriority, "priority", "", "new priority (low, medium, high, critical)")
 	setCmd.Flags().StringVar(&setEffort, "effort", "", "new effort (small, medium, large; configurable per project)")
@@ -100,6 +112,34 @@ func resolveSetTaskID(cmd *cobra.Command, args []string) (string, error) {
 	return "", fmt.Errorf("task ID required: provide as positional argument or --task-id flag")
 }
 
+// findSetTarget scans for the task to modify, returning it alongside the full
+// task list (needed for dependency validation). It refuses to act on an ID that
+// resolves to more than one file.
+func findSetTarget(taskID string) (*model.Task, []*model.Task, error) {
+	flags := GetGlobalFlags()
+	scanDir := ResolveScanDir(nil)
+
+	tasks, err := scanTasks(scanDir, flags)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	debugLog("scan directory: %s", scanDir)
+	debugLog("found %d task(s)", len(tasks))
+
+	task := findExactMatch(taskID, tasks)
+	if task == nil {
+		return nil, nil, fmt.Errorf("task not found: %s", taskID)
+	}
+
+	if dupes := findDuplicatesByID(taskID, tasks); len(dupes) > 1 {
+		return nil, nil, fmt.Errorf("refusing to modify task %s: found %d files with this ID\n%s\nRun 'taskmd deduplicate' to fix",
+			taskID, len(dupes), formatDuplicatePaths(dupes))
+	}
+
+	return task, tasks, nil
+}
+
 func runSet(cmd *cobra.Command, args []string) error {
 	taskID, err := resolveSetTaskID(cmd, args)
 	if err != nil {
@@ -111,25 +151,9 @@ func runSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	flags := GetGlobalFlags()
-	scanDir := ResolveScanDir(nil)
-
-	tasks, err := scanTasks(scanDir, flags)
+	task, tasks, err := findSetTarget(taskID)
 	if err != nil {
 		return err
-	}
-
-	debugLog("scan directory: %s", scanDir)
-	debugLog("found %d task(s)", len(tasks))
-
-	task := findExactMatch(taskID, tasks)
-	if task == nil {
-		return fmt.Errorf("task not found: %s", taskID)
-	}
-
-	if dupes := findDuplicatesByID(taskID, tasks); len(dupes) > 1 {
-		return fmt.Errorf("refusing to modify task %s: found %d files with this ID\n%s\nRun 'taskmd deduplicate' to fix",
-			taskID, len(dupes), formatDuplicatePaths(dupes))
 	}
 
 	if req.Dependencies != nil {
@@ -144,10 +168,15 @@ func runSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	plan, err := planRename(task, req)
+	if err != nil {
+		return err
+	}
+
 	changes := buildChangeLog(task, req)
 
 	if setDryRun {
-		printSetConfirmation(task, changes)
+		printSetConfirmation(task, changes, plan)
 		r := getRenderer()
 		fmt.Println("\n" + formatWarning("Dry run — no changes made.", r))
 		return nil
@@ -156,8 +185,11 @@ func runSet(cmd *cobra.Command, args []string) error {
 	if err := taskfile.UpdateTaskFile(task.FilePath, req); err != nil {
 		return err
 	}
+	if err := applyRename(task, req, plan); err != nil {
+		return err
+	}
 
-	printSetConfirmation(task, changes)
+	printSetConfirmation(task, changes, plan)
 	return nil
 }
 
@@ -179,6 +211,17 @@ func resolveDoneFlag(cmd *cobra.Command) error {
 		} else {
 			setStatus = string(model.StatusCompleted)
 		}
+	}
+	return nil
+}
+
+// resolveTitleFlags validates --title and its --rename companion.
+func resolveTitleFlags(cmd *cobra.Command) error {
+	if cmd.Flags().Changed("title") && strings.TrimSpace(setTitle) == "" {
+		return fmt.Errorf("--title cannot be empty")
+	}
+	if setRename && !cmd.Flags().Changed("title") {
+		return fmt.Errorf("--rename requires --title")
 	}
 	return nil
 }
@@ -209,9 +252,13 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 	if err := resolveDoneFlag(cmd); err != nil {
 		return taskfile.UpdateRequest{}, err
 	}
+	if err := resolveTitleFlags(cmd); err != nil {
+		return taskfile.UpdateRequest{}, err
+	}
 
 	var req taskfile.UpdateRequest
 
+	setStringField(&req.Title, setTitle)
 	setStringField(&req.Status, setStatus)
 	setStringField(&req.Priority, setPriority)
 	setStringField(&req.Effort, setEffort)
@@ -254,14 +301,14 @@ func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {
 	}
 
 	if !hasUpdates(req) {
-		return taskfile.UpdateRequest{}, fmt.Errorf("nothing to update: provide --status, --priority, --effort, --type, --owner, --parent, --phase, --done, --add-tag, --remove-tag, --add-pr, --remove-pr, --add-touches, --remove-touches, or --depends-on")
+		return taskfile.UpdateRequest{}, fmt.Errorf("nothing to update: provide --title, --status, --priority, --effort, --type, --owner, --parent, --phase, --done, --add-tag, --remove-tag, --add-pr, --remove-pr, --add-touches, --remove-touches, or --depends-on")
 	}
 
 	return req, nil
 }
 
 func hasUpdates(req taskfile.UpdateRequest) bool {
-	hasScalar := req.Status != nil || req.Priority != nil || req.Effort != nil ||
+	hasScalar := req.Title != nil || req.Status != nil || req.Priority != nil || req.Effort != nil ||
 		req.Type != nil || req.Owner != nil || req.Parent != nil || req.Phase != nil
 	hasTags := len(req.AddTags) > 0 || len(req.RemTags) > 0
 	hasPRs := len(req.AddPRs) > 0 || len(req.RemPRs) > 0
@@ -302,6 +349,7 @@ func buildChangeLog(task *model.Task, req taskfile.UpdateRequest) []changeEntry 
 		oldValue string
 		newValue *string
 	}{
+		{"title", task.Title, req.Title},
 		{"status", string(task.Status), req.Status},
 		{"priority", string(task.Priority), req.Priority},
 		{"effort", string(task.Effort), req.Effort},
@@ -363,7 +411,7 @@ func terminalDateChangeEntry(field string, oldTime model.FlexibleTime, newValue 
 	return nil
 }
 
-func printSetConfirmation(task *model.Task, changes []changeEntry) {
+func printSetConfirmation(task *model.Task, changes []changeEntry, plan renamePlan) {
 	r := getRenderer()
 	fmt.Printf("Updated task %s (%s):\n", formatTaskID(task.ID, r), task.Title)
 	for _, c := range changes {
@@ -376,6 +424,20 @@ func printSetConfirmation(task *model.Task, changes []changeEntry) {
 			formatDim(old, r),
 			colorizeFieldValue(c.field, c.newValue, r),
 		)
+	}
+
+	// The directory never changes, so base names are the informative part.
+	if plan.newPath != "" {
+		fmt.Printf("  %s: %s -> %s\n",
+			formatLabel("file", r),
+			formatDim(filepath.Base(task.FilePath), r),
+			filepath.Base(plan.newPath),
+		)
+	}
+
+	if plan.headingSkipped(task.Title) {
+		fmt.Println(formatWarning(
+			fmt.Sprintf("Note: body heading %q does not match the old title — left unchanged.", "# "+plan.heading.Text), r))
 	}
 }
 

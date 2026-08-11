@@ -197,3 +197,51 @@ func TestSet_CancelledDate_AutoSet(t *testing.T) {
 	}
 	_ = result
 }
+
+func TestSet_Title_Rename(t *testing.T) {
+	dir := setupTaskDir(t)
+	writeTask(t, dir, "001-setup.md", "001", "Setup", "pending", nil)
+
+	result := mustRun(t, dir, "set", "001", "--title", "Bootstrap the project", "--rename")
+
+	if !strings.Contains(result.Stdout, "file: 001-setup.md -> 001-bootstrap-the-project.md") {
+		t.Errorf("Expected rename in output, got: %s", result.Stdout)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "001-setup.md")); err == nil {
+		t.Error("Expected the original file to be gone")
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "001-bootstrap-the-project.md"))
+	if err != nil {
+		t.Fatalf("failed to read renamed task file: %v", err)
+	}
+	fileStr := string(content)
+	if !strings.Contains(fileStr, `title: "Bootstrap the project"`) {
+		t.Errorf("Expected updated frontmatter title, got:\n%s", fileStr)
+	}
+	if !strings.Contains(fileStr, "# Bootstrap the project") {
+		t.Errorf("Expected updated body heading, got:\n%s", fileStr)
+	}
+
+	// The task must still be reachable by ID from its new path.
+	getResult := mustRun(t, dir, "get", "001")
+	if !strings.Contains(getResult.Stdout, "Bootstrap the project") {
+		t.Errorf("Expected the renamed task to be resolvable by ID, got: %s", getResult.Stdout)
+	}
+}
+
+func TestSet_Title_RenameRequiresTitle(t *testing.T) {
+	dir := setupTaskDir(t)
+	writeTask(t, dir, "001-setup.md", "001", "Setup", "pending", nil)
+
+	result := run(t, dir, "set", "001", "--rename")
+
+	if result.ExitCode == 0 {
+		t.Fatal("Expected non-zero exit code for --rename without --title")
+	}
+	combined := result.Stdout + result.Stderr
+	if !strings.Contains(combined, "--rename requires --title") {
+		t.Errorf("Expected an actionable error, got: %s", combined)
+	}
+}

@@ -551,6 +551,9 @@ taskmd set 042 --phase v0.2
 
 # Clear phase
 taskmd set 042 --phase ""
+
+# Rename a task
+taskmd set 042 --title "A better name"
 ```
 
 **Flags:**
@@ -559,6 +562,8 @@ taskmd set 042 --phase ""
 |------|---------|-------------|
 | `[task-id]` | | Task ID as positional argument |
 | `--task-id` | | Task ID to update (alternative to positional) |
+| `--title` | | New title (also updates the body's `#` heading) |
+| `--rename` | `false` | With `--title`, rename the file to `<id>-<new-slug>.md` |
 | `--status` | | New status (`pending`, `in-progress`, `in-review`, `completed`, `blocked`, `cancelled`) |
 | `--priority` | | New priority (`low`, `medium`, `high`, `critical`) |
 | `--effort` | | New effort (`small`, `medium`, `large`) |
@@ -576,6 +581,25 @@ taskmd set 042 --phase ""
 | `--type` | | Work type (`feature`, `bug`, `improvement`, `chore`, `docs`) |
 | `--depends-on` | | Set dependencies (comma-separated IDs, e.g. `010,015`) |
 | `--verify` | `false` | Run verification checks before completing a task |
+
+**Renaming a task:**
+
+`--title` updates the `title` frontmatter field and the matching `#` heading in the
+task body. If the body heading has been customized so that it no longer matches the
+old title, it is left alone and the command says so.
+
+```bash
+# Update the title and body heading; the file stays where it is
+taskmd set 042 --title "A better name"
+
+# Also rename the file to 042-a-better-name.md
+taskmd set 042 --title "A better name" --rename
+```
+
+Renaming the file is opt-in because the old path may be referenced by git history,
+links, or bookmarks. Tasks are always resolved by ID, so a stale filename slug is
+harmless. `--rename` refuses to overwrite an existing file, and `--rename` without
+`--title` is an error.
 
 **Tag management:**
 ```bash
