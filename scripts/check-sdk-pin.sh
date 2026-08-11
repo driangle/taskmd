@@ -45,10 +45,10 @@ SDK_MODULE="github.com/driangle/taskmd/sdk/go"
 SDK_DIR="sdk/go"
 CLI_PACKAGE="github.com/driangle/taskmd/apps/cli/cmd/taskmd"
 
-# The bump command shown in every failure message.
-# Shown in failure messages. Releases go through scripts/release.sh, which tags
-# sdk/go and repoints the pin; this is the manual equivalent.
-BUMP_CMD="cd apps/cli && go get $SDK_MODULE@<version> && go mod tidy   # tag sdk/go/v<version> first"
+# The bump command shown in every failure message. Releases go through
+# scripts/release.sh, which tags sdk/go and repoints the pin as part of the
+# release; bump-sdk-pin.sh does the same job between releases.
+BUMP_CMD="make bump-sdk-pin VERSION=<version>   # tags sdk/go, pushes it, repoints the pin, commits"
 
 if [ ! -f "$GO_MOD" ]; then
     echo "check-sdk-pin: $GO_MOD not found, skipping"
@@ -107,11 +107,18 @@ if [ "$STAGED_SDK" -eq 1 ]; then
     echo "check-sdk-pin: NOTE — this commit changes $SDK_DIR/."
     echo
     echo "  apps/cli/go.mod still pins $PINNED."
-    echo "  After pushing, bump the pin so 'go install ...@latest' keeps working:"
+    echo
+    echo "  Usually you can ignore this: once the commit is on main, CI tags the next"
+    echo "  $SDK_DIR version and pushes the pin bump for you. Just 'git pull' afterwards,"
+    echo "  or your next commit will be blocked by a pin that is stale only locally."
+    echo
+    echo "  Breaking API change? Say so in the commit message, or it ships as a patch:"
+    echo
+    echo "      sdk-bump: minor"
+    echo
+    echo "  To bump now instead of waiting for CI, from a clean tree:"
     echo
     echo "      $BUMP_CMD"
-    echo
-    echo "  The next commit that does not touch $SDK_DIR/ will be blocked until you do."
     exit 0
 fi
 
@@ -126,10 +133,12 @@ echo
 echo "  go.work hides this locally, but external installs read go.mod:"
 echo "      go install $CLI_PACKAGE@latest   # would fail to compile"
 echo
-echo "  Fix (the SDK commit must be pushed first, so the pin can reference it):"
+echo "  If this drift is already on main, CI has probably bumped the pin already —"
+echo "  'git pull' may be all you need."
+echo
+echo "  Otherwise, fix it with one command, from a clean tree:"
 echo
 echo "      $BUMP_CMD"
-echo "      GOWORK=off go build ./cmd/taskmd    # verify"
 echo
 echo "  See issue #8 / PR #9 for the previous occurrence."
 exit 1

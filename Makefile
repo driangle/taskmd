@@ -1,4 +1,4 @@
-.PHONY: install-dev install-dev-full check check-lite test lint check-file-length check-sdk-pin sync-spec docker-build docker-run
+.PHONY: install-dev install-dev-full check check-lite test lint check-file-length check-sdk-pin bump-sdk-pin sync-spec docker-build docker-run
 
 # Install development binary (delegates to apps/cli)
 install-dev:
@@ -25,6 +25,13 @@ check-file-length:
 # this locally, but external `go install` reads go.mod. See issue #8 / PR #9.
 check-sdk-pin:
 	./scripts/check-sdk-pin.sh --strict
+
+# Tag sdk/go and repoint the pin at it, in one step. Use between releases, when
+# an SDK change has landed but the next release is not imminent.
+#   make bump-sdk-pin VERSION=0.4.1
+bump-sdk-pin:
+	@test -n "$(VERSION)" || { echo "usage: make bump-sdk-pin VERSION=0.4.1"; exit 1; }
+	./scripts/bump-sdk-pin.sh $(VERSION)
 
 # Run all checks (compile, lint, tests for all projects + docs build)
 check: check-lite

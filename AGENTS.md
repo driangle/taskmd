@@ -471,13 +471,39 @@ commit, that install fails to compile. This shipped once already — see
 tags, so `@latest` resolves to **main HEAD**: drift breaks users as soon as it lands
 on main, not at release time.
 
-Three guards keep the pin honest:
+Four guards keep the pin honest:
 
 | Guard | When | Behavior |
 |-------|------|----------|
 | `scripts/check-sdk-pin.sh --staged` | pre-commit hook | Warns on the commit that *introduces* SDK changes (the pin can't reference an unpushed commit), then **blocks** any later commit that leaves the pin stale |
-| `make check-sdk-pin` / CI `sdk-pin` job | pushes to main | Any drift is an error; also builds with `GOWORK=off` to exercise the real `go install` path |
+| CI `sdk-pin` job | pushes to main | **Auto-heals**: tags the next `sdk/go` version, repoints the pin, and pushes the bump back to main — then verifies with `--strict` and a `GOWORK=off` build |
+| `make check-sdk-pin` | any time, locally | Any drift is an error (report only, no healing) |
 | `scripts/release.sh` | every release | Tags and pushes `sdk/go` when it changed, repoints the pin at that version, and verifies the `GOWORK=off` build before tagging the CLI |
+
+#### Auto-bump on main: what you need to know
+
+Since CI heals drift, the normal path is **do nothing** — land your SDK change and the
+pin catches up on its own. Two things are still on you:
+
+**Breaking changes must be declared.** The bump defaults to **patch**, which is right for
+additive or fix-only work. A machine cannot detect a breaking API change, so pre-1.0 you
+flag it in the commit that makes the break:
+
+```
+refactor(sdk): rename Heading.Text to Heading.Title
+
+sdk-bump: minor
+```
+
+Any commit touching `sdk/go` since the last tag carrying that marker promotes the whole
+batch to a minor bump. Without it, a breaking change ships under a patch version that
+importers will pick up automatically — and **module versions are immutable**, so there is
+no fixing it afterwards.
+
+**The bump commit does not get its own CI run.** CI pushes with `GITHUB_TOKEN`, which
+GitHub deliberately does not let trigger further workflow runs. The `sdk-pin` job runs its
+verification *after* the bump, so the landed state is checked — but no other job re-runs
+against it. That is fine because the bump only touches `go.mod`/`go.sum`.
 
 ### Versioning: two independent modules, two tags
 
@@ -520,13 +546,25 @@ The pin is normally repointed **at release time** by `scripts/release.sh`:
 If `sdk/go` changed and you omit `--sdk-version`, the script stops and tells you.
 If `sdk/go` did not change, omit it and no SDK tag is created.
 
-To repoint the pin by hand between releases, the SDK tag must already be pushed:
+CI bumps the pin for you once the change is on main (see *Auto-bump on main* above), so
+this is only needed when you want the bump **before** pushing, or when CI cannot push
+(for example a fork, or branch protection that rejects the bot). From a clean tree:
 
 ```bash
-git tag -a sdk/go/v0.4.1 -m "sdk/go v0.4.1" && git push origin sdk/go/v0.4.1
-cd apps/cli && go get github.com/driangle/taskmd/sdk/go@v0.4.1 && go mod tidy
-GOWORK=off go build ./cmd/taskmd    # verify
+make bump-sdk-pin VERSION=0.4.1
+./scripts/bump-sdk-pin.sh 0.4.1 --dry-run   # to preview first
 ```
+
+That tags `sdk/go/v0.4.1`, pushes the tag, repoints `apps/cli/go.mod`, verifies the
+`GOWORK=off` build, and commits the bump. Then `git push`.
+
+The ordering matters, and is why this is a script rather than a snippet: `go get`
+resolves versions through the module proxy, so the tag has to be **pushed** before the
+pin can reference it. Pushing a tag also pushes the commit objects it points at, so this
+works from a branch you have not pushed yet — tag, push tag, then pin.
+
+Pick the version by what changed: pre-1.0, a breaking API change is a **minor** bump
+(`v0.4.0` → `v0.5.0`), additive or fix-only is a **patch** bump (`v0.4.0` → `v0.4.1`).
 
 ### Commit Messages
 
