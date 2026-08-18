@@ -1,12 +1,13 @@
 ---
 id: "01kk60r95"
 title: "Benchmark add-task skill"
-status: pending
+status: completed
 priority: medium
 dependencies: []
 tags: ["benchmark", "skill-eval"]
 created: 2026-03-08
 phase: skill-benchmarks
+completed_at: 2026-08-18
 ---
 
 # Benchmark add-task skill
@@ -17,33 +18,28 @@ Benchmark the add-task skill by running it with and without the skill loaded, co
 
 ## Prerequisites
 
-- Read `benchmark/CLAUDE.md` for methodology, control case setup, and known pitfalls
-- Use `benchmark/run_eval.sh` for all eval runs (handles stream-json, timing extraction)
-- Reference `benchmark/evals.json` for the eval prompts and assertions
+- Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
+- See `evals/README.md` for how a suite is built, and the hermeticity note before adding
+  variants (`allowed_tools` does not gate built-ins)
+- `benchmark/` is deprecated — its fixtures were carried over into `evals/add-task/workspace/`
 
 ## Tasks
 
-- [ ] Set up isolated projects using `benchmark/fixtures/setup.sh`
-  - **with_skill**: full `taskmd init` project (CLAUDE.md, .taskmd.yaml, TASKMD_SPEC.md present)
-  - **without_skill**: bare project — remove CLAUDE.md, TASKMD_SPEC.md, .taskmd.yaml, .taskmd/; block `taskmd` from PATH using shadow dir
-- [ ] Run with_skill eval using `benchmark/run_eval.sh`:
-  ```
-  bash benchmark/run_eval.sh <project-dir> "create a new task to implement user notifications via email and in-app, high priority, tags: notifications,backend" benchmark/iteration-1/eval-4-add-task/with_skill/outputs --allowedTools "Bash,Skill,Read,Glob,Grep,taskmd:add-task"
-  ```
-- [ ] Run without_skill baseline using `benchmark/run_eval.sh` with taskmd blocked:
-  ```
-  PATH="$SHADOW_DIR:$PATH" bash benchmark/run_eval.sh <project-dir> "create a new task to implement user notifications via email and in-app, high priority, tags: notifications,backend" benchmark/iteration-1/eval-4-add-task/without_skill/outputs --allowedTools "Bash,Read,Glob,Grep"
-  ```
-- [ ] Write `eval_metadata.json` with assertions from `evals.json`
-- [ ] Grade both outputs against assertions
-- [ ] Write `benchmark.json` with pass rates, timing deltas, token/cost comparison
-- [ ] Write `report.md` summarizing results (see `benchmark/iteration-1/report.md` for format)
-- [ ] Write improvement suggestions to `benchmark/suggestions/add-task.md`
+- [x] Build a skival suite for add-task (`evals/add-task/suite.yaml`)
+- [x] Set up the fixture workspaces
+  - `workspace/` — full `taskmd init` project (config, templates, CLAUDE.md, TASKMD_SPEC.md),
+    tasks grouped across `cli/`, `web/` and the root
+  - `workspace-bare/` — no config, no docs, `taskmd` shadowed off PATH via `.shadow/taskmd`
+- [x] Write deterministic graders (`workspace/.verify/`, stdlib-only Go module)
+- [x] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
+- [x] Grade correctness and record timing, tokens and cost per sample
+- [x] Write the results report (`evals/add-task/REPORT.md`)
+- [x] Write improvement suggestions (`evals/add-task/SUGGESTIONS.md`)
 
 ## Acceptance Criteria
 
-- Both with_skill and without_skill runs are executed and saved to `benchmark/iteration-1/`
-- `timing.json` exists for both runs with duration_ms, output_tokens, total_cost_usd
-- `benchmark.json` contains pass rate deltas AND timing/cost comparison
-- `report.md` exists with results table, timing table, analysis, and recommendations
-- `benchmark/suggestions/add-task.md` written with improvement ideas
+- A skival suite exists for add-task and passes `skival validate`
+- All variants are executed with per-sample isolation and pinned tool access
+- Per-sample duration, token usage and cost are recorded
+- The report contains a results table, cost/latency comparison, analysis and recommendations
+- Improvement suggestions are written and grounded in observed failures

@@ -1,3 +1,14 @@
+> [!WARNING]
+> **Deprecated — superseded by [`evals/`](../evals).**
+>
+> Skill benchmarking now runs on [skival](https://github.com/driangle/skival): deterministic
+> graders instead of LLM-assertion grading, per-sample isolation, pinned tool access, and
+> cost/latency/variance reporting. See [`evals/README.md`](../evals/README.md) for the harness
+> and [`evals/add-task/REPORT.md`](../evals/add-task/REPORT.md) for a worked example.
+>
+> This directory is kept for its fixtures and for reference to past iterations. Don't add new
+> evals here.
+
 # Skill Benchmarks
 
 Measures how much the taskmd Claude Code skills improve task management compared to a vanilla Claude Code session (no skills loaded).

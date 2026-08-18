@@ -98,6 +98,9 @@ regression check now, not a discriminator.
 
 ## Next
 
+Skill- and CLI-level improvements suggested by these results are in
+[`SUGGESTIONS.md`](SUGGESTIONS.md). Suite-level follow-ups:
+
 1. **Retire or replace `add-group-routing`** as a discriminator (saturated).
 2. **Add evals for what only the skills teach** — phases (`--phase`, including adding a missing
    phase to `.taskmd.yaml`), `--parent` subtasks, custom templates, the effort vocabulary.
