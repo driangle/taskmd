@@ -1,0 +1,100 @@
+version: 1
+title: "add-task skill"
+description: >
+  Does the taskmd add-task skill make an agent better at filing tasks than a
+  vanilla Claude Code session in the same project? Three realistic requests,
+  graded by deterministic checks against the resulting task files.
+
+defaults:
+  runner: claude-code
+  model: "claude-sonnet-5"
+  samples: 5    # lite-skill behaviour is bimodal; 3 samples land anywhere between 0/3 and 3/3
+  timeout: 240
+  parallel: 3
+  runner_config:
+    # Identical toolset for every variant, so the skill file is the only
+    # difference between them.
+    allowed_tools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
+    # Critical: without this, the agent invokes the taskmd plugin skill installed
+    # in the developer's own ~/.claude, so *every* variant — including no-skill —
+    # silently runs the real skill and the suite measures nothing. skival injects
+    # its own `skill:` files as an appended system prompt, so this does not
+    # disable the variants under test.
+    # `allowed_tools` does not actually gate these built-ins: agents were seen
+    # invoking the installed taskmd plugin skill (Skill) and filing work into
+    # Claude Code's own tracker (TaskCreate) instead of writing task files.
+    # Both make every variant score the same thing and neither is visible
+    # without reading the conversation logs.
+    disallowed_tools:
+      ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+
+ranking:
+  weights:
+    correctness: 0.70
+    cost: 0.20
+    duration: 0.10
+
+evals:
+  - id: add-basic
+    name: "Basic task with priority and tags"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      create a new task to implement user notifications via email and in-app,
+      high priority, tags: notifications,backend
+    verify:
+      - type: agent_exits_ok
+      - type: check
+        run: "cd .verify && GOWORK=off go run . add-basic"
+    variants: &variants
+      - name: no-skill
+      - name: plugin-skill
+        skill: ../../claude-code-plugin/skills/add-task/SKILL.md
+      - name: lite-skill
+        skill: ../../claude-code-plugin-lite/skills/add-task/SKILL.md
+      # No skill AND no taskmd: `workspace-bare` drops .taskmd.yaml, .taskmd/,
+      # tasks/CLAUDE.md and TASKMD_SPEC.md, and the PATH below puts a stub
+      # `taskmd` first so the agent has only markdown files to work with.
+      # Verifiers run outside this env and still use the real CLI.
+      - name: bare-project
+        dir: ./workspace-bare
+        env:
+          PATH: ".shadow:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+  - id: add-bug-template
+    name: "Bug report routed to a template and group"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      file a bug: the search box in the CLI crashes when you submit an empty
+      query instead of just showing everything
+    verify:
+      - type: agent_exits_ok
+      - type: check
+        run: "cd .verify && GOWORK=off go run . add-bug-template"
+    variants: *variants
+
+  - id: add-group-routing
+    name: "Task routed to the right group directory"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      add a task for a dark mode toggle in the dashboard UI
+    verify:
+      - type: agent_exits_ok
+      - type: check
+        run: "cd .verify && GOWORK=off go run . add-group-routing"
+    variants: *variants
+
+  - id: add-dependency
+    name: "Ordering constraint captured as a dependency"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      add a low priority task to document the full-text search feature — it
+      can't be started until task 002 is finished
+    verify:
+      - type: agent_exits_ok
+      - type: check
+        run: "cd .verify && GOWORK=off go run . add-dependency"
+    variants: *variants

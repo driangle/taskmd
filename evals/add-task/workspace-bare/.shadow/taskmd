@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stub that shadows the real taskmd binary for the bare-project variant, so the
+# agent has to work with plain markdown files. Verifiers run outside this PATH
+# and still use the real CLI.
+echo "taskmd: command not found" >&2
+exit 127
