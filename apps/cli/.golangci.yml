@@ -1,140 +1,156 @@
-# golangci-lint configuration
+# golangci-lint configuration (schema v2 — requires golangci-lint v2.x)
 # Follows Go conventions for code quality and maintainability
 # See: https://golangci-lint.run/usage/configuration/
+#
+# Migrated from the v1 schema with `golangci-lint migrate`. Notes on the move:
+#   - errcheck/govet/ineffassign/staticcheck/unused are enabled by default in v2,
+#     so they no longer appear under `linters.enable`.
+#   - gosimple was folded into staticcheck (its S1xxx checks).
+#   - gofmt/goimports are now `formatters`, not linters.
+#   - run.timeout is gone; v2 has no timeout by default.
+version: "2"
 
 run:
-  timeout: 5m
   tests: true
   modules-download-mode: readonly
 
-linters-settings:
-  # Function length checker - max 60 lines per function
-  # This is the Go-idiomatic way to keep code manageable
-  # Small functions naturally lead to reasonably-sized files
-  funlen:
-    lines: 60
-    statements: 45
-    ignore-comments: true
-
-  # Cyclomatic complexity - catches overly complex functions
-  gocyclo:
-    min-complexity: 15
-
-  # Cognitive complexity - how hard code is to understand
-  gocognit:
-    min-complexity: 20
-
-  # Repeated strings that should be constants
-  goconst:
-    min-len: 3
-    min-occurrences: 5
-
-  # Formatting
-  gofmt:
-    simplify: true
-
-  # Import ordering
-  goimports:
-    local-prefixes: github.com/driangle/taskmd
-
-  # Error checking
-  errcheck:
-    check-type-assertions: true
-    check-blank: false
-
 linters:
   enable:
-    - funlen      # Function length checker
-    - gocyclo     # Cyclomatic complexity
-    - gocognit    # Cognitive complexity
-    - goconst     # Repeated strings
-    - gofmt       # Formatting
-    - goimports   # Import ordering
-    - revive      # General linting
-    - errcheck    # Unchecked errors
-    - gosimple    # Simplifications
-    - govet       # Go vet
-    - ineffassign # Ineffectual assignments
-    - staticcheck # Static analysis
-    - unused      # Unused code
-    - misspell    # Misspellings
+    - funlen # Function length checker
+    - gocyclo # Cyclomatic complexity
+    - gocognit # Cognitive complexity
+    - goconst # Repeated strings
+    - revive # General linting
+    - misspell # Misspellings
 
-  disable:
-    - typecheck   # Disabled to avoid module issues
+  settings:
+    # Function length checker - max 60 lines per function
+    # This is the Go-idiomatic way to keep code manageable
+    # Small functions naturally lead to reasonably-sized files
+    funlen:
+      lines: 60
+      statements: 45
+      ignore-comments: true
+
+    # Cyclomatic complexity - catches overly complex functions
+    gocyclo:
+      min-complexity: 15
+
+    # Cognitive complexity - how hard code is to understand
+    gocognit:
+      min-complexity: 20
+
+    # Repeated strings that should be constants
+    goconst:
+      min-len: 3
+      min-occurrences: 5
+
+    # Error checking
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+
+    staticcheck:
+      # QF (quickfix) checks are opinionated refactor suggestions - tagged
+      # switches, De Morgan rewrites, embedded-field elision - not correctness
+      # issues. v1 never ran them; keeping them off holds the bar steady rather
+      # than churning unrelated files.
+      # ST1000 (package comments) is off for the same reason revive's
+      # package-comments is excluded below: internal packages don't need one.
+      # SA/S1 and the rest of ST stay enabled.
+      checks:
+        - all
+        - -QF*
+        - -ST1000
+
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+    rules:
+      # Allow longer test functions and relaxed error checking in tests
+      - path: _test\.go
+        linters:
+          - funlen
+          - gocyclo
+          - errcheck
+          - goconst
+
+      # Cobra commands require (cmd *cobra.Command, args []string) signature
+      - text: "unused-parameter: parameter 'cmd' seems to be unused"
+        linters:
+          - revive
+
+      # HTTP handlers require (w http.ResponseWriter, r *http.Request) signature
+      - text: "unused-parameter: parameter 'r' seems to be unused"
+        linters:
+          - revive
+
+      # Package comments are not required for internal packages
+      - text: package-comments
+        linters:
+          - revive
+
+      # Exported comment requirements relaxed for internal packages
+      - path: internal/
+        text: 'exported:'
+        linters:
+          - revive
+
+      # fmt.Fprint/Fprintf/Fprintln to stdout/writers rarely need error checks
+      - text: Error return value of `fmt\.Fprint
+        linters:
+          - errcheck
+
+      # Deferred Close/Flush/Shutdown calls - errors are typically logged or unactionable
+      - text: Error return value of `.*\.Close` is not checked
+        linters:
+          - errcheck
+
+      - text: Error return value of `.*\.Flush` is not checked
+        linters:
+          - errcheck
+
+      - text: Error return value of `.*\.Shutdown` is not checked
+        linters:
+          - errcheck
+
+      # viper.BindPFlag in init() - errors indicate programmer mistakes, not runtime issues
+      - text: Error return value of `viper\.BindPFlag` is not checked
+        linters:
+          - errcheck
+
+      # These packages switch on vocabulary strings - output formats, field
+      # names, MCP tool/argument names, foreign-system statuses, TODO markers.
+      # Hoisting them into constants adds indirection without adding meaning.
+      - path: internal/(cli|mcp|sync|todos)/
+        linters:
+          - goconst
 
 issues:
-  # Exclude test files from some checks
-  exclude-rules:
-    # Allow longer test functions and relaxed error checking in tests
-    - path: _test\.go
-      linters:
-        - funlen
-        - gocyclo
-        - errcheck
-        - goconst
-
-    # Cobra commands require (cmd *cobra.Command, args []string) signature
-    - text: "unused-parameter: parameter 'cmd' seems to be unused"
-      linters:
-        - revive
-
-    # HTTP handlers require (w http.ResponseWriter, r *http.Request) signature
-    - text: "unused-parameter: parameter 'r' seems to be unused"
-      linters:
-        - revive
-
-    # Package comments are not required for internal packages
-    - text: "package-comments"
-      linters:
-        - revive
-
-    # Exported comment requirements relaxed for internal packages
-    - path: internal/
-      text: "exported:"
-      linters:
-        - revive
-
-    # fmt.Fprint/Fprintf/Fprintln to stdout/writers rarely need error checks
-    - text: "Error return value of `fmt\\.Fprint"
-      linters:
-        - errcheck
-
-    # Deferred Close/Flush/Shutdown calls - errors are typically logged or unactionable
-    - text: "Error return value of `.*\\.Close` is not checked"
-      linters:
-        - errcheck
-
-    - text: "Error return value of `.*\\.Flush` is not checked"
-      linters:
-        - errcheck
-
-    - text: "Error return value of `.*\\.Shutdown` is not checked"
-      linters:
-        - errcheck
-
-    # viper.BindPFlag in init() - errors indicate programmer mistakes, not runtime issues
-    - text: "Error return value of `viper\\.BindPFlag` is not checked"
-      linters:
-        - errcheck
-
-    # CLI commands use format/field name strings in switch/case - constants add no value
-    - path: internal/cli/
-      linters:
-        - goconst
-
   # Maximum issues count per linter
   max-issues-per-linter: 0
 
   # Maximum count of issues with the same text
   max-same-issues: 0
 
-  # Show all issues
-  exclude-use-default: false
+formatters:
+  enable:
+    - gofmt # Formatting
+    - goimports # Import ordering
 
-# Output configuration
-output:
-  formats:
-    - format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-  sort-results: true
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/driangle/taskmd
+
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

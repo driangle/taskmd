@@ -183,7 +183,7 @@ func fetchPage(client *http.Client, baseURL, jql, auth, pageToken string) ([]jir
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, "", fmt.Errorf("Jira API returned %d: %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("jira: API returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result searchResponse

@@ -20,12 +20,10 @@ jobs:
           go-version: '1.25'
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: v1.64.8
-          install-mode: goinstall
+          version: v2.12.2
           working-directory: apps/cli
-          args: --timeout=5m
 
   test:
     name: Test (${{ matrix.os }})
