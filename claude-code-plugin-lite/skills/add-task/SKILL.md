@@ -56,7 +56,9 @@ The user's task description is in `$ARGUMENTS`.
 
 5. **Generate the task ID**:
    - Read the ID strategy from `.taskmd.yaml` (default: `sequential`)
-   - Scan existing files with `Glob` for `<task-dir>/**/*.md` to determine used IDs
+   - Scan existing files with `Glob` for `<task-dir>/**/*.md` to determine used IDs —
+     this includes `archive/`, and it must: an archived task's ID is still taken and
+     must never be handed out again
    - **Sequential** (default): Find the highest numeric ID, add 1, zero-pad to `padding` width (default 3). E.g., if highest is `042`, next is `043`
    - **Prefixed**: Find highest number with the configured prefix. E.g., `dr-001`, `dr-002`
    - **Random**: Generate a random alphanumeric string (lowercase letters and digits, i.e. base36) of configured `length` (default 6)

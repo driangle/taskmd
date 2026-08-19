@@ -162,3 +162,29 @@ created: 2026-02-14
 		t.Errorf("expected 011, got %q", output)
 	}
 }
+
+func TestNextID_CountsArchivedIDs(t *testing.T) {
+	repo := newTaskRepo(t, map[string]string{
+		"001-first.md": `---
+id: "001"
+title: "First task"
+status: pending
+priority: medium
+created: 2026-02-14
+---
+`,
+		"archive/002-second.md": `---
+id: "002"
+title: "Second task"
+status: completed
+priority: medium
+created: 2026-02-14
+---
+`,
+	})
+
+	output := strings.TrimSpace(nextIDStdout(t, repo))
+	if output != "003" {
+		t.Errorf("expected 003 (002 is archived), got %q", output)
+	}
+}

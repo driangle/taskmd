@@ -51,6 +51,25 @@ func scanActiveAndArchived(scanDir string, flags GlobalFlags) (active, archived 
 	return result.Tasks, archived, nil
 }
 
+// scanIDPool returns the IDs of every task in scanDir, active and archived.
+// ID generation must see archived tasks too: archiving a task removes it from
+// the active scan, and without this the next `add` would hand its ID out again.
+func scanIDPool(scanDir string, flags GlobalFlags) ([]string, error) {
+	active, archived, err := scanActiveAndArchived(scanDir, flags)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(active)+len(archived))
+	for _, task := range active {
+		ids = append(ids, task.ID)
+	}
+	for _, task := range archived {
+		ids = append(ids, task.ID)
+	}
+	return ids, nil
+}
+
 // reportScanErrors prints scan errors to stderr when verbose is enabled.
 func reportScanErrors(errs []scanner.ScanError, verbose bool) {
 	if !verbose || len(errs) == 0 {

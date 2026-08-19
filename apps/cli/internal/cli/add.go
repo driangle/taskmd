@@ -41,7 +41,8 @@ var addCmd = &cobra.Command{
 
 The title is used to generate both the task title and the filename slug.
 Use --slug to provide a custom slug instead of the auto-generated one.
-A sequential ID is automatically assigned based on existing tasks.
+A sequential ID is automatically assigned based on existing tasks, including
+archived ones, so IDs are never reused.
 
 Use --template to start from a reusable template (bug, feature, chore, or custom).
 CLI flags override template values when explicitly provided.
@@ -147,13 +148,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 }
 
 func resolveNextID(scanDir string, flags GlobalFlags) (string, error) {
-	tasks, err := scanTasks(scanDir, flags)
+	ids, err := scanIDPool(scanDir, flags)
 	if err != nil {
 		return "", err
-	}
-	ids := make([]string, len(tasks))
-	for i, task := range tasks {
-		ids[i] = task.ID
 	}
 
 	cfg := resolveIDConfig()

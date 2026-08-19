@@ -18,7 +18,8 @@ var nextIDCmd = &cobra.Command{
 	Long: `Next-id scans task files and outputs the next available sequential ID.
 
 It finds the highest numeric ID among existing tasks and returns max + 1,
-preserving any common prefix and zero-padding.
+preserving any common prefix and zero-padding. Archived tasks are included,
+so an archived task's ID is never handed out again.
 
 By default outputs just the ID string (ideal for scripting). Use --format json
 for structured output with additional metadata.
@@ -42,14 +43,9 @@ func runNextID(_ *cobra.Command, args []string) error {
 
 	scanDir := ResolveScanDir(args)
 
-	tasks, err := scanTasks(scanDir, flags)
+	ids, err := scanIDPool(scanDir, flags)
 	if err != nil {
 		return err
-	}
-
-	ids := make([]string, len(tasks))
-	for i, task := range tasks {
-		ids[i] = task.ID
 	}
 
 	cfg := resolveIDConfig()

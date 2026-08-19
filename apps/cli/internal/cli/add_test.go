@@ -595,3 +595,26 @@ func TestAdd_PhaseOmittedWhenEmpty(t *testing.T) {
 		t.Error("phase should not appear in frontmatter when not set")
 	}
 }
+
+// TestAdd_DoesNotReuseArchivedID reproduces the reported bug: after a task is
+// archived, `add` handed its ID out again because ID generation only scanned
+// active tasks. Walks the full reported flow: add, add, complete, archive, add.
+func TestAdd_DoesNotReuseArchivedID(t *testing.T) {
+	repo := newTaskRepo(t, nil)
+
+	addStdout(t, repo, "First task")
+	addStdout(t, repo, "Second task")
+
+	if res := repo.Run("set", "002", "--status", "completed"); res.Err != nil {
+		t.Fatalf("set failed: %v", res.Err)
+	}
+	if res := repo.Run("archive", "--all-completed", "-y"); res.Err != nil {
+		t.Fatalf("archive failed: %v", res.Err)
+	}
+
+	output := addStdout(t, repo, "Third task")
+
+	if !strings.Contains(output, "Created task 003") {
+		t.Errorf("expected 'Created task 003' (002 is archived), got: %s", output)
+	}
+}

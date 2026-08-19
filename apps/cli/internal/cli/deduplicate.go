@@ -109,7 +109,12 @@ func runDeduplicate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	reassignments, err := planReassignments(scanResult.Tasks)
+	archived, err := taskScanner.ScanArchive()
+	if err != nil {
+		return fmt.Errorf("archive scan failed: %w", err)
+	}
+
+	reassignments, err := planReassignments(scanResult.Tasks, collectAllIDs(archived))
 	if err != nil {
 		return err
 	}
@@ -272,9 +277,11 @@ func promptDisambiguation(ambRefs []ambiguousRef, reassignments []reassignment) 
 }
 
 // planReassignments detects duplicate IDs and plans which tasks need new IDs.
-func planReassignments(tasks []*model.Task) ([]reassignment, error) {
+// reservedIDs are IDs that are not in tasks but must not be handed out (e.g.
+// archived tasks).
+func planReassignments(tasks []*model.Task, reservedIDs []string) ([]reassignment, error) {
 	idMap := buildIDMap(tasks)
-	allIDs := collectAllIDs(tasks)
+	allIDs := append(collectAllIDs(tasks), reservedIDs...)
 	cfg := resolveIDConfig()
 
 	var reassignments []reassignment
