@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail  # -E so the ERR trap is inherited by functions
 
 # Colors for output
 RED='\033[0;31m'
@@ -533,8 +533,23 @@ update_release_notes() {
 
     log_step "Updating release notes"
 
-    gh release edit "$tag" --notes-file "$notes_file"
-    log_success "Release notes applied to $tag"
+    # CI creates the release in a late job step, so it may not exist the instant
+    # the workflow reports success.
+    local attempt
+    for attempt in $(seq 1 12); do
+        gh release view "$tag" &> /dev/null && break
+        sleep 5
+    done
+
+    if gh release edit "$tag" --notes-file "$notes_file"; then
+        log_success "Release notes applied to $tag"
+        return 0
+    fi
+
+    log_error "Failed to apply release notes to $tag"
+    log_info "Apply them manually with:"
+    log_info "  gh release edit $tag --notes-file $notes_file"
+    return 1
 }
 
 # Push changes
@@ -573,14 +588,27 @@ monitor_workflow() {
     log_step "Monitoring GitHub Actions workflow"
 
     log_info "Waiting for workflow to start..."
-    sleep 5
 
-    # Get the latest workflow run for the release workflow
-    local workflow_id
-    workflow_id=$(gh run list --workflow=release.yml --limit=1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
+    # Find the run triggered by THIS tag. Taking the newest run unconditionally
+    # races with GitHub registering it, and silently latches onto the previous
+    # release's run - which, being already complete, reports instant success.
+    local sha
+    sha=$(git rev-parse "$tag^{commit}")
+
+    local workflow_id=""
+    local attempt
+    for attempt in $(seq 1 30); do
+        workflow_id=$(gh run list --workflow=release.yml --limit=20 \
+            --json databaseId,headSha,headBranch \
+            --jq "[.[] | select(.headBranch == \"$tag\" or .headSha == \"$sha\")][0].databaseId" \
+            2>/dev/null || echo "")
+        [[ -n "$workflow_id" && "$workflow_id" != "null" ]] && break
+        workflow_id=""
+        sleep 5
+    done
 
     if [[ -z "$workflow_id" ]]; then
-        log_warning "Could not find workflow run"
+        log_warning "Timed out waiting for a workflow run for $tag"
         log_info "Check manually at: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/actions"
         log_info "Release artifacts will be available once the workflow completes"
         return 0
@@ -619,6 +647,21 @@ get_release_url() {
         repo_url=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
         echo "https://github.com/$repo_url/releases/tag/$tag"
     }
+}
+
+# Version to roll back to if a release step fails; empty disables rollback
+# (set once the tag has been pushed and rolling back is no longer appropriate).
+ROLLBACK_VERSION=""
+
+# ERR trap installed around the release steps in main()
+on_release_error() {
+    local exit_code=$?
+    trap - ERR
+    log_error "Release step failed (exit $exit_code)"
+    if [[ -n "$ROLLBACK_VERSION" ]]; then
+        rollback "$ROLLBACK_VERSION"
+    fi
+    error_exit "Release failed"
 }
 
 # Rollback on failure
@@ -700,46 +743,66 @@ main() {
         error_exit "Notes file not found: $NOTES_FILE"
     fi
 
-    # Perform release
-    local release_failed=false
+    # Perform release.
+    #
+    # These steps run under a plain ERR trap rather than `{ ... } || ...`:
+    # placing a group (or a function call) in a tested context makes bash ignore
+    # `set -e` for everything inside it, so a mid-block failure would neither
+    # abort nor trip the rollback - it would just carry on and tag anyway.
     local workflow_failed=false
+    local notes_failed=false
 
-    {
-        update_versions "$clean_version"
-        release_sdk_module
-        sync_sdk_pin
-        verify_external_build
-        commit_version_changes "$clean_version"
-        create_git_tag "$clean_version"
+    ROLLBACK_VERSION="$clean_version"
+    trap on_release_error ERR
 
-        if [[ "$NO_PUSH" == "false" ]]; then
-            push_changes "$clean_version"
+    update_versions "$clean_version"
+    release_sdk_module
+    sync_sdk_pin
+    verify_external_build
+    commit_version_changes "$clean_version"
+    create_git_tag "$clean_version"
 
-            # Monitor workflow
-            if ! monitor_workflow "$clean_version"; then
-                workflow_failed=true
-            fi
+    if [[ "$NO_PUSH" == "false" ]]; then
+        push_changes "$clean_version"
 
-            # Apply release notes to the CI-created release
-            if [[ "$workflow_failed" == "false" ]]; then
-                update_release_notes "$clean_version" "$NOTES_FILE"
-            fi
-        else
-            log_warning "Skipping push (--no-push enabled)"
-            log_info "To push manually: git push origin $(git rev-parse --abbrev-ref HEAD) && git push origin $tag"
+        # The tag is public from here on, so rolling back is no longer the right
+        # move - report failures instead.
+        trap - ERR
+        ROLLBACK_VERSION=""
+
+        # Monitor workflow
+        if ! monitor_workflow "$clean_version"; then
+            workflow_failed=true
         fi
-    } || {
-        release_failed=true
-    }
 
-    if [[ "$release_failed" == "true" ]]; then
-        rollback "$clean_version"
-        error_exit "Release failed"
+        # Apply release notes to the CI-created release
+        if [[ "$workflow_failed" == "false" ]]; then
+            if ! update_release_notes "$clean_version" "$NOTES_FILE"; then
+                notes_failed=true
+            fi
+        fi
+    else
+        trap - ERR
+        ROLLBACK_VERSION=""
+        log_warning "Skipping push (--no-push enabled)"
+        log_info "To push manually: git push origin $(git rev-parse --abbrev-ref HEAD) && git push origin $tag"
     fi
 
     # Report results
     echo ""
-    if [[ "$workflow_failed" == "true" ]]; then
+    if [[ "$notes_failed" == "true" ]]; then
+        echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
+        echo -e "${YELLOW}║  Released, but Notes Not Applied!     ║${NC}"
+        echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}\n"
+
+        log_warning "Version: $clean_version"
+        log_warning "Tag: $tag (pushed, workflow succeeded)"
+        log_error "Release notes were NOT applied - the release body is empty"
+        log_info "Apply them with:"
+        log_info "  gh release edit $tag --notes-file $NOTES_FILE"
+
+        exit 1
+    elif [[ "$workflow_failed" == "true" ]]; then
         echo -e "${YELLOW}╔════════════════════════════════════════╗${NC}"
         echo -e "${YELLOW}║   Tag Pushed but Workflow Failed!     ║${NC}"
         echo -e "${YELLOW}╚════════════════════════════════════════╝${NC}\n"
