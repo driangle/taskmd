@@ -42,13 +42,11 @@ alongside cost and latency so we can tell whether the skill file earns its conte
   - `workspace/` — full `taskmd init` project (`.taskmd.yaml`, `.taskmd/`, `tasks/CLAUDE.md`,
     `tasks/TASKMD_SPEC.md`) with tasks grouped across `cli/`, `web/` and the root
   - `workspace-bare/` — no config, no docs, `taskmd` shadowed off PATH via `.shadow/taskmd`
-  - **This skill needs more fixture than add-task has.** add-task's five tasks cover
-    `pending` / `in-progress` / `completed` and a partially-checked subtask list
-    (`cli/001` is 1 of 4), but *no* task carries `owner` or `dependencies` — both of which
-    the plugin skill's output format promises. Add at least one task (e.g. `006`) with a
-    populated `owner` and a `dependencies` list so those fields can actually be graded,
-    and keep the spread of statuses/priorities/groups so a lookup can be wrong in a
-    visible way
+  - Fork `evals/fixtures/` (shared base) rather than add-task's: it now carries `owner` on
+    `001`/`003`/`005`/`006`, a real `dependencies` edge on `003`, and two phases — the fields the
+    plugin skill's output format promises and the add-task fixture lacked. The spread of
+    statuses, priorities and groups is preserved, so a lookup can still be wrong visibly.
+    `evals/fixtures/README.md` records the verified ground truth
 - [ ] Write deterministic graders as a stdlib-only Go module under
       `evals/get-task-status/workspace/.verify/` (`main.go` dispatching a `checks` map,
       as in add-task), reading the agent's output from **stdin** — see *Grading notes*

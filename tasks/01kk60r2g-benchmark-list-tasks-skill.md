@@ -36,16 +36,16 @@ it costs to load.
       `skival validate suite.yaml`
 - [ ] Set up the fixture workspaces under `evals/list-tasks/`
   - `workspace/` — full `taskmd init` project. The `add-task` fixture already covers everything
-    this skill needs to read: five tasks (`001`–`005`) with mixed statuses (`in-progress`,
-    `pending`, `completed`), priorities (`critical`/`high`/`medium`/`low`), types and tags, split
-    across `tasks/cli/`, `tasks/web/` and the root. Copy it rather than pointing `dir` at
-    `../add-task/workspace`, so the two suites stay independently editable — but keep the task
-    content identical so results remain comparable.
+    this skill needs to read: six tasks (`001`–`006`) with mixed statuses (`in-progress`,
+    `pending`, `completed`), priorities (`critical`/`high`/`medium`/`low`), types, tags, phases
+    and owners, split across `tasks/cli/`, `tasks/web/` and the root. Copy it rather than
+    pointing `dir` at the shared fixture, so the suites stay independently editable.
   - `workspace-bare/` — the stripped variant: no `.taskmd.yaml`, no `.taskmd/`, no
     `tasks/CLAUDE.md`, no `TASKMD_SPEC.md`, and a `.shadow/taskmd` stub first on `PATH`
-  - No fixture beyond `add-task`'s is required. One optional extension: none of the fixture
-    tasks set `phase` or `owner`, so evals over those fields are not gradable today — add them
-    only if a phase/owner eval is wanted.
+  - Fork `evals/fixtures/` (shared base) rather than add-task's: it adds `phase` on every task
+    (two configured phases), `owner` on four, and a dependency edge — so `--phase` and owner
+    filters are now gradable. It has six tasks, not five; graders must not hardcode a count of
+    five. `evals/fixtures/README.md` records the verified ground truth.
 - [ ] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`
       (`main.go` + `checks.go` + `assert.go`, run as `cd .verify && GOWORK=off go run . <name>`)
 - [ ] Resolve the read-only grading question first — see **Grading notes** below; the prompt
@@ -61,17 +61,19 @@ it costs to load.
 One behavior per eval — the `add-task` suite deliberately split `add-bug-template` from
 `add-group-routing` because a single eval asserting two things lets one failure mask the other.
 
-- [ ] `list-all` — "show me all my tasks". Asserts the full set `001`–`005` is reported,
+- [ ] `list-all` — "show me all my tasks". Asserts the full set `001`–`006` is reported,
       including the `completed` task `005` and the ones nested under `tasks/cli/` and
       `tasks/web/`. This is the eval that catches an agent that only globs the root directory.
 - [ ] `list-status-filter` — "which of my tasks are still pending?". Asserts exactly
-      `002`, `003`, `004` — `001` is `in-progress` and `005` is `completed`, so both must be
-      excluded. Requires a negative assertion (see Grading notes).
+      `002`, `003`, `004`, `006` — `001` is `in-progress` and `005` is `completed`, so both must
+      be excluded. Requires a negative assertion (see Grading notes).
 - [ ] `list-scope-filter` — "what's on the plate for the CLI?". Asserts exactly `001` and `005`,
       the two tasks under `tasks/cli/`.
 - [ ] `list-json-format` — "list my high priority tasks as JSON". Asserts a parseable JSON array
-      containing exactly `001` and `005`, each with at least `id` and `title`. Grades output
-      *shape* as well as content, which the table-format evals cannot.
+      containing exactly `001`, `005` and `006`, each with at least `id` and `title`. Grades
+      output *shape* as well as content, which the table-format evals cannot.
+- [ ] `list-phase-filter` — "what's in the mvp phase?". Asserts exactly `001`, `002`, `003`, `005`
+      — newly gradable now that the fixture carries phases.
 
 ## Grading notes
 
@@ -94,14 +96,14 @@ That gives three routes, in preference order:
    style, and keeps the prompt natural ("show me my tasks") — no write step bolted onto a
    read-only skill. Match on stable tokens (IDs, field names), never on sentence phrasing.
 2. **`output_contains` for cheap positive assertions.** It asserts substrings are present in the
-   agent's output, which covers `list-all` well (all five IDs must appear). It is
+   agent's output, which covers `list-all` well (all six IDs must appear). It is
    presence-only — there is no `output_not_contains` (confirmed in `internal/verifier/output.go`)
    — so it **cannot** express `list-status-filter` or `list-scope-filter` correctly: an agent that
-   dumps all five tasks would pass a "pending tasks" eval because the three expected IDs are all
+   dumps all six tasks would pass a "pending tasks" eval because the four expected IDs are all
    present. Use it as a smoke assertion; the two-sided grade belongs in `check_output`.
 3. **A no-mutation check.** Independently of correctness, every eval should run a Go check
    asserting the fixture is untouched: `taskmd -d tasks list --format json` still returns exactly
-   the five baseline tasks with unchanged fields, and `taskmd validate` passes. That catches the
+   the six baseline tasks with unchanged fields, and `taskmd validate` passes. That catches the
    real failure mode of a read skill — an agent that "helpfully" edits or reorganizes files — and
    it is the only filesystem assertion worth making here.
 

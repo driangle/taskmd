@@ -1,0 +1,11 @@
+dir: ./tasks
+
+phases:
+  - id: mvp
+    name: "MVP"
+    description: "Ship the first usable release"
+    due: 2026-04-01
+  - id: polish
+    name: "Polish"
+    description: "Round off the rough edges"
+    due: 2026-06-01

@@ -44,12 +44,15 @@ and latency per sample.
     `TASKMD_SPEC.md`, `tasks/cli/`, `tasks/web/`, root-level tasks, `src/app.go`), and
     `workspace-bare/` stripped the same way — no `.taskmd.yaml`, no `.taskmd/`, no
     `tasks/CLAUDE.md`, no `TASKMD_SPEC.md`, and `.shadow/taskmd` first on `PATH`
-  - **This skill needs a purpose-built task set, not the add-task one.** The add-task fixture
-    has no `dependencies` and no `phase` spread, so "what's next?" has several defensible
-    answers there. Author the dependency graph, priority ladder, statuses and phases so that
-    **each eval has exactly one correct answer and every runner-up is wrong for a stated,
-    checkable reason** (blocked by an incomplete dependency, wrong status, out of scope).
-    Without that, the grader measures taste rather than correctness.
+  - Fork `evals/fixtures/` (shared base), which now carries the dependency edge, phases and
+    owners the add-task fixture lacked. Read `evals/fixtures/README.md` first — it records the
+    verified ground truth for `taskmd next` on that fixture.
+  - **`taskmd next` returns a ranked list, not a single answer, and #1 is not the
+    highest-priority task.** On the shared fixture it ranks `002` first for being on the critical
+    path, ahead of two `high` tasks. So "which task is #1" is *not* a crisp assertion: an agent
+    answering `001` or `006` is reasoning defensibly even though the CLI disagrees. Grade the
+    robust fact — a blocked task must never be recommended — and report first-place agreement as
+    prose, not pass/fail. Extend the fixture only where an eval needs a case it lacks.
   - Keep the answer stable across variants: the lite skill ranks priority → effort → created,
     the plugin skill defers to `taskmd next`. If those two ranking rules could disagree on the
     fixture, the eval measures the tie-break, not the skill.
@@ -63,11 +66,12 @@ and latency per sample.
 - [ ] Write improvement suggestions (`evals/next-task/SUGGESTIONS.md`)
 - [ ] Proposed evals — one behavior each, so a failure in one can't mask another (the add-task
       suite split `add-bug-template` from `add-group-routing` for exactly this reason):
-  - `next-obvious` — "what should I work on next?" with one unambiguously highest-priority,
-    unblocked, `pending` task. The floor case: if a variant misses this, nothing else matters.
-  - `next-skips-blocked` — same question, but the highest-priority pending task has a
-    dependency that is not `completed`. The correct answer is the next-best *unblocked* task;
-    recommending the blocked one fails.
+  - `next-skips-blocked` — **the anchor eval.** "What should I work on next?" On the shared
+    fixture `003` is `critical` priority but blocked by pending `002`, and `taskmd next` omits it
+    entirely (verified). An agent sorting by priority alone recommends it and fails. This is the
+    one assertion here that is genuinely two-sided and stable.
+  - `next-obvious` — same question, graded loosely: the answer must be one of the *unblocked*
+    pending tasks. Do not assert a specific winner; see the ranked-list note above.
   - `next-none-available` — "anything I can pick up?" with every pending task blocked and
     everything else `in-progress` or `completed`. The correct answer is that nothing is
     available; an agent that invents a recommendation fails.
@@ -108,9 +112,9 @@ be presented as a recommendation, and some form of "nothing available / all bloc
 
 Two caveats to design against:
 
-1. **The fixture carries the fairness.** A two-sided ID assertion is only fair if exactly one
-   answer is correct. This is the fixture-design constraint above, and it is the main work of
-   this task.
+1. **The fixture carries the fairness.** A two-sided ID assertion is only fair when the excluded
+   set is genuinely wrong — which holds for blocked tasks and not for ranking order. Assert the
+   negative set (blocked IDs must not appear); keep the positive side loose.
 2. **Substring matching on free prose is brittle.** IDs are matchable; phrasings like "nothing
    is available" are not. Prefer numeric-ID assertions, keep the negative set to IDs, and match
    the "nothing available" case on a small set of alternatives rather than one exact string. If
@@ -120,8 +124,8 @@ Two caveats to design against:
 ## Acceptance Criteria
 
 - A skival suite exists at `evals/next-task/suite.yaml` and passes `skival validate suite.yaml`
-- The fixture admits exactly one correct answer per eval, and each runner-up is excluded for a
-  stated, checkable reason
+- Every eval's negative set (IDs that must not be recommended) is excluded for a stated,
+  checkable reason — not merely out-ranked
 - Every grader is shown to fail as well as pass, by hand, before a full run is paid for
 - All four variants are executed with per-sample isolation and pinned tool access
   (`allowed_tools` **and** `disallowed_tools`), with no tool leaks in the conversation logs

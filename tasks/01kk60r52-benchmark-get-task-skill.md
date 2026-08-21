@@ -37,9 +37,10 @@ whether `taskmd init`'s own docs already carry the behavior.
   - `workspace/` — full `taskmd init` project, same grouped fixture tasks as add-task
     (`001`/`005` in `cli/`, `003` in `web/`, `002`/`004` at the root)
   - `workspace-bare/` — no config, no docs, `taskmd` shadowed off PATH via `.shadow/taskmd`
-  - the add-task fixture is **not** sufficient as-is: no fixture task has `dependencies`, and
-    no two tasks share an ambiguous ID prefix, so the blocked-state and ambiguous-lookup evals
-    need a fixture task added (e.g. a `006` that depends on `002`)
+  - Fork `evals/fixtures/` (shared base) rather than add-task's: `003` now depends on pending
+    `002`, giving the blocked-state eval a real target, and `001`/`005` are both auth tasks, so
+    "the auth task" is a genuinely ambiguous keyword query without a contrived near-duplicate.
+    `evals/fixtures/README.md` records the verified ground truth
 - [ ] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`,
       following `evals/add-task/workspace/.verify/{checks.go,assert.go}`
 - [ ] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
@@ -60,7 +61,7 @@ One behavior per eval — add-task deliberately split `add-bug-template` from
       the available tasks) rather than inventing one or reporting the nearest match as if it were
       the one asked for
 - [ ] `get-blocked-state` — "can I start task 006?"; must report the unmet dependency on `002`
-      and that the task is not startable (requires the new fixture task above)
+      and that the task is not startable (fixture task `003`, blocked by pending `002`)
 - [ ] `get-json-format` — "give me task 004 as JSON"; output must contain a parseable JSON object
       carrying at least `id`, `title` and `status` with the fixture's values
 
@@ -97,7 +98,7 @@ Two honest caveats to record in the report:
 ## Acceptance Criteria
 
 - A skival suite exists for get-task and passes `skival validate`
-- Fixture gaps (dependency chain, ambiguous lookup) are closed in the workspaces
+- The forked fixture keeps the dependency edge and the ambiguous auth-task pair intact
 - All four variants are executed with per-sample isolation and pinned tool access
   (`allowed_tools` **and** `disallowed_tools`)
 - Every eval's grader is verified to fail on wrong output, not just pass on right output

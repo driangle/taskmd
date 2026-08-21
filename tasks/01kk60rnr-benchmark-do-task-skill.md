@@ -43,9 +43,9 @@ and latency per sample.
   - Add at least one fixture task whose subtasks describe a **small, deterministic** change in
     `src/` (e.g. resolving the existing `// TODO: implement graceful shutdown` in `src/app.go`
     with a named function), so "did the work actually get done" is mechanically checkable
-  - Decide the `worklogs` setting explicitly: `evals/add-task/workspace/.taskmd.yaml` currently
-    contains only `dir: ./tasks`, so worklogs are **off** — set `worklogs: true` in the do-task
-    fixture if the worklog eval is to assert a file was created
+  - No `worklogs` config is needed: `taskmd worklog` writes unconditionally and there is **no
+    `worklogs` key in `.taskmd.yaml`**, despite the repo's `CLAUDE.md` documenting one (verified
+    against the installed CLI — see the note in `evals/fixtures/README.md`)
 - [ ] Write deterministic graders as a stdlib-only Go module under the suite's
       `workspace/.verify/` (`checks.go` + `assert.go` + `taskmd.go`, one entry per check in the
       `checks` map), invoked as `cd .verify && GOWORK=off go run . <check-id>`
@@ -65,7 +65,7 @@ and latency per sample.
 - `do-code-change` — "do task 006": the pinned change landed — the named function exists in
   `src/app.go`, the resolved TODO comment is gone, and the fixture's `go test ./src/...` passes.
 - `do-worklog` — "start task 001 and keep a worklog": `tasks/cli/.worklogs/001.md` exists and
-  carries at least one timestamped `##` heading (requires `worklogs: true` in the fixture config).
+  carries at least one timestamped `##` heading.
 - `do-lookup-by-name` — "work on the full-text search task": the agent resolves the name to task
   `002` and moves *that* task, not a keyword-adjacent one — catches lookup failures that the
   ID-based evals hide.
@@ -82,9 +82,9 @@ the suite:
 - status transitioned to `in-progress` and ended `completed` (via `taskmd -d tasks list --format json`)
 - `- [ ]` subtasks checked off as `- [x]` in the task file
 - worklog file created at `tasks/<group>/.worklogs/<ID>.md` (or `tasks/.worklogs/<ID>.md` for root
-  tasks) with a timestamped heading — but read `.taskmd.yaml` for whether worklogs are enabled in the
-  fixture rather than assuming; both skill files say to skip worklogs *silently* when they are off,
-  so with the current `add-task` config the correct behavior is **no worklog file**
+  tasks) with a timestamped heading. `taskmd worklog` writes unconditionally — there is no
+  `worklogs` config key to gate it — so a missing worklog file is a genuine miss, not a
+  config-dependent maybe.
 - `taskmd validate` still passes over the whole task set
 - no stray new task was created, and no unrelated fixture task changed status
 

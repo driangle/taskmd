@@ -32,8 +32,14 @@ Requires `taskmd` and `go` on `PATH`. The `taskmd` used is whatever is installed
 ## How a suite is put together
 
 **`workspace/`** is the fixture project every sample starts from: `taskmd init` output plus
-five baseline tasks (`001`–`005`, mixed statuses/priorities/types) and `src/app.go` with TODO
-comments. Task content is carried over from `benchmark/fixtures/` so results stay comparable.
+baseline tasks (mixed statuses/priorities/types) and `src/app.go` with TODO comments.
+
+New suites fork [`fixtures/`](fixtures) — the shared base, six tasks carrying `phase`, `owner` and
+a real dependency edge, with its verified ground truth recorded in
+[`fixtures/README.md`](fixtures/README.md). **`add-task/workspace/` is frozen and stays on its own
+five-task copy**: its graders hardcode `baselineIDs` as `001`–`005`, and its committed
+[REPORT.md](add-task/REPORT.md) baseline was measured against that exact fixture, so adding a task
+there would both break the graders and invalidate the numbers.
 
 The fixture tasks are **grouped** — `tasks/cli/`, `tasks/web/`, and two cross-cutting tasks at
 the root. That is deliberate: an eval that asserts "route this to `cli`" against a flat project
