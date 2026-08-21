@@ -75,9 +75,23 @@ taskmd verify <id>                       # Run acceptance checks
 - A task with unmet dependencies should stay `pending` or `blocked`
 - Circular dependencies are invalid -- use `taskmd validate` to detect them
 
+### Organizing Tasks
+
+Five fields group tasks; they are not interchangeable. Ask: does this grouping end, and
+must it happen before another one?
+
+- Ends and is sequenced -> `phase` (a stage of the roadmap: `v0.4` -> `v0.5` -> `v1.0`)
+- Ends but is not sequenced -> `parent` (an epic task the members point at)
+- Never ends -> `group` (structural area) or `tags` (cross-cutting attribute)
+
+Do not put long-lived workstreams in `phases`. Something like `vscode-extension` finishes
+but is not a stage of a sequence -- make it a parent task, and use `dependencies` between
+parents for any ordering that genuinely exists. See `TASKMD_SPEC.md` for the full table.
+
 ### Phases
 
 - When introducing a new phase, add it to the `phases` list in `.taskmd.yaml` before assigning it to tasks
+- Keep the phase list short and genuinely ordered -- `next` ranks by phase position
 
 ## Worklogs
 

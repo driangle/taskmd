@@ -32,10 +32,10 @@ Description and subtasks go here.
 | `tags` | No | Lowercase, hyphen-separated (e.g., `[core, api]`) |
 | `group` | No | Logical grouping (derived from directory if omitted) |
 | `owner` | No | Free-form assignee |
-| `phase` | No | Phase identifier (e.g., `"v0.2"`) — see Configuration below |
+| `phase` | No | Phase identifier (e.g., `"v0.2"`) — an ordered stage; see Choosing an Organizing Axis |
 | `touches` | No | Scope identifiers for conflict detection (e.g., `["cli/graph"]`) |
 | `context` | No | File paths relevant to the task (e.g., `["docs/api-design.md"]`) |
-| `parent` | No | Parent task ID — organizational only, no blocking |
+| `parent` | No | Parent task ID — organizational only, no blocking. Models a bounded initiative |
 | `created_at` | No | `YYYY-MM-DD` (alias: `created`) |
 | `verify` | No | Acceptance checks (see below) |
 | `pr` | No | Pull request URLs — managed via `taskmd set --add-pr <url>` |
@@ -76,6 +76,30 @@ tasks/
 ```
 
 Group resolution: explicit `group` field > parent directory name > none.
+
+## Choosing an Organizing Axis
+
+Five fields group tasks, and they are not interchangeable:
+
+| Axis | Per task | Ordered? | Ends? | Use for |
+|------|----------|----------|-------|---------|
+| `group` | one | no | never | An enduring area of the product — `cli`, `web` |
+| `tags` | many | no | never | Cross-cutting attributes — `go`, `mvp`, `ux` |
+| `touches` | many | no | never | Code areas a task modifies — conflict detection |
+| `parent` | one | no | **yes** | A bounded initiative with a goal and an end |
+| `phase` | one | **yes** | **yes** | A time-ordered stage of the roadmap |
+
+The test: **does this grouping end, and must it happen before another one?**
+
+- Ends and is sequenced → `phase`
+- Ends but is not sequenced → `parent` (an epic task the members point at)
+- Never ends → `group` (structural) or `tags` (attribute)
+
+Do not put long-lived workstreams in `phases`. A phase list is a sequence
+(`v0.4` → `v0.5` → `v1.0`); entries like `vscode-extension` are initiatives that finish
+but are not stages, and belong in a parent task — with `dependencies` between parents for
+any ordering that genuinely exists. Keep the phase list short: `next` ranks by phase
+position, and a long unordered list dilutes that signal.
 
 ## Configuration (.taskmd.yaml)
 

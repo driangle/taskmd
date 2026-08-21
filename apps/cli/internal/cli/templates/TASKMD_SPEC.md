@@ -125,7 +125,7 @@ tags:
 
 **`owner`** — Free-form string for assigning a task to a person or team. Used for filtering and display; no validation is applied.
 
-**`phase`** — String identifying the phase, sprint, or release a task belongs to. When phases are configured in `.taskmd.yaml`, this should match a phase `id`. Used for time-based grouping and filtering.
+**`phase`** — String identifying the phase, sprint, or release a task belongs to. When phases are configured in `.taskmd.yaml`, this should match a phase `id`. Used for time-based grouping and filtering. Phases are an ordered sequence; for a bounded initiative that is not a stage of that sequence, use [`parent`](#optional-fields) instead — see [Choosing an Organizing Axis](#choosing-an-organizing-axis).
 
 ```yaml
 phase: "core-cli"
@@ -179,6 +179,9 @@ The `context` command merges files from both `touches` (via scope resolution) an
 ```yaml
 parent: "045"
 ```
+
+A parent task is the recommended way to model a bounded initiative — a body of work with a
+goal and an end, such as an extension or a platform port. See [Choosing an Organizing Axis](#choosing-an-organizing-axis).
 
 **`created_at`** — Date when the task was created, in `YYYY-MM-DD` format. The deprecated alias `created` is also accepted for backward compatibility.
 
@@ -364,6 +367,41 @@ Scopes are optionally defined in `.taskmd.yaml` as a map of scope identifier to 
 | `description` | No | Human-readable explanation, included in validation messages |
 
 When scopes are configured, `touches` values not found in the config produce a warning. When no scopes config exists, all values are accepted silently.
+
+## Choosing an Organizing Axis
+
+taskmd offers five ways to group tasks. They are not interchangeable — each answers a
+different question, and picking the wrong one produces groupings that tools cannot rank
+or report on usefully.
+
+| Axis | Per task | Ordered? | Ends? | Use for |
+|------|----------|----------|-------|---------|
+| `group` | one | no | never | An enduring area of the product — `cli`, `web`, `docs` |
+| `tags` | many | no | never | Cross-cutting attributes — `go`, `mvp`, `ux` |
+| `touches` | many | no | never | Code areas a task modifies — drives conflict detection |
+| `parent` | one | no | **yes** | A bounded initiative with a goal and an end |
+| `phase` | one | **yes** | **yes** | A time-ordered stage of the roadmap — a sprint or release |
+
+The distinguishing test: **does this grouping have an end state, and does it need to
+happen before another one?**
+
+- Ends, and is sequenced before others → **`phase`**
+- Ends, but is not sequenced → **`parent`** (an epic task the members point at)
+- Never ends → **`group`** (structural) or **`tags`** (attribute)
+
+The common mistake is putting long-lived workstreams into `phases`. A phase list is a
+sequence: `v0.4` → `v0.5` → `v1.0`. Entries like `vscode-extension` or `windows-support`
+are initiatives that finish but are not stages of a pipeline — they belong in a parent
+task, with `dependencies` between those parents expressing any ordering that genuinely
+exists. Overloading `phases` this way makes phase ordering meaningless, because most of
+the list is not actually ordered.
+
+Modeling an initiative as a parent task also gives it a home for its rationale and
+acceptance criteria, and lets `next --root <id>` scope recommendations to that initiative.
+
+Keep the phase list short. Phase position contributes a ranking bonus in `next` that
+decays with position, so a list of many unordered "phases" dilutes the signal it exists
+to provide.
 
 ## File Organization
 
