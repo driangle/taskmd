@@ -4,7 +4,7 @@ description: Split a large task into smaller sub-tasks. Accepts a task ID, evalu
 allowed-tools: Bash, Read, Glob, Write
 ---
 
-# Divide and Conquer
+# Split Task
 
 Evaluate a task's complexity and, if warranted, split it into smaller, focused sub-tasks.
 
