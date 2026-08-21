@@ -66,6 +66,12 @@ can still reach the `Skill` tool (loading plugin skills installed in your own `~
 configuration, and neither is visible in skival's report. Every suite must pin
 `disallowed_tools` as well as `allowed_tools`.
 
+Newer skival turns this from a manual audit into a hard assertion: `tool_not_used` fails any
+sample that touched a forbidden tool, and upstream has since added default-deny tool enforcement
+and a per-variant tool census in the report. **The `skival` on this machine predates all of it** —
+`skival validate` rejects `tool_not_used` with `field tools not found`. Run `make install` in the
+skival checkout before relying on it, and until then keep auditing by hand.
+
 Audit a run's conversations before trusting it; anything outside the variant's `allowed_tools`
 is a leak:
 
@@ -79,6 +85,32 @@ for f in glob.glob('results/<run>/evals/*/*/*.conversation.jsonl'):
             if isinstance(b,dict) and b.get('type')=='tool_use': c[b['name']]+=1
 print(dict(c))"
 ```
+
+### Verifier types
+
+The `add-task` suite uses only two verifiers, which has repeatedly misled people into thinking
+those are the only ones. skival registers ten (`internal/verifier/pipeline.go`). The ones that
+matter for these suites:
+
+| Type | Required | Sees | Use for |
+|------|----------|------|---------|
+| `agent_exits_ok` | — | exit status | every eval, as a floor |
+| `check` | `run` | the workspace after the run | skills that mutate task files |
+| `check_output` | `run` | agent's final text on **stdin** | read-only skills (`list`, `get`, `next`, `status`) |
+| `output_contains` | `values` | agent's final text | cheap presence-only smoke assertions |
+| `file_contains` | `path` | one file | narrow single-file assertions |
+| `tool_not_used` | `tools` | the conversation | hard hermeticity backstop (see below) |
+| `judge` | `criteria` | tool activity + response | avoid — LLM grading is what `benchmark/` did badly |
+
+`check_output` is the key one for read-only skills: same stdlib-only Go grader as `check`, reading
+`os.Stdin` instead of the task file. Two rules keep those graders honest:
+
+- **Assert two-sided.** The expected IDs must appear *and* the competing ones must not.
+  `output_contains` is presence-only — there is no `output_not_contains` — so an agent that dumps
+  every task passes a naive "pending only" assertion. Two-sided logic belongs in `check_output`.
+- **Match stable tokens, not prose.** Task IDs and field names are matchable; sentence phrasing is
+  not. Matching the plugin skill's pretty-printed layout grades formatting compliance and unfairly
+  fails `no-skill`.
 
 **Verification** is deterministic. Each eval runs `agent_exits_ok` plus a Go check:
 
