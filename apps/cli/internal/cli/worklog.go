@@ -6,9 +6,17 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/sdk/go/worklog"
 )
+
+// worklogsEnabled reports whether the project allows writing worklog entries.
+// Worklogs are off unless `worklogs: true` is set in .taskmd.yaml, so an absent
+// key means disabled. Reading existing worklogs is never gated.
+func worklogsEnabled() bool {
+	return viper.GetBool("worklogs")
+}
 
 var (
 	worklogAdd    string
@@ -62,6 +70,10 @@ func runWorklog(cmd *cobra.Command, args []string) error {
 
 	// Add mode
 	if worklogAdd != "" {
+		if !worklogsEnabled() {
+			return fmt.Errorf("worklogs are disabled for this project, so no entry was written for task %s; "+
+				"set `worklogs: true` in .taskmd.yaml to enable them", taskID)
+		}
 		if err := worklog.AppendEntry(wlPath, worklogAdd); err != nil {
 			return fmt.Errorf("failed to add worklog entry: %w", err)
 		}

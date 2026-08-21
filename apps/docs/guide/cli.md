@@ -1111,6 +1111,10 @@ taskmd worklog 015 --format yaml
 | `--add` | | Append a new worklog entry with the given text |
 | `--format` | `text` | Output format (`text`, `json`, `yaml`) |
 
+`--add` respects the [`worklogs`](/reference/configuration#configuration-options) config key. Worklogs
+are opt-in: unless `worklogs: true` is set in `.taskmd.yaml`, the command refuses to write and
+explains why. Viewing is never gated.
+
 ### import - Import Tasks from External Sources
 
 Fetch tasks from an external source (GitHub Issues, Jira, etc.) and create local markdown task files. This is a one-time onboarding tool for populating your `tasks/` directory.

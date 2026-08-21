@@ -24,7 +24,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
    - Use `Edit` to change the status to `in-progress` in the frontmatter
 
 4. **Start a worklog entry** (if worklogs are enabled):
-   - Check `.taskmd.yaml` for `worklogs: true` — only create worklogs if explicitly enabled
+   - Check `.taskmd.yaml` for `worklogs: true` — worklogs are opt-in, so skip this step unless the key is explicitly set to `true`
    - If enabled, find or create worklog at `<task-dir>/<group>/.worklogs/<ID>.md`
    - Append a timestamped entry noting your approach
 

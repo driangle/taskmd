@@ -27,7 +27,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
 2. **Read the task file** with the `Read` tool to get the full description, subtasks, and acceptance criteria
 3. **Mark the task as in-progress**: Run `taskmd set <ID> --status in-progress` from the current working directory (do **not** `cd` elsewhere first — see the ⚠️ note above)
 4. **Start a worklog entry** (only if worklogs are enabled):
-   - Check `.taskmd.yaml` for `worklogs: true`. If it is not explicitly enabled, skip all worklog steps silently — do not mention worklogs, do not tell the user they are disabled, just move on.
+   - Check `.taskmd.yaml` for `worklogs: true`. Worklogs are opt-in — an absent key means disabled. If it is not explicitly enabled, skip all worklog steps silently — do not mention worklogs, do not tell the user they are disabled, just move on.
    - If enabled, find or create the worklog file at `tasks/<group>/.worklogs/<ID>.md` (or `tasks/.worklogs/<ID>.md` for root tasks)
    - Append a timestamped entry noting your approach and initial findings
 5. **Do the task**: Follow the task description and complete the work described

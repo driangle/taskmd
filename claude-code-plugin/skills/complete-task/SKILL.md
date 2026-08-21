@@ -35,7 +35,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077`). If `$ARGUMENTS` is e
    - If any items are genuinely incomplete, report them to the user and ask how to proceed — do NOT mark the task as completed
 
 3. **Add a final worklog entry** (if worklogs are enabled):
-   - Check `.taskmd.yaml` for `worklogs: true` -- only create worklogs if explicitly enabled; skip this step otherwise
+   - Check `.taskmd.yaml` for `worklogs: true` -- worklogs are opt-in, so skip this step unless the key is explicitly set to `true`
    - Otherwise, find the worklog file at `tasks/<group>/.worklogs/<ID>.md` (or `tasks/.worklogs/<ID>.md`)
    - If a worklog exists, append a timestamped completion summary
 

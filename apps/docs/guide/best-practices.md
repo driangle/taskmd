@@ -454,14 +454,16 @@ burst traffic better for our use case.
 
 ### When to Enable Worklogs
 
-Worklogs are disabled by default. For team projects or when you want an audit trail, enable them:
+Worklogs are opt-in — an absent key means disabled. For team projects, or whenever you want an
+audit trail of decisions, turn them on:
 
 ```yaml
 # .taskmd.yaml
 worklogs: true
 ```
 
-Existing worklogs are always readable regardless of this setting.
+Until you do, `taskmd worklog --add` refuses to write and explains why, and agents skip worklog
+steps. Only writing is gated: existing worklogs are always readable regardless of this setting.
 
 ## Common Pitfalls
 

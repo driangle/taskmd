@@ -241,6 +241,39 @@ workflow: pr-review
 
 When using `--done` in `pr-review` mode, the CLI sets status to `in-review` instead of `completed`.
 
+## Worklogs
+
+A worklog is an append-only log of timestamped progress notes for a single task, stored
+alongside the task file at `<task-dir>/<group>/.worklogs/<ID>.md`. Entries are written with
+`taskmd worklog <ID> --add "..."` and read with `taskmd worklog <ID>`.
+
+Worklogs are **opt-in**. The `worklogs` key in `.taskmd.yaml` controls whether new entries may
+be written.
+
+| Value | Behavior |
+|-------|----------|
+| absent (default) | Disabled — same as `false` |
+| `false` | Disabled — `taskmd worklog --add` refuses to write and explains why |
+| `true` | Enabled — worklog entries are written |
+
+```yaml
+# .taskmd.yaml
+worklogs: true
+```
+
+Only **writing** is gated. Existing worklogs remain readable in every view (`taskmd worklog`,
+`taskmd get`, `taskmd feed --source worklog`, and the web UI) regardless of the setting, and
+`taskmd rm` still deletes a task's worklog when the task is removed.
+
+Each entry is a `##` heading carrying an RFC 3339 timestamp, followed by free-form markdown:
+
+```markdown
+## 2026-02-15T10:30:00Z
+
+Started implementation. Using the existing SQLite index rather than adding a
+new dependency.
+```
+
 ## ID Generation
 
 The `id` section in `.taskmd.yaml` configures how task IDs are generated.

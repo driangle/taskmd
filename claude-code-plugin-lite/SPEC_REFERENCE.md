@@ -89,7 +89,7 @@ id:
   length: 6             # for random/ulid
   padding: 3            # for sequential
 workflow: solo          # solo | pr-review
-worklogs: false         # true to enable worklogs
+worklogs: false         # true to allow writing worklog entries
 phases:
   - id: phase-id
     name: "Phase Name"

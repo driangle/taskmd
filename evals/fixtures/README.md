@@ -68,7 +68,10 @@ task file:
 
 ## Note on worklogs
 
-`taskmd worklog` writes unconditionally — **there is no `worklogs` key in `.taskmd.yaml`**, despite
-the repo's `CLAUDE.md` and `tasks/CLAUDE.md` both documenting one. Verified against the installed
-CLI: a fresh `taskmd init` project with no such key still writes `tasks/.worklogs/<ID>.md`. Do not
-add the key to a fixture expecting it to gate anything.
+Worklogs are **opt-in**: with no `worklogs` key in `.taskmd.yaml` — the state every fixture
+workspace is in — `taskmd worklog <ID> --add` exits non-zero with "worklogs are disabled for this
+project" and writes nothing. Only `worklogs: true` permits a write. Reads (`taskmd worklog <ID>`,
+`get`, `feed --source worklog`) work either way.
+
+So a fixture asserting "no worklog file" needs no config at all, and one exercising worklog
+writes must add `worklogs: true`. The key validates cleanly in both states.

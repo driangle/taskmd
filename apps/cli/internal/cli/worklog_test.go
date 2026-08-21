@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"github.com/driangle/taskmd/sdk/go/worklog"
 )
 
@@ -132,10 +134,14 @@ func TestWorklog_TaskNotFound(t *testing.T) {
 	}
 }
 
+// enableWorklogs seeds `worklogs: true`. Worklogs are off unless the key is set,
+// so every test that expects a write to land must configure it.
+func enableWorklogs() { viper.Set("worklogs", true) }
+
 func TestWorklog_AddEntry(t *testing.T) {
 	repo := newWorklogRepo(t)
 
-	res := repo.Run("worklog", "015", "--add", "Started implementation of auth module")
+	res := repo.RunWith(enableWorklogs, "worklog", "015", "--add", "Started implementation of auth module")
 	if res.Err != nil {
 		t.Fatalf("runWorklog --add failed: %v", res.Err)
 	}
@@ -158,7 +164,7 @@ func TestWorklog_AddEntry(t *testing.T) {
 func TestWorklog_AddThenView(t *testing.T) {
 	repo := newWorklogRepo(t)
 
-	res := repo.Run("worklog", "015", "--add", "First entry")
+	res := repo.RunWith(enableWorklogs, "worklog", "015", "--add", "First entry")
 	if res.Err != nil {
 		t.Fatalf("First add failed: %v", res.Err)
 	}
@@ -173,6 +179,56 @@ func TestWorklog_AddThenView(t *testing.T) {
 
 	if len(wl.Entries) != 1 {
 		t.Errorf("Expected 1 entry, got %d", len(wl.Entries))
+	}
+}
+
+// Worklogs are opt-in: only `worklogs: true` permits a write, and an absent key
+// means disabled. Only writes are gated — viewing an existing worklog always works.
+
+func TestWorklog_AddEntry_WorklogsDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		configure func()
+	}{
+		{"explicitly disabled", func() { viper.Set("worklogs", false) }},
+		{"absent key", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newWorklogRepo(t)
+
+			res := repo.RunWith(tc.configure, "worklog", "015", "--add", "Should not be written")
+			if res.Err == nil {
+				t.Fatal("Expected an error when worklogs are disabled")
+			}
+			if !strings.Contains(res.Err.Error(), "worklogs are disabled") {
+				t.Errorf("Expected the error to explain why, got: %v", res.Err)
+			}
+			if !strings.Contains(res.Err.Error(), "worklogs: true") {
+				t.Errorf("Expected the error to say how to enable them, got: %v", res.Err)
+			}
+
+			if _, err := os.Stat(repo.Path(".worklogs/015.md")); !os.IsNotExist(err) {
+				t.Error("Expected no worklog file to be created when worklogs are disabled")
+			}
+		})
+	}
+}
+
+func TestWorklog_ViewEntries_WorklogsDisabled(t *testing.T) {
+	repo := newWorklogRepoWithLog(t)
+
+	res := repo.RunWith(func() { viper.Set("worklogs", false) },
+		"worklog", "015", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("Expected reads to work with worklogs disabled, got: %v", res.Err)
+	}
+
+	var wl worklog.Worklog
+	if err := json.Unmarshal([]byte(res.Stdout), &wl); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
+	}
+	if len(wl.Entries) != 2 {
+		t.Errorf("Expected 2 entries, got %d", len(wl.Entries))
 	}
 }
 

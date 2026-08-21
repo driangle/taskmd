@@ -1626,6 +1626,19 @@ func TestValidateConfig_Effort(t *testing.T) {
 	}
 }
 
+// The worklogs key is documented and honored by `taskmd worklog`, so neither
+// value may be reported as an unknown key.
+func TestValidateConfig_WorklogsIsAKnownKey(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{TopKeys: []string{"worklogs"}, ConfigPath: ".taskmd.yaml"}
+
+	result := v.ValidateConfig(config)
+
+	if result.Warnings != 0 {
+		t.Errorf("Warnings = %d, want 0 (issues: %v)", result.Warnings, result.Issues)
+	}
+}
+
 // The effort key must be recognized, or every configured project would also get
 // an "unknown config key" warning.
 func TestValidateConfig_EffortIsAKnownKey(t *testing.T) {

@@ -522,6 +522,7 @@ var knownConfigKeys = map[string]bool{
 	"id":       true,
 	"phases":   true,
 	"effort":   true,
+	"worklogs": true,
 }
 
 // checkUnknownConfigKeys warns about unrecognized top-level config keys.

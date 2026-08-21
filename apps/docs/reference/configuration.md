@@ -38,7 +38,7 @@ Command-line flags always override config file values.
 |--------|------|---------|-------------|
 | `dir` | string | `.` | Default task directory |
 | `ignore` | string[] | `[]` | Additional directories to skip when scanning (beyond the built-in skip list) |
-| `worklogs` | boolean | `false` | Enable or disable worklog file creation |
+| `worklogs` | boolean | `false` | Allow writing worklog entries; set to `true` to opt in |
 | `workflow` | string | `"solo"` | Workflow mode: `"solo"` or `"pr-review"` |
 | `todos.exclude` | string[] | `[]` | Glob patterns to exclude from TODO/FIXME scanning |
 | `web.port` | integer | `8080` | Web server port |
@@ -63,7 +63,7 @@ ignore:
   - "legacy"
 ```
 
-**`worklogs`** — Worklogs are disabled by default. When set to `true`, agents and workflows create worklog files in `.worklogs/` directories. Existing worklogs can always be read regardless of this setting.
+**`worklogs`** — Worklogs are opt-in; an absent key means disabled. Until you set `worklogs: true`, `taskmd worklog <id> --add` refuses to write and explains why, and agents skip worklog steps. Only writing is gated — existing worklogs can always be read regardless of this setting, and `taskmd rm` still deletes a removed task's worklog.
 
 **`workflow`** — Controls the development workflow mode:
 - `solo` (default) — optimized for single-developer workflows

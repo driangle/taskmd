@@ -427,6 +427,73 @@ func TestConfig_SubdirectoryDefaultTaskDir(t *testing.T) {
 	}
 }
 
+// --- worklogs ---
+
+// The worklogs key gates `taskmd worklog --add`. Worklogs are opt-in: only
+// `worklogs: true` permits a write, and an absent key means disabled. Both
+// values must also validate cleanly — the key was documented long before it
+// was recognized.
+
+func TestConfig_WorklogsDisabled(t *testing.T) {
+	for _, tc := range []struct{ name, config string }{
+		{"explicitly disabled", "dir: .\nworklogs: false\n"},
+		{"absent key", "dir: .\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeTask(t, root, "001-alpha.md", "001", "Alpha Task", "in-progress", nil)
+			writeConfig(t, root, tc.config)
+
+			result := run(t, root, "worklog", "001", "--add", "should not be written")
+
+			if result.ExitCode == 0 {
+				t.Errorf("expected a non-zero exit when worklogs are disabled, got:\n%s", result.Stdout)
+			}
+			if !strings.Contains(result.Stderr, "worklogs are disabled") {
+				t.Errorf("expected the error to explain why, got stderr:\n%s", result.Stderr)
+			}
+			if !strings.Contains(result.Stderr, "worklogs: true") {
+				t.Errorf("expected the error to say how to enable them, got stderr:\n%s", result.Stderr)
+			}
+			if _, err := os.Stat(filepath.Join(root, ".worklogs", "001.md")); !os.IsNotExist(err) {
+				t.Error("expected no worklog file to be written")
+			}
+		})
+	}
+}
+
+func TestConfig_WorklogsEnabled(t *testing.T) {
+	root := t.TempDir()
+	writeTask(t, root, "001-alpha.md", "001", "Alpha Task", "in-progress", nil)
+	writeConfig(t, root, "dir: .\nworklogs: true\n")
+
+	mustRun(t, root, "worklog", "001", "--add", "an entry")
+
+	data, err := os.ReadFile(filepath.Join(root, ".worklogs", "001.md"))
+	if err != nil {
+		t.Fatalf("expected a worklog file to be written: %v", err)
+	}
+	if !strings.Contains(string(data), "an entry") {
+		t.Errorf("expected the entry text in the worklog, got:\n%s", data)
+	}
+}
+
+func TestConfig_WorklogsValidatesCleanly(t *testing.T) {
+	for _, value := range []string{"true", "false"} {
+		t.Run(value, func(t *testing.T) {
+			root := t.TempDir()
+			writeTask(t, root, "001-alpha.md", "001", "Alpha Task", "pending", nil)
+			writeConfig(t, root, "dir: .\nworklogs: "+value+"\n")
+
+			result := mustRun(t, root, "validate")
+
+			if strings.Contains(result.Stdout+result.Stderr, "unknown config key") {
+				t.Errorf("worklogs: %s should be a known config key, got:\n%s", value, result.Stdout)
+			}
+		})
+	}
+}
+
 // --- Helper ---
 
 // writeConfig creates a .taskmd.yaml file in the given directory.

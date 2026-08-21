@@ -95,7 +95,7 @@ parents for any ordering that genuinely exists. See `TASKMD_SPEC.md` for the ful
 
 ## Worklogs
 
-When worklogs are enabled (`worklogs: true` in `.taskmd.yaml`), record progress with:
+Worklogs are opt-in. When `worklogs: true` is set in `.taskmd.yaml`, record progress with:
 
 ```bash
 taskmd worklog <id> --add "Started implementation. Approach: ..."

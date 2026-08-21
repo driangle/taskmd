@@ -1,11 +1,12 @@
 ---
 title: "Honor the worklogs config key or stop documenting it"
 id: "01m0jfw0q"
-status: pending
+status: completed
 priority: medium
 type: bug
 tags: ["worklogs", "config", "docs"]
 created: "2026-08-21"
+completed_at: 2026-08-21
 ---
 
 # Honor the worklogs config key or stop documenting it
@@ -56,27 +57,40 @@ The two halves disagree about what "enabled" means, which is the actual defect: 
 
 ## Tasks
 
-- [ ] Decide the semantics and write them down: does an absent key mean enabled or disabled?
+- [x] Decide the semantics and write them down: does an absent key mean enabled or disabled?
       The skills assume disabled; the CLI behaves as enabled. Changing the CLI to default-off is a
       behavior change for existing users, so favour default-on and make `worklogs: false` the
       opt-out — then fix the skills, which are the side that is wrong
-- [ ] Read the key in the CLI and gate `taskmd worklog` writes on it, with a clear message when
+- [x] Read the key in the CLI and gate `taskmd worklog` writes on it, with a clear message when
       declining rather than silent success
-- [ ] Add `worklogs` to the known top-level config keys so `taskmd validate` stops flagging it
+- [x] Add `worklogs` to the known top-level config keys so `taskmd validate` stops flagging it
       (see `loadConfigForValidation` in `apps/cli/internal/cli/validate.go` and the validator's
       `ConfigData.TopKeys`)
-- [ ] Check the other write paths for the same gap — `taskmd rm`, `feed`, and the web export all
+- [x] Check the other write paths for the same gap — `taskmd rm`, `feed`, and the web export all
       touch worklogs
-- [ ] Align the six skills that check the key: `do-task`, `complete-task` and `divide-and-conquer`
+- [x] Align the six skills that check the key: `do-task`, `complete-task` and `divide-and-conquer`
       in both `claude-code-plugin/` and `claude-code-plugin-lite/`
-- [ ] Align the docs to whatever is implemented: `CLAUDE.md:277`, `tasks/CLAUDE.md:80`, the
+- [x] Align the docs to whatever is implemented: `CLAUDE.md:277`, `tasks/CLAUDE.md:80`, the
       `taskmd init` templates (`CLAUDE.md`, `GEMINI.md`, `CODEX.md`, each line 98), and
       `claude-code-plugin-lite/SPEC_REFERENCE.md:92`
-- [ ] Document the key in `docs/taskmd_specification.md`, which currently does not mention it at
+- [x] Document the key in `docs/taskmd_specification.md`, which currently does not mention it at
       all — then `make sync-spec`
-- [ ] Add a CLI test covering enabled, explicitly disabled, and absent
-- [ ] Update the note in `evals/fixtures/README.md`, which records the current broken behavior for
+- [x] Add a CLI test covering enabled, explicitly disabled, and absent
+- [x] Update the note in `evals/fixtures/README.md`, which records the current broken behavior for
       eval authors
+
+## Resolution
+
+Worklogs are **opt-in**: only `worklogs: true` permits a write, and an absent key means disabled.
+This matches what the skills and most of the docs already claimed, so the CLI was the side that
+moved. It is a behavior change for any project that relied on `taskmd worklog --add` working with
+no config — including this repo, whose `.taskmd.yaml` now sets `worklogs: true` explicitly.
+
+Only *writing* is gated: `taskmd worklog --add` refuses with an explanatory error naming the key
+to set, exit 1. Reads (`worklog` view, `get`, `feed --source worklog`, web) and `taskmd rm`'s
+worklog cleanup are unchanged — they act on files that already exist, so the setting has nothing
+to say about them. The web API has no worklog write endpoint yet; task `179` should route its edit
+path through the same gate.
 
 ## Acceptance Criteria
 

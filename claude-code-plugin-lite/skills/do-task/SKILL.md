@@ -24,7 +24,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
    - Use `Edit` to change `status: pending` (or current status) to `status: in-progress` in the frontmatter
 
 4. **Start a worklog entry** (only if worklogs are enabled):
-   - Check `.taskmd.yaml` for `worklogs: true`. If it is not explicitly enabled, skip all worklog steps silently — do not mention worklogs, do not tell the user they are disabled, just move on.
+   - Check `.taskmd.yaml` for `worklogs: true`. Worklogs are opt-in — an absent key means disabled. If it is not explicitly enabled, skip all worklog steps silently — do not mention worklogs, do not tell the user they are disabled, just move on.
    - If enabled, find or create the worklog file at `<task-dir>/<group>/.worklogs/<ID>.md` (or `<task-dir>/.worklogs/<ID>.md` for root tasks)
    - Append a timestamped entry noting your approach and initial findings
 
