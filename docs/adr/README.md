@@ -13,3 +13,6 @@ sequentially and keep them short.
 - [0002 — Lite plugin prose conformance](0002-lite-plugin-prose-conformance.md): the
   lite plugin's prose reimplements CLI algorithms; the CLI is authoritative and
   conformance tests fail the build on drift.
+- [0003 — Plugin versioning policy](0003-plugin-versioning-policy.md): the three
+  marketplace plugins version independently, not in lockstep with the repo;
+  `plugin.json` is the sole source of truth and `release.sh` enforces the bump.

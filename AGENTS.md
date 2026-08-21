@@ -505,7 +505,13 @@ GitHub deliberately does not let trigger further workflow runs. The `sdk-pin` jo
 verification *after* the bump, so the landed state is checked — but no other job re-runs
 against it. That is fine because the bump only touches `go.mod`/`go.sum`.
 
-### Versioning: two independent modules, two tags
+### Versioning: independent version lines
+
+Nothing in this repo is in lockstep with the repo version except the repo itself. The CLI,
+the SDK module, and the three marketplace plugins each version on their own line, because
+each one's number has to mean something to a different audience.
+
+#### The Go modules: two independent modules, two tags
 
 `apps/cli` and `sdk/go` version **independently**, because the SDK's version numbers
 have to mean something to people importing the library:
@@ -530,6 +536,42 @@ path (`github.com/driangle/taskmd/sdk/go/v2`) and a repo-wide import rewrite.
 **Module versions are immutable.** Once a tag is pushed and the Go module proxy has
 fetched it, that version is fixed forever — you cannot retag it. Pick the next number
 instead.
+
+#### The three plugins: independent lines, no tags
+
+The marketplace plugins version independently too, and their versions are **not** derived
+from the repo version — `release.sh` used to rewrite `claude-code-plugin`'s manifest to
+the repo version on every release, and that is exactly what was removed:
+
+| Plugin | Directory | Line | Bump when |
+|--------|-----------|------|-----------|
+| `taskmd` | `claude-code-plugin/` | `0.x`, pre-1.0 | the directory changed |
+| `taskmd-lite` | `claude-code-plugin-lite/` | `0.x`, pre-1.0 | the directory changed |
+| `taskmd-mcp` | `claude-code-plugin-mcp/` | `1.x`, **stable** | the directory changed |
+
+Plugins carry **no tags of their own** — they are served from the marketplace repo at
+whatever commit it points to, so "the last release" is the last `vX.Y.Z` repo tag. The
+version lives in exactly one place, `<plugin>/.claude-plugin/plugin.json`;
+`.claude-plugin/marketplace.json` deliberately carries none, and `release.sh` fails the
+release if a `version` key appears there.
+
+`taskmd-mcp` is at `1.x` while the CLI is pre-1.0 on purpose: its MCP tool surface is a
+contract other clients code against, so a changed tool signature is a **major** bump
+there, where a renamed skill in the pre-1.0 plugins is only a minor one. Full rules:
+[ADR 0003](docs/adr/0003-plugin-versioning-policy.md).
+
+**A changed plugin blocks the release until you version it.** `release.sh` diffs each
+plugin directory against the last repo tag and, for every one that moved, requires
+`--plugin-taskmd-version` / `--plugin-lite-version` / `--plugin-mcp-version`:
+
+```bash
+./scripts/release.sh 0.4.2 --plugin-mcp-version 1.1.0 --notes-file notes.md
+```
+
+Unlike the sdk pin, there is no CI auto-heal — the bump size depends on what the change
+means to consumers, which a script cannot infer. Preview what a release would demand with
+`./scripts/release.sh --dry-run <version>`; the plugin check runs as a pre-flight, so a
+dry run reports every missing bump at once without touching anything.
 
 ### Workflow when you change `sdk/go`
 

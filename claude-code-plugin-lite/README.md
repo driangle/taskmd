@@ -70,3 +70,21 @@ in CI via `go test ./...` from `apps/cli`):
 
 If a conformance test fails, update the named `SKILL.md` so its prose matches
 the current CLI behavior — do not weaken the test.
+
+## Versioning
+
+This plugin is on its **own `0.x` semver line**, independent of both the taskmd CLI
+release number and the other marketplace plugins. Because it runs no binary, it moves
+when the **spec or the prose** moves — a CLI release that does not touch this directory
+does not bump it. See
+[ADR 0003](https://github.com/driangle/taskmd/blob/main/docs/adr/0003-plugin-versioning-policy.md).
+
+Pre-1.0, skill names and their arguments are not yet a stability promise:
+
+- **Patch** — new skills, new flags on existing skills, prose corrections that bring a
+  skill back in line with the CLI.
+- **Minor** — a skill renamed or removed, or the arguments it accepts changed.
+
+The authoritative version is the `version` field in
+[`.claude-plugin/plugin.json`](./.claude-plugin/plugin.json). The marketplace manifest
+deliberately does not repeat it.

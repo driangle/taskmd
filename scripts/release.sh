@@ -20,6 +20,9 @@ NO_PUSH=false
 VERSION=""
 NOTES_FILE=""
 SDK_VERSION=""
+PLUGIN_TASKMD_VERSION=""
+PLUGIN_LITE_VERSION=""
+PLUGIN_MCP_VERSION=""
 
 # Help message
 usage() {
@@ -40,6 +43,14 @@ OPTIONS:
     --sdk-version VER   Version for the sdk/go module, tagged as sdk/go/vVER.
                         Required when sdk/go has changed since its last tag.
                         Omit when sdk/go is unchanged (no SDK tag is created).
+    --plugin-taskmd-version VER
+                        New version for the 'taskmd' plugin manifest.
+    --plugin-lite-version VER
+                        New version for the 'taskmd-lite' plugin manifest.
+    --plugin-mcp-version VER
+                        New version for the 'taskmd-mcp' plugin manifest.
+                        Each is required when that plugin's directory changed
+                        since the last release tag, and ignored otherwise.
     --skip-checks       Skip git status and branch checks (use with caution)
 
 EXAMPLES:
@@ -49,25 +60,35 @@ EXAMPLES:
     $(basename "$0") --no-push 0.0.1                  # Create tag locally only
     $(basename "$0") 0.3.1 --sdk-version 0.4.1 --notes-file notes.md
                                                       # CLI v0.3.1 + sdk/go/v0.4.1
+    $(basename "$0") 0.3.1 --plugin-mcp-version 1.1.0 --notes-file notes.md
+                                                      # CLI v0.3.1 + taskmd-mcp 1.1.0
 
 PROCESS:
      1. Validate git repository state (clean working directory)
      2. Validate version format (semantic versioning)
      3. Update version in package.json files
-     4. Tag and push sdk/go (only when it changed; see --sdk-version)
-     5. Point apps/cli/go.mod at the SDK version and verify the external build
-     6. Commit version changes
-     7. Create annotated git tag
-     8. Push changes and tag to GitHub
-     9. Monitor GitHub Actions release workflow
-    10. Apply release notes to the GitHub release
-    11. Report success with release URL
+     4. Bump changed plugin manifests (see the plugin version flags)
+     5. Tag and push sdk/go (only when it changed; see --sdk-version)
+     6. Point apps/cli/go.mod at the SDK version and verify the external build
+     7. Commit version changes
+     8. Create annotated git tag
+     9. Push changes and tag to GitHub
+    10. Monitor GitHub Actions release workflow
+    11. Apply release notes to the GitHub release
+    12. Report success with release URL
 
 VERSIONING:
     apps/cli and sdk/go are separate Go modules and version independently.
     The CLI is tagged vX.Y.Z; the SDK is tagged sdk/go/vX.Y.Z and only when
     its code changed. apps/cli/go.mod pins a released SDK version, so external
     `go install` keeps working. See "The sdk/go pin" in AGENTS.md.
+
+    The three marketplace plugins version independently too, on their own
+    semver lines, with no tags of their own. A plugin is bumped only when its
+    directory changed; the repo version is never propagated into a plugin
+    manifest. If a plugin changed and no version flag was given, this script
+    fails rather than shipping a modified plugin under its old version.
+    See docs/adr/0003-plugin-versioning-policy.md.
 
 REQUIREMENTS:
     - git (with GitHub remote configured)
@@ -132,6 +153,27 @@ parse_args() {
                     error_exit "--sdk-version requires a version argument"
                 fi
                 SDK_VERSION="$2"
+                shift 2
+                ;;
+            --plugin-taskmd-version)
+                if [[ -z "${2:-}" ]]; then
+                    error_exit "--plugin-taskmd-version requires a version argument"
+                fi
+                PLUGIN_TASKMD_VERSION="$2"
+                shift 2
+                ;;
+            --plugin-lite-version)
+                if [[ -z "${2:-}" ]]; then
+                    error_exit "--plugin-lite-version requires a version argument"
+                fi
+                PLUGIN_LITE_VERSION="$2"
+                shift 2
+                ;;
+            --plugin-mcp-version)
+                if [[ -z "${2:-}" ]]; then
+                    error_exit "--plugin-mcp-version requires a version argument"
+                fi
+                PLUGIN_MCP_VERSION="$2"
                 shift 2
                 ;;
             --skip-checks)
@@ -339,19 +381,182 @@ update_versions() {
         fi
     fi
 
-    # Update claude-code-plugin/.claude-plugin/plugin.json
-    local plugin_json="$PROJECT_ROOT/claude-code-plugin/.claude-plugin/plugin.json"
-    if [[ -f "$plugin_json" ]]; then
-        if command -v jq &> /dev/null; then
-            local tmp_file
-            tmp_file=$(mktemp)
-            jq --arg ver "$version" '.version = $ver' "$plugin_json" > "$tmp_file"
-            mv "$tmp_file" "$plugin_json"
-            log_success "Updated $plugin_json"
-        else
-            log_warning "jq not installed, skipping $plugin_json"
-        fi
+    # Plugin manifests are deliberately NOT updated here: the three marketplace
+    # plugins version independently of the repo. See release_plugins().
+}
+
+# --- Plugin versioning -------------------------------------------------------
+#
+# The three marketplace plugins (taskmd, taskmd-lite, taskmd-mcp) are on their
+# own semver lines and are NOT bumped by a repo release. A plugin moves only
+# when its own directory moved, so its version number keeps its meaning for
+# whoever installed it. See docs/adr/0003-plugin-versioning-policy.md.
+#
+# Plugins have no tags of their own, so "released state" is the last repo tag:
+# that is the commit the marketplace served at the previous release.
+
+# Return the most recent repo release tag (vX.Y.Z), skipping module tags like
+# sdk/go/vX.Y.Z, or empty if the repo was never released.
+latest_release_tag() {
+    git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true
+}
+
+# Read the current version out of a plugin manifest.
+plugin_manifest_version() {
+    jq -r '.version // ""' "$1"
+}
+
+# Fail unless $2 is a strictly higher semver than $1.
+#
+# Plugin versions are what consumers have cached, so a repeated or lowered
+# version silently ships changed code under a version someone already has.
+require_version_increase() {
+    local current="$1" next="$2" plugin="$3"
+
+    if [[ "$current" == "$next" ]]; then
+        error_exit "$plugin is already at $current. Pick a higher version — a plugin's changes cannot ship under a version consumers already have."
     fi
+
+    local lowest
+    lowest=$(printf '%s\n%s\n' "$current" "$next" | sort -V | head -n 1)
+    if [[ "$lowest" != "$current" ]]; then
+        error_exit "$plugin version $next is lower than the current $current. Plugin versions only move forward."
+    fi
+}
+
+# Report whether a plugin's directory changed since the last release.
+plugin_changed_since_release() {
+    local dir="$1"
+    local last_tag
+    last_tag=$(latest_release_tag)
+
+    if [[ -z "$last_tag" ]]; then
+        return 0   # never released: treat as changed
+    fi
+
+    ! git diff --quiet "$last_tag" HEAD -- "$dir"
+}
+
+# Validate one plugin's version situation without touching anything.
+#
+# Mirrors release_sdk_module(): unchanged means nothing to do, changed without a
+# version means stop and ask. Runs as a pre-flight check so --dry-run catches a
+# missing bump before anything is written.
+#
+# Returns 1 for a missing bump rather than exiting, so one run can report every
+# plugin that needs a version instead of failing on them one at a time.
+check_plugin_version() {
+    local plugin="$1" dir="$2" flag="$3" requested="$4"
+
+    local manifest="$PROJECT_ROOT/$dir/.claude-plugin/plugin.json"
+    if [[ ! -f "$manifest" ]]; then
+        log_warning "$plugin: no manifest at $manifest, skipping"
+        return
+    fi
+
+    local last_tag
+    last_tag=$(latest_release_tag)
+
+    if ! plugin_changed_since_release "$dir"; then
+        log_success "$plugin unchanged since $last_tag, no bump needed"
+        if [[ -n "$requested" ]]; then
+            log_warning "$flag $requested given but $dir has not changed; it will be ignored"
+        fi
+        return
+    fi
+
+    if [[ -z "$requested" ]]; then
+        log_error "$plugin has changed since ${last_tag:-its last release}:"
+        git diff --stat "${last_tag:-HEAD}" HEAD -- "$dir" | tail -n 5
+        log_error ""
+        log_error "Pass $flag X.Y.Z to release it. See docs/adr/0003-plugin-versioning-policy.md"
+        log_error "for what a patch, minor, and major bump mean for this plugin."
+        return 1
+    fi
+
+    if ! command -v jq &> /dev/null; then
+        error_exit "jq is required to bump $plugin. Install it with: brew install jq"
+    fi
+
+    local next current
+    next=$(validate_version "$requested")
+    current=$(plugin_manifest_version "$manifest")
+    require_version_increase "$current" "$next" "$plugin"
+
+    log_info "$plugin will be bumped: $current -> $next"
+}
+
+# Write a plugin's new version into its manifest. Assumes check_plugin_version()
+# already accepted it.
+apply_plugin_version() {
+    local plugin="$1" dir="$2" requested="$3"
+
+    local manifest="$PROJECT_ROOT/$dir/.claude-plugin/plugin.json"
+
+    if [[ ! -f "$manifest" || -z "$requested" ]] || ! plugin_changed_since_release "$dir"; then
+        return
+    fi
+
+    local next
+    next=$(validate_version "$requested")
+
+    local tmp_file
+    tmp_file=$(mktemp)
+    jq --arg ver "$next" '.version = $ver' "$manifest" > "$tmp_file"
+    mv "$tmp_file" "$manifest"
+    log_success "Updated $manifest to $next"
+}
+
+# Guard the "plugin.json is the single source of truth" rule.
+#
+# A version mirrored into marketplace.json is a second copy with nothing keeping
+# it honest, and duplicated version numbers drift. Keep them out entirely.
+check_marketplace_versions() {
+    local marketplace="$PROJECT_ROOT/.claude-plugin/marketplace.json"
+
+    if [[ ! -f "$marketplace" ]] || ! command -v jq &> /dev/null; then
+        return
+    fi
+
+    if jq -e '[.plugins[]? | has("version")] | any' "$marketplace" > /dev/null; then
+        log_error "$marketplace has version fields on its plugin entries."
+        log_error "Plugin versions live only in <plugin>/.claude-plugin/plugin.json."
+        log_error "See docs/adr/0003-plugin-versioning-policy.md"
+        exit 1
+    fi
+
+    log_success "marketplace.json carries no duplicate versions"
+}
+
+# Pre-flight: every changed plugin must have a valid, higher version to ship under.
+check_plugin_versions() {
+    log_step "Checking plugin versions"
+
+    check_marketplace_versions
+
+    # Report every plugin missing a bump in one pass, so a release that touched
+    # all three does not have to be re-run once per plugin.
+    local missing=0
+
+    check_plugin_version "taskmd" "claude-code-plugin" \
+        "--plugin-taskmd-version" "$PLUGIN_TASKMD_VERSION" || missing=1
+    check_plugin_version "taskmd-lite" "claude-code-plugin-lite" \
+        "--plugin-lite-version" "$PLUGIN_LITE_VERSION" || missing=1
+    check_plugin_version "taskmd-mcp" "claude-code-plugin-mcp" \
+        "--plugin-mcp-version" "$PLUGIN_MCP_VERSION" || missing=1
+
+    if [[ "$missing" == "1" ]]; then
+        error_exit "One or more changed plugins need a version. See the errors above."
+    fi
+}
+
+# Write the accepted versions into the manifests of every changed plugin.
+update_plugin_versions() {
+    log_step "Updating plugin manifests"
+
+    apply_plugin_version "taskmd" "claude-code-plugin" "$PLUGIN_TASKMD_VERSION"
+    apply_plugin_version "taskmd-lite" "claude-code-plugin-lite" "$PLUGIN_LITE_VERSION"
+    apply_plugin_version "taskmd-mcp" "claude-code-plugin-mcp" "$PLUGIN_MCP_VERSION"
 }
 
 # Return the most recent sdk/go tag, or empty if the module was never tagged.
@@ -480,7 +685,8 @@ commit_version_changes() {
 
     log_step "Committing version changes"
 
-    git add package.json apps/web/package.json apps/vscode/package.json apps/cli/internal/cli/root.go claude-code-plugin/.claude-plugin/plugin.json apps/cli/go.mod apps/cli/go.sum 2>/dev/null || true
+    git add package.json apps/web/package.json apps/vscode/package.json apps/cli/internal/cli/root.go apps/cli/go.mod apps/cli/go.sum 2>/dev/null || true
+    git add claude-code-plugin/.claude-plugin/plugin.json claude-code-plugin-lite/.claude-plugin/plugin.json claude-code-plugin-mcp/.claude-plugin/plugin.json 2>/dev/null || true
 
     if [[ -z $(git diff --cached --name-only) ]]; then
         log_warning "No version changes to commit"
@@ -718,6 +924,7 @@ main() {
     check_prerequisites
     check_git_status
     check_tag_exists "$tag"
+    check_plugin_versions
 
     if [[ "$DRY_RUN" == "true" ]]; then
         log_success "\nDry run completed successfully!"
@@ -756,6 +963,7 @@ main() {
     trap on_release_error ERR
 
     update_versions "$clean_version"
+    update_plugin_versions
     release_sdk_module
     sync_sdk_pin
     verify_external_build

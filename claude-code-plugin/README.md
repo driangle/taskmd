@@ -123,6 +123,22 @@ The MCP server exposes task operations as tools (`list`, `get`, `next`, `search`
 
 For other MCP-compatible clients, see the [MCP Server Guide](https://driangle.github.io/taskmd/guide/mcp) for configuration snippets (Claude Desktop, Cursor, Windsurf, etc.).
 
+## Versioning
+
+This plugin is on its **own `0.x` semver line**. It does not track the taskmd CLI release
+number — the three marketplace plugins version independently, so a bump here means *this
+plugin* changed, not that a CLI release happened. See
+[ADR 0003](https://github.com/driangle/taskmd/blob/main/docs/adr/0003-plugin-versioning-policy.md).
+
+Pre-1.0, skill names and their arguments are not yet a stability promise:
+
+- **Patch** — new skills, new flags on existing skills, prompt and wording fixes.
+- **Minor** — a skill renamed or removed, or the arguments it accepts changed.
+
+The authoritative version is the `version` field in
+[`.claude-plugin/plugin.json`](./.claude-plugin/plugin.json). The marketplace manifest
+deliberately does not repeat it.
+
 ## Troubleshooting
 
 **"taskmd: command not found"**

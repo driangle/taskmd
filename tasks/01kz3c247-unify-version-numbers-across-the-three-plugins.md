@@ -1,7 +1,7 @@
 ---
 id: "01kz3c247"
 title: "Unify version numbers across the three plugins"
-status: pending
+status: completed
 priority: low
 effort: small
 type: chore
@@ -9,6 +9,7 @@ phase: critical-feedback
 dependencies: []
 tags: [plugins, release, cleanup]
 created_at: 2026-08-03
+completed_at: 2026-08-21
 ---
 
 # Unify version numbers across the three plugins
@@ -22,12 +23,19 @@ coherent story about compatibility or maturity. Decide on a versioning policy an
 
 ## Tasks
 
-- [ ] Decide the versioning policy: lockstep with the repo, or independent semver per plugin
-- [ ] If lockstep: align all three `plugin.json` versions to the repo version and add a release
-      step that bumps them together
-- [ ] If independent: document each plugin's version line and stability guarantees in its README
-- [ ] Reconcile `.claude-plugin/marketplace.json` so listed versions match the plugin manifests
-- [ ] Add the version bump(s) to the release checklist / `release` skill
+- [x] Decide the versioning policy: lockstep with the repo, or independent semver per plugin
+      — **independent semver**, recorded in `docs/adr/0003-plugin-versioning-policy.md`
+- [x] ~~If lockstep: align all three `plugin.json` versions to the repo version~~ — not
+      taken; `release.sh` no longer propagates the repo version into any plugin manifest
+- [x] If independent: document each plugin's version line and stability guarantees in its README
+      (`taskmd` `0.x`, `taskmd-lite` `0.x`, `taskmd-mcp` `1.x`; the mcp plugin had no README,
+      so one was written)
+- [x] Reconcile `.claude-plugin/marketplace.json` so listed versions match the plugin manifests
+      — it carries no versions by design; `plugin.json` is the sole source of truth and
+      `release.sh` fails the release if a `version` key appears in the marketplace manifest
+- [x] Add the version bump(s) to the release checklist / `release` skill — `--plugin-taskmd-version`,
+      `--plugin-lite-version`, `--plugin-mcp-version`, required when that plugin's directory
+      changed since the last release tag
 
 ## Acceptance Criteria
 
