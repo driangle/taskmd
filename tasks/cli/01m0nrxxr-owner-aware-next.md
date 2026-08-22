@@ -1,13 +1,14 @@
 ---
 title: "Owner-aware next: respect owner on in-progress tasks and add --for flag"
 id: "01m0nrxxr"
-status: pending
+status: cancelled
 priority: high
 type: feature
 tags: ["next", "sdk", "coordination"]
 created: "2026-08-22"
 effort: medium
 phase: worktree-support
+cancelled_at: 2026-08-22
 ---
 
 # Owner-aware next: respect owner on in-progress tasks and add --for flag

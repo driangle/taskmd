@@ -6,7 +6,7 @@ priority: critical
 type: feature
 tags: ["worktrees", "overlay", "next"]
 created: "2026-08-22"
-dependencies: ["01m0n8cpm", "01m0nrxxr"]
+dependencies: ["01m0n8cpm"]
 effort: large
 phase: worktree-support
 ---
@@ -26,7 +26,7 @@ recommended in worktrees B and C. Spec: `docs/specs/worktree-support.md` §3–5
 - [ ] Merge rule: local copy is the base for all content; effective status is the max across copies by the ladder `pending < blocked < in-progress < in-review < cancelled < completed`; mtime breaks ties for the winning copy; remote winners carry provenance (worktree basename + branch)
 - [ ] Scan sibling worktrees through the existing `newTaskScanner` seam in `internal/cli/scan.go`
 - [ ] Activation: `worktrees: auto|true|false` config key (default `auto` — active only in multi-worktree repos), persistent `--worktrees` global flag, `TASKMD_WORKTREES` env
-- [ ] `next`: recommend against effective status and effective owner (composes with the owner rules); `--explain` names the excluding worktree
+- [ ] `next`: recommend against effective status; `--explain` names the excluding worktree
 - [ ] `list`: `WORKTREE` column rendered only when the overlay is active and at least one task is annotated; `--status` filters on effective status; sibling-only tasks included and marked
 - [ ] `set` guard: an ID resolving only to a sibling copy fails with an error naming the worktree and branch (codifies task `01kzdpvr1`)
 - [ ] One-line warning when copies of a task are in divergent terminal states (`completed` vs `cancelled`)

@@ -41,8 +41,7 @@ travel with the branch that contains the work.
    across worktrees, with provenance ("in-progress in worktree `agent-b`").
 3. All worktrees of one repository resolve to a **single** project identity — one
    registry entry, one `--project` id, no double-counting in `--all-projects`.
-4. Make `next` owner-aware, so multiple agents coordinate even within one checkout.
-5. Degrade to exactly today's behavior when git is absent, the directory is not a
+4. Degrade to exactly today's behavior when git is absent, the directory is not a
    repo, or the repo has a single worktree.
 
 ## Non-goals
@@ -60,6 +59,15 @@ travel with the branch that contains the work.
   local copy. Git remains the merge tool for content.
 - **Write redirection.** Mutations (`set`, `add`, `rm`, `archive`) always write to
   the current worktree's files. Rejected alternative — see ADR 0005.
+- **Owner-based coordination.** An earlier revision made `next` owner-aware
+  (exclude in-progress tasks claimed by others, plus a `--for <owner>` flag) to
+  close the same-checkout multi-agent race. Implemented, then rejected: the
+  coordination unit is **one agent per worktree**, where effective status alone
+  already prevents double-assignment; `owner` stays pure display/assignment
+  metadata, and repurposing it as a claim would silently hide a solo user's own
+  in-progress tasks the moment they fill the field in. If same-checkout
+  coordination ever becomes real, the claims sidecar (Open question 1) is the
+  answer, not `owner`. See §6.
 
 ## Terminology
 
@@ -179,7 +187,7 @@ warning when the overlay is active.
 
 | Command | Behavior with overlay active |
 |---------|------------------------------|
-| `next` | Recommends against **effective** status: a task `in-progress`/`in-review`/`completed` in any sibling is not actionable. Local `in-progress` tasks keep today's resume semantics (see §6 for owner rules). `--explain` names the excluding worktree. |
+| `next` | Recommends against **effective** status: a task `in-progress`/`in-review`/`completed` in any sibling is not actionable. Local `in-progress` tasks keep today's resume semantics. `--explain` names the excluding worktree. |
 | `list` | Extra `WORKTREE` column (only rendered when the overlay is active and at least one task is annotated). `--status` filters on effective status. Sibling-only tasks included, marked. |
 | `board`, `stats`, `graph`, `report`, `metrics`, `tracks`, `phases` | Operate on effective status. |
 | `get` | Shows the local copy, plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ. |
@@ -203,24 +211,14 @@ worktrees: auto   # auto | true | false   (default: auto)
 Per-invocation override: a persistent `--worktrees=<auto|true|false>` global flag,
 mirroring how other global flags work in `root.go`. Env: `TASKMD_WORKTREES`.
 
-### 6. Owner-aware `next` (independent of worktrees)
+### 6. Owner-aware `next` — removed
 
-The spec's existing `owner` frontmatter field becomes coordination-relevant:
-
-- New rule in the recommender (`sdk/go/next`): a task whose effective status is
-  `in-progress` **and** whose effective owner is non-empty is only actionable for
-  that owner.
-- New flag: `taskmd next --for <owner>`. When set, tasks owned by others are
-  excluded, and tasks owned by `<owner>` sort first (resume-your-own-work).
-  When unset, behavior for *unowned* tasks is unchanged; owned in-progress tasks
-  are excluded (safe default — you can't accidentally steal claimed work).
-- Convention for agents (skill-level, not CLI-enforced): claim by
-  `taskmd set <id> --status in-progress --owner <name>` as one call, where
-  `<name>` identifies the agent/worktree (e.g. the branch name).
-
-This closes the same-checkout race and makes the worktree overlay actionable: the
-overlay propagates visibility across worktrees; owner rules turn visibility into
-exclusion.
+This section previously specified owner-based coordination (in-progress tasks
+claimed via `owner` excluded from `next`, plus a `--for <owner>` flag). It was
+implemented (2026-08-22), then reverted the same day and moved to Non-goals —
+see the rationale there. The section number is retained so cross-references to
+§7–§9 stay valid. `EffectiveOwner` in §3 remains: `owner` is still merged and
+displayed as provenance, it just carries no exclusion semantics.
 
 ### 7. Projects registry integration
 
@@ -328,15 +326,13 @@ depend on per-worktree isolation set `worktrees: false`.
 ## Implementation order
 
 1. **`gitmeta` package** — identity resolve + worktree list, with e2e coverage.
-2. **Owner-aware `next`** (`sdk/go/next` + `--for`) — independently shippable;
-   SDK change, so it rides the sdk-pin workflow (patch bump: additive).
-3. **Overlay merge layer** — `OverlayTask`, effective status, provenance; wire into
+2. **Overlay merge layer** — `OverlayTask`, effective status, provenance; wire into
    `next` and `list` first.
-4. **Remaining read views** — board/stats/graph/get/validate annotations; MCP/web.
-5. **Registry identity** — common-dir resolution in register / cwd-matching /
+3. **Remaining read views** — board/stats/graph/get/validate annotations; MCP/web.
+4. **Registry identity** — common-dir resolution in register / cwd-matching /
    `--all-projects` dedupe.
-6. **Docs** — spec-sync surfaces if the `owner` semantics wording in
-   `docs/taskmd_specification.md` changes (run `make sync-spec`).
+5. **Docs** — spec-sync surfaces if any wording in `docs/taskmd_specification.md`
+   changes (run `make sync-spec`).
 
 ## Open questions
 
@@ -350,8 +346,8 @@ depend on per-worktree isolation set `worktrees: false`.
 2. **Effective status vs. `in-review`.** Under the `pr-review` workflow a task can
    be `in-review` in a merged-away branch's worktree after the primary already
    marked it `completed`. The ladder handles this (completed wins), but should
-   `next --for` surface your own `in-review` tasks as "awaiting review" instead of
-   hiding them? Leaning yes, via `--explain` text only.
+   `next --explain` call out excluded `in-review` tasks as "awaiting review"
+   rather than silently hiding them? Leaning yes, via `--explain` text only.
 3. **Provenance naming.** Worktree root basename is usually meaningful
    (`agent-b`, `taskmd-2`) but not guaranteed unique. Branch name is the fallback
    discriminator. Good enough for v1?
