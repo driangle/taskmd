@@ -1,13 +1,14 @@
 ---
 title: "Add gitmeta package: repo identity and worktree discovery"
 id: "01m0n8cpm"
-status: pending
+status: completed
 priority: critical
 type: feature
 tags: ["git", "worktrees"]
 created: "2026-08-22"
 effort: medium
 phase: worktree-support
+completed_at: 2026-08-22
 ---
 
 # Add gitmeta package: repo identity and worktree discovery
@@ -21,14 +22,14 @@ worktree-support task builds on. Spec: `docs/specs/worktree-support.md` §1–2.
 
 ## Tasks
 
-- [ ] Add `Identity{CommonDir, WorktreeRoot, IsLinked}` and `Resolve(dir)` backed by a single
+- [x] Add `Identity{CommonDir, WorktreeRoot, IsLinked}` and `Resolve(dir)` backed by a single
       `git -C <dir> rev-parse --path-format=absolute --git-common-dir --git-dir --show-toplevel` invocation
-- [ ] `Resolve` returns `(nil, nil)` when git is missing from PATH, dir is not a repo, or git errors; log under `--debug`
-- [ ] Add `Worktree{Root, Branch, IsLocal}` and `ListWorktrees(id)` backed by `git worktree list --porcelain`
-- [ ] Filter discovery results: skip prunable worktrees, roots missing on disk, and worktrees without a `.taskmd.yaml` (warn under `--verbose`)
-- [ ] Resolve each sibling worktree's tasks dir by reading its `.taskmd.yaml` directly (raw yaml, no viper), resolving relative `dir`/`task-dir` against the worktree root
-- [ ] Unit tests for porcelain parsing and filtering (fixture output, no git needed)
-- [ ] E2E tests (`-tags e2e`): real repo with `git worktree add`; assert identity/discovery, linked-vs-primary, and no-repo/no-git degradation
+- [x] `Resolve` returns `(nil, nil)` when git is missing from PATH, dir is not a repo, or git errors; log under `--debug`
+- [x] Add `Worktree{Root, Branch, IsLocal}` and `ListWorktrees(id)` backed by `git worktree list --porcelain`
+- [x] Filter discovery results: skip prunable worktrees, roots missing on disk, and worktrees without a `.taskmd.yaml` (warn under `--verbose`)
+- [x] Resolve each sibling worktree's tasks dir by reading its `.taskmd.yaml` directly (raw yaml, no viper), resolving relative `dir`/`task-dir` against the worktree root
+- [x] Unit tests for porcelain parsing and filtering (fixture output, no git needed)
+- [x] E2E tests (`-tags e2e`): real repo with `git worktree add`; assert identity/discovery, linked-vs-primary, and no-repo/no-git degradation
 
 ## Acceptance Criteria
 

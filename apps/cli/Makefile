@@ -45,7 +45,7 @@ test:
 
 # Run end-to-end tests (builds binary and tests as subprocess)
 e2e:
-	go test -tags e2e -count=1 -v ./internal/e2e/...
+	go test -tags e2e -count=1 -v ./internal/e2e/... ./internal/gitmeta/...
 
 GOLANGCI_LINT := $(shell command -v golangci-lint 2>/dev/null || echo $(shell go env GOPATH)/bin/golangci-lint)
 
