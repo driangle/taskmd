@@ -17,6 +17,9 @@ phases:
   - id: critical-feedback
     name: "Critical Feedback"
     description: "Address findings from the project critical evaluation: doc reconciliation, scope discipline, plugin sync, and code/test cleanup"
+  - id: worktree-support
+    name: "Worktree Support"
+    description: "Git worktree awareness per docs/specs/worktree-support.md: one project identity per repo, cross-worktree read overlay, owner-aware next"
   - id: skill-benchmarks
     name: "Skill Benchmarks"
     description: "Establish quality baselines for all agent skills"

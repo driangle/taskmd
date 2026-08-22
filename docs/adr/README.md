@@ -16,3 +16,10 @@ sequentially and keep them short.
 - [0003 — Plugin versioning policy](0003-plugin-versioning-policy.md): the three
   marketplace plugins version independently, not in lockstep with the repo;
   `plugin.json` is the sole source of truth and `release.sh` enforces the bump.
+- [0004 — Reading local git metadata is core](0004-local-git-metadata-is-core.md):
+  core may read git metadata about the repo containing the task files (read-only,
+  local-only, no-op without git); writing to git stays out of core.
+- [0005 — Worktrees are facets of one project](0005-worktrees-are-facets-of-one-project.md):
+  worktrees share one project identity (the git common dir); cross-worktree
+  coordination is a read-side overlay over sibling task files; mutations stay
+  strictly local to the current worktree.
