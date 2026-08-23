@@ -439,3 +439,74 @@ func statusOf(tasks []*model.Task, id string) string {
 	}
 	return ""
 }
+
+func TestHandleConfig_WorktreeOverlay_Info(t *testing.T) {
+	dp, _, _ := overlayFixtureDP(t)
+
+	var resp map[string]any
+	getJSON(t, handleConfig(Config{}, dp), "/api/config", &resp)
+
+	wt, ok := resp["worktree"].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing worktree info with overlay active: %v", resp)
+	}
+	if wt["siblings"] != float64(1) {
+		t.Errorf("worktree.siblings = %v, want 1", wt["siblings"])
+	}
+}
+
+func TestHandleConfig_OverlayInactive_NoWorktreeInfo(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	var resp map[string]any
+	getJSON(t, handleConfig(Config{}, dp), "/api/config", &resp)
+
+	if _, ok := resp["worktree"]; ok {
+		t.Errorf("worktree info present with overlay inactive: %v", resp)
+	}
+}
+
+func TestHandleBoard_WorktreeOverlay_ProvenanceOnCards(t *testing.T) {
+	dp, _, _ := overlayFixtureDP(t)
+
+	var groups []struct {
+		Group string           `json:"group"`
+		Tasks []map[string]any `json:"tasks"`
+	}
+	getJSON(t, handleBoard(dp, nil, effortScaleForTest()), "/api/board?groupBy=status", &groups)
+
+	cards := map[string]map[string]any{}
+	for _, g := range groups {
+		for _, task := range g.Tasks {
+			cards[task["id"].(string)] = task
+		}
+	}
+	if claimed := cards["001"]; claimed["worktree"] != "agent-b" {
+		t.Errorf("board card 001 worktree = %v, want agent-b", claimed["worktree"])
+	}
+	if sib := cards["099"]; sib["remote_only"] != true {
+		t.Errorf("board card 099 should be remote_only: %v", sib)
+	}
+	if free := cards["002"]; free["worktree"] != nil || free["remote_only"] != nil {
+		t.Errorf("board card 002 has unexpected provenance: %v", free)
+	}
+}
+
+func TestHandleBoard_OverlayInactive_CardShapeUnchanged(t *testing.T) {
+	dir := createTestTaskDir(t)
+	dp := NewDataProvider(dir, false)
+
+	var groups []struct {
+		Tasks []map[string]any `json:"tasks"`
+	}
+	getJSON(t, handleBoard(dp, nil, effortScaleForTest()), "/api/board?groupBy=status", &groups)
+
+	for _, g := range groups {
+		for _, task := range g.Tasks {
+			if _, ok := task["worktree"]; ok {
+				t.Errorf("board card carries worktree with overlay inactive: %v", task)
+			}
+		}
+	}
+}

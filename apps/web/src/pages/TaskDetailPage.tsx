@@ -12,8 +12,10 @@ import type { TaskUpdateRequest } from "../api/types.ts";
 import { TaskEditForm } from "../components/tasks/TaskEditForm.tsx";
 import { LoadingState } from "../components/shared/LoadingState.tsx";
 import { ErrorState } from "../components/shared/ErrorState.tsx";
-import { StatusBadge, PhaseBadge } from "../components/tasks/TaskTable/Badges.tsx";
+import { StatusBadge, WorktreeBadge } from "../components/tasks/TaskTable/Badges.tsx";
 import { WorklogSection } from "../components/tasks/WorklogSection.tsx";
+import { WorktreeCopiesSection } from "../components/tasks/WorktreeCopiesSection.tsx";
+import { TaskMetaGrid } from "../components/tasks/TaskMetaGrid.tsx";
 
 export function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -92,7 +94,14 @@ export function TaskDetailPage() {
                 <h2 className="text-xl font-semibold mt-1">{task.title}</h2>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge status={task.status} />
+                <StatusBadge status={task.effective_status || task.status} />
+                {(task.worktree || task.remote_only) && (
+                  <WorktreeBadge
+                    worktree={task.worktree}
+                    branch={task.branch}
+                    remoteOnly={task.remote_only}
+                  />
+                )}
                 {!readonly && (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -104,34 +113,11 @@ export function TaskDetailPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-sm">
-              {task.priority && (
-                <Field label="Priority" value={task.priority} />
-              )}
-              {task.effort && <Field label="Effort" value={task.effort} />}
-              {task.phase && (
-                <div>
-                  <dt className="text-xs text-gray-500 dark:text-gray-400">Phase</dt>
-                  <dd className="mt-0.5"><PhaseBadge phase={task.phase} /></dd>
-                </div>
-              )}
-              {task.owner && <Field label="Owner" value={task.owner} />}
-              {task.group && <Field label="Group" value={task.group} />}
-              {task.parent && (
-                <div>
-                  <dt className="text-xs text-gray-500 dark:text-gray-400">Parent</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={`/tasks/${task.parent}`}
-                      className="text-blue-600 hover:underline dark:text-blue-400 font-mono"
-                    >
-                      {task.parent}
-                    </Link>
-                  </dd>
-                </div>
-              )}
-              {task.created && <Field label="Created" value={task.created} />}
-            </div>
+            <TaskMetaGrid task={task} />
+
+            {task.worktrees && task.worktrees.length > 0 && (
+              <WorktreeCopiesSection copies={task.worktrees} />
+            )}
 
             {task.dependencies && task.dependencies.length > 0 && (
               <div className="mb-6">
@@ -200,15 +186,6 @@ export function TaskDetailPage() {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="font-medium">{value}</dd>
     </div>
   );
 }

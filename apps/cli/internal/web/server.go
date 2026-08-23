@@ -133,7 +133,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects", handleProjects(s.config.ListProjects))
-	mux.HandleFunc("GET /api/config", handleConfig(s.config))
+	mux.HandleFunc("GET /api/config", handleConfig(s.config, s.dp))
 	mux.HandleFunc("GET /api/search", handleSearch(s.dp))
 	mux.HandleFunc("GET /api/tasks", handleTasks(s.dp))
 	mux.HandleFunc("GET /api/tasks/{id}", handleTaskByID(s.dp))

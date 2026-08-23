@@ -689,7 +689,7 @@ func TestHandleConfig(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	rec := httptest.NewRecorder()
 
-	handleConfig(cfg)(rec, req)
+	handleConfig(cfg, nil)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -713,7 +713,7 @@ func TestHandleConfig_ReadOnly(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	rec := httptest.NewRecorder()
 
-	handleConfig(cfg)(rec, req)
+	handleConfig(cfg, nil)(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -732,7 +732,7 @@ func TestHandleConfig_Efforts_DefaultVocabulary(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	rec := httptest.NewRecorder()
 
-	handleConfig(Config{})(rec, req)
+	handleConfig(Config{}, nil)(rec, req)
 
 	var resp ConfigResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -753,7 +753,7 @@ func TestHandleConfig_Efforts_CustomVocabulary(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	rec := httptest.NewRecorder()
 
-	handleConfig(Config{Efforts: scale})(rec, req)
+	handleConfig(Config{Efforts: scale}, nil)(rec, req)
 
 	var resp ConfigResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -1491,7 +1491,7 @@ func TestHandleConfig_WithProject(t *testing.T) {
 	}, false, worktree.Builder{})
 
 	cfg := Config{ReadOnly: false, Version: "test", Phases: defaultPhases}
-	handler := setupProjectMiddleware(resolver, handleConfig(cfg))
+	handler := setupProjectMiddleware(resolver, handleConfig(cfg, nil))
 
 	// With ?project=proj-a, should return project phases.
 	req := httptest.NewRequest(http.MethodGet, "/api/config?project=proj-a", nil)
@@ -1515,7 +1515,7 @@ func TestHandleConfig_WithoutProject_ReturnsDefault(t *testing.T) {
 	defaultPhases := []PhaseInfo{{ID: "default-phase", Name: "Default Phase"}}
 	cfg := Config{ReadOnly: false, Version: "test", Phases: defaultPhases}
 
-	handler := setupProjectMiddleware(nil, handleConfig(cfg))
+	handler := setupProjectMiddleware(nil, handleConfig(cfg, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	rec := httptest.NewRecorder()

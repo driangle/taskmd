@@ -187,3 +187,20 @@ describe("applyFilters", () => {
     expect(result.map((t) => t.id)).toEqual(["002"]);
   });
 });
+
+describe("applyFilters worktree overlay", () => {
+  it("matches the status filter against the effective status", () => {
+    const tasks = [
+      makeTask({ id: "010", status: "pending", effective_status: "in-progress" }),
+      makeTask({ id: "011", status: "pending" }),
+    ];
+    const filters = { ...defaultFilterState(), selectedStatuses: new Set(["in-progress"]) };
+    expect(applyFilters(tasks, filters).map((t) => t.id)).toEqual(["010"]);
+  });
+
+  it("excludes a task whose local status matches but effective status does not", () => {
+    const tasks = [makeTask({ id: "010", status: "pending", effective_status: "completed" })];
+    const filters = { ...defaultFilterState(), selectedStatuses: new Set(["pending"]) };
+    expect(applyFilters(tasks, filters)).toEqual([]);
+  });
+});

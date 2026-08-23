@@ -40,6 +40,32 @@ export function PhaseBadge({ phase }: { phase: string }) {
   );
 }
 
+export function WorktreeBadge({
+  worktree,
+  branch,
+  remoteOnly,
+}: {
+  worktree?: string;
+  branch?: string;
+  remoteOnly?: boolean;
+}) {
+  const name = worktree || "sibling";
+  const where = branch ? `${name} (${branch})` : name;
+  const tooltipText = remoteOnly
+    ? `Exists only in worktree ${where}`
+    : `Status from worktree ${where}`;
+  return (
+    <span
+      className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 inline-flex items-center gap-1 cursor-help whitespace-nowrap"
+      title={tooltipText}
+      aria-label={tooltipText}
+    >
+      <span aria-hidden="true">⎇</span>
+      <span>{name}</span>
+    </span>
+  );
+}
+
 export function BlockedStatusBadge({
   dependencies,
   taskStatusMap,

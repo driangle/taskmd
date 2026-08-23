@@ -8,12 +8,21 @@ export interface PhaseInfo {
   description: string;
 }
 
+export interface WorktreeOverlayInfo {
+  /** Local worktree's directory name; may be absent. */
+  name?: string;
+  /** Number of sibling worktrees merged into the served view. */
+  siblings: number;
+}
+
 interface AppConfig {
   readonly: boolean;
   version: string;
   phases: PhaseInfo[];
   /** Project's effort vocabulary. Absent on servers older than this key. */
   efforts?: string[];
+  /** Active worktree overlay; absent in single-worktree repos. */
+  worktree?: WorktreeOverlayInfo;
 }
 
 declare global {
@@ -26,7 +35,16 @@ declare global {
 // Available immediately on first render — no async fetch needed for the default config.
 const injectedConfig: AppConfig | undefined = window.__TASKMD_CONFIG__;
 
-export function useConfig(project?: string | null) {
+export interface UseConfigResult {
+  readonly: boolean;
+  version: string;
+  phases: PhaseInfo[];
+  efforts: string[];
+  /** Active worktree overlay; absent in single-worktree repos. */
+  worktree?: WorktreeOverlayInfo;
+}
+
+export function useConfig(project?: string | null): UseConfigResult {
   const params = new URLSearchParams();
   if (project) params.set("project", project);
   const qs = params.toString();
@@ -40,5 +58,6 @@ export function useConfig(project?: string | null) {
     version: data?.version ?? "",
     phases: data?.phases ?? [],
     efforts: data?.efforts?.length ? data.efforts : DEFAULT_EFFORTS,
+    worktree: data?.worktree,
   };
 }

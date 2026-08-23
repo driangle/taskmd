@@ -1,8 +1,9 @@
 import { createColumnHelper } from "@tanstack/react-table";
 import { Link } from "react-router-dom";
 import type { Task } from "../../../api/types.ts";
-import { StatusBadge, PriorityBadge, TypeBadge, PhaseBadge, BlockedStatusBadge } from "./Badges.tsx";
+import { StatusBadge, PriorityBadge, TypeBadge, PhaseBadge, BlockedStatusBadge, WorktreeBadge } from "./Badges.tsx";
 import { compareBlocked, comparePriority } from "./sorting.ts";
+import { effectiveStatus } from "./utils.ts";
 
 export function createTaskColumns(
   selectedTags: Set<string>,
@@ -37,7 +38,22 @@ export function createTaskColumns(
     }),
     columnHelper.accessor("status", {
       header: "Status",
-      cell: (info) => <StatusBadge status={info.getValue()} />,
+      cell: (info) => {
+        const task = info.row.original;
+        const remote = Boolean(task.worktree) || Boolean(task.remote_only);
+        return (
+          <div className="flex items-center gap-1.5">
+            <StatusBadge status={effectiveStatus(task)} />
+            {remote && (
+              <WorktreeBadge
+                worktree={task.worktree}
+                branch={task.branch}
+                remoteOnly={task.remote_only}
+              />
+            )}
+          </div>
+        );
+      },
     }),
     columnHelper.accessor("dependencies", {
       id: "blocked",

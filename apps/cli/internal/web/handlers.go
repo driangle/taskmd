@@ -32,6 +32,8 @@ type ConfigResponse struct {
 	// Efforts is the project's effort vocabulary, lowest to highest. The web UI
 	// uses it to populate the effort filter and the edit-form dropdown.
 	Efforts []string `json:"efforts"`
+	// Worktree describes the active worktree overlay; absent when inactive.
+	Worktree *WorktreeOverlayInfo `json:"worktree,omitempty"`
 }
 
 func handleProjects(listFn func() ([]ProjectEntry, error)) http.HandlerFunc {
@@ -52,7 +54,7 @@ func handleProjects(listFn func() ([]ProjectEntry, error)) http.HandlerFunc {
 	}
 }
 
-func handleConfig(cfg Config) http.HandlerFunc {
+func handleConfig(cfg Config, dp *DataProvider) http.HandlerFunc {
 	phases := cfg.Phases
 	if phases == nil {
 		phases = []PhaseInfo{}
@@ -62,11 +64,15 @@ func handleConfig(cfg Config) http.HandlerFunc {
 		if p == nil {
 			p = []PhaseInfo{}
 		}
+		// Best effort: config must keep serving even if the overlay scan
+		// fails; task endpoints report that error instead.
+		info, _ := effectiveDP(r, dp).OverlayInfo()
 		writeJSON(w, ConfigResponse{
 			ReadOnly: cfg.ReadOnly,
 			Version:  cfg.Version,
 			Phases:   p,
 			Efforts:  cfg.Efforts.Values(),
+			Worktree: info,
 		})
 	}
 }
@@ -245,7 +251,12 @@ func handleBoard(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) htt
 			board.ReorderKeys(grouped, phaseOrder)
 		}
 
-		writeJSON(w, board.ToJSON(grouped))
+		overlay, err := dp.GetOverlay()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, annotateBoard(board.ToJSON(grouped), overlay))
 	}
 }
 

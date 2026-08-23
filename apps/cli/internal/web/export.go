@@ -73,6 +73,10 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	if err != nil {
 		return fmt.Errorf("failed to build worktree overlay: %w", err)
 	}
+	overlayInfo, err := dp.OverlayInfo()
+	if err != nil {
+		return fmt.Errorf("failed to resolve worktree overlay info: %w", err)
+	}
 
 	archivedTasks, err := dp.GetArchivedTasks()
 	if err != nil {
@@ -80,7 +84,7 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	}
 
 	// Generate static JSON data files
-	if err := generateDataFiles(cfg, tasks, archivedTasks, overlay); err != nil {
+	if err := generateDataFiles(cfg, tasks, archivedTasks, overlay, overlayInfo); err != nil {
 		return err
 	}
 
@@ -104,7 +108,7 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	return nil
 }
 
-func generateDataFiles(cfg ExportConfig, tasks, archivedTasks []*model.Task, overlay *worktree.Overlay) error {
+func generateDataFiles(cfg ExportConfig, tasks, archivedTasks []*model.Task, overlay *worktree.Overlay, overlayInfo *WorktreeOverlayInfo) error {
 	apiDir := filepath.Join(cfg.OutputDir, "api")
 	efforts := cfg.Efforts
 
@@ -112,6 +116,7 @@ func generateDataFiles(cfg ExportConfig, tasks, archivedTasks []*model.Task, ove
 		ReadOnly: true,
 		Version:  cfg.Version,
 		Efforts:  efforts.Values(),
+		Worktree: overlayInfo,
 	}); err != nil {
 		return err
 	}
@@ -134,7 +139,7 @@ func generateDataFiles(cfg ExportConfig, tasks, archivedTasks []*model.Task, ove
 		return err
 	}
 
-	if err := generateBoardFiles(filepath.Join(apiDir, "board"), effective, efforts); err != nil {
+	if err := generateBoardFiles(filepath.Join(apiDir, "board"), effective, efforts, overlay); err != nil {
 		return err
 	}
 
@@ -203,13 +208,13 @@ func buildWorklogEntries(t *model.Task) []WorklogEntryJSON {
 	return entries
 }
 
-func generateBoardFiles(boardDir string, tasks []*model.Task, efforts effort.Scale) error {
+func generateBoardFiles(boardDir string, tasks []*model.Task, efforts effort.Scale, overlay *worktree.Overlay) error {
 	for _, groupBy := range []string{"status", "priority", "effort", "type", "group", "tag"} {
 		grouped, err := board.GroupTasks(tasks, groupBy, efforts)
 		if err != nil {
 			return fmt.Errorf("failed to group tasks by %s: %w", groupBy, err)
 		}
-		if err := writeJSONFile(boardDir, groupBy+".json", board.ToJSON(grouped)); err != nil {
+		if err := writeJSONFile(boardDir, groupBy+".json", annotateBoard(board.ToJSON(grouped), overlay)); err != nil {
 			return err
 		}
 	}

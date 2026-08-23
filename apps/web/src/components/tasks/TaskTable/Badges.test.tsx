@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { StatusBadge, PriorityBadge, TypeBadge, PhaseBadge, BlockedStatusBadge } from "./Badges.tsx";
+import { StatusBadge, PriorityBadge, TypeBadge, PhaseBadge, BlockedStatusBadge, WorktreeBadge } from "./Badges.tsx";
 import { STATUS_COLORS, PRIORITY_COLORS, TYPE_COLORS, getPhaseColor } from "./constants.ts";
 
 describe("StatusBadge", () => {
@@ -110,5 +110,31 @@ describe("BlockedStatusBadge", () => {
     render(<BlockedStatusBadge dependencies={["005", "999"]} taskStatusMap={statusMap} />);
     expect(screen.getByText("(1)")).toBeInTheDocument();
     expect(screen.getByLabelText("Blocked by: 999")).toBeInTheDocument();
+  });
+});
+
+describe("WorktreeBadge", () => {
+  it("renders the worktree name", () => {
+    render(<WorktreeBadge worktree="agent-b" branch="dnc/001/parser" />);
+    expect(screen.getByText("agent-b")).toBeInTheDocument();
+  });
+
+  it("explains the status provenance in the tooltip, including the branch", () => {
+    render(<WorktreeBadge worktree="agent-b" branch="dnc/001/parser" />);
+    expect(
+      screen.getByLabelText("Status from worktree agent-b (dnc/001/parser)"),
+    ).toBeInTheDocument();
+  });
+
+  it("describes remote-only tasks as existing only in the sibling worktree", () => {
+    render(<WorktreeBadge worktree="agent-b" remoteOnly />);
+    expect(
+      screen.getByLabelText("Exists only in worktree agent-b"),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to a generic label when the worktree name is missing", () => {
+    render(<WorktreeBadge remoteOnly />);
+    expect(screen.getByText("sibling")).toBeInTheDocument();
   });
 });

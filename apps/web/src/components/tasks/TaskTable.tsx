@@ -13,7 +13,7 @@ import { useConfig } from "../../hooks/use-config.ts";
 import { STATUSES, PRIORITIES, TYPES } from "./TaskTable/constants.ts";
 import { FilterBar } from "./TaskTable/FilterBar.tsx";
 import { createTaskColumns } from "./TaskTable/columns.tsx";
-import { toggleInSet } from "./TaskTable/utils.ts";
+import { toggleInSet, effectiveStatus } from "./TaskTable/utils.ts";
 import { applyFilters, hasActiveFilters as checkActiveFilters } from "./TaskTable/filters.ts";
 import { MobileCardList } from "./TaskTable/MobileCardList.tsx";
 import { DesktopTable } from "./TaskTable/DesktopTable.tsx";
@@ -120,7 +120,7 @@ export function TaskTable({ tasks, initialTags, initialStatuses, initialPrioriti
   );
 
   const taskStatusMap = useMemo(
-    () => new Map(tasks.map((t) => [t.id, t.status])),
+    () => new Map(tasks.map((t) => [t.id, effectiveStatus(t)])),
     [tasks],
   );
 

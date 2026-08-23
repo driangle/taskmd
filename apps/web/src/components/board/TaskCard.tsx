@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { BoardTask } from "../../api/types.ts";
-import { PhaseBadge } from "../tasks/TaskTable/Badges.tsx";
+import { PhaseBadge, WorktreeBadge } from "../tasks/TaskTable/Badges.tsx";
 
 interface TaskCardProps {
   task: BoardTask;
@@ -92,6 +92,9 @@ export function TaskCard({ task, sourceGroup, canDrag, focused = false, showPhas
         )}
         {showPhase && task.phase && (
           <PhaseBadge phase={task.phase} />
+        )}
+        {(task.worktree || task.remote_only) && (
+          <WorktreeBadge worktree={task.worktree} remoteOnly={task.remote_only} />
         )}
       </div>
     </div>

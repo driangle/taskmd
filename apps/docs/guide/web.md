@@ -403,9 +403,16 @@ local copy):
 
 Aggregate endpoints (`/api/board`, `/api/graph`, `/api/stats`, `/api/next`,
 `/api/tracks`, `/api/search`) operate on effective statuses, and `/api/next`
-never recommends a task claimed in a sibling worktree. Edits stay strictly
+never recommends a task claimed in a sibling worktree. Board cards from
+`/api/board` additionally carry `worktree` and `remote_only` so the UI can
+badge tasks whose winning copy is remote. Edits stay strictly
 local: a `PUT` targeting a task that exists only in a sibling worktree returns
 `409 Conflict` with the guard message instead of writing.
+
+`GET /api/config` gains a `worktree` object while the overlay is active —
+`{"name": "<local worktree>", "siblings": <count>}` — which the web UI uses
+for its header indicator ("worktree `agent-b` — 3 siblings"). It is omitted
+in single-worktree repos.
 
 Live reload covers sibling worktrees too — a claim made in another worktree
 reaches connected browsers over the SSE stream, and `git worktree add`/

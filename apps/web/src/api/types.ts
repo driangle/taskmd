@@ -16,6 +16,25 @@ export interface Task {
   file_path: string;
   worklog_entries?: number;
   worklog_updated?: string;
+  // Worktree overlay provenance. Present only when the server merges
+  // multiple git worktrees; `status`/`owner` still describe the local copy.
+  effective_status?: string;
+  effective_owner?: string;
+  /** Winning copy's worktree name; empty/absent when the local copy wins. */
+  worktree?: string;
+  branch?: string;
+  /** True when the task exists only in a sibling worktree. */
+  remote_only?: boolean;
+  /** Per-worktree copies; sent on the detail endpoint when copies diverge. */
+  worktrees?: WorktreeCopy[];
+}
+
+export interface WorktreeCopy {
+  worktree?: string;
+  branch?: string;
+  status: string;
+  owner?: string;
+  local?: boolean;
 }
 
 export interface WorklogEntry {
@@ -38,6 +57,10 @@ export interface BoardTask {
   type?: string;
   phase?: string;
   tags?: string[];
+  /** Winning copy's worktree name; absent when the local copy wins. */
+  worktree?: string;
+  /** True when the task exists only in a sibling worktree. */
+  remote_only?: boolean;
 }
 
 export interface GraphData {

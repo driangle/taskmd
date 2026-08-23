@@ -174,3 +174,39 @@ describe("TaskDetailPage", () => {
     expect(screen.getByText("Started work")).toBeInTheDocument();
   });
 });
+
+describe("TaskDetailPage worktree provenance", () => {
+  it("renders the effective status and worktree badge when the winning copy is remote", () => {
+    mockTask = makeTask({
+      status: "pending",
+      effective_status: "in-progress",
+      worktree: "agent-b",
+      branch: "dnc/042/parser",
+    });
+    renderPage();
+    expect(screen.getByText("in-progress")).toBeInTheDocument();
+    expect(screen.queryByText("pending")).not.toBeInTheDocument();
+    expect(screen.getByText("agent-b")).toBeInTheDocument();
+  });
+
+  it("renders the per-worktree copies section when copies diverge", () => {
+    mockTask = makeTask({
+      effective_status: "in-progress",
+      worktree: "agent-b",
+      worktrees: [
+        { status: "pending", local: true },
+        { worktree: "agent-b", branch: "dnc/042/parser", status: "in-progress", owner: "agent-b" },
+      ],
+    });
+    renderPage();
+    expect(screen.getByText("Worktree Copies")).toBeInTheDocument();
+    expect(screen.getByText("dnc/042/parser")).toBeInTheDocument();
+    expect(screen.getByText("(local)")).toBeInTheDocument();
+  });
+
+  it("renders no copies section for a single-worktree task", () => {
+    mockTask = makeTask();
+    renderPage();
+    expect(screen.queryByText("Worktree Copies")).not.toBeInTheDocument();
+  });
+});

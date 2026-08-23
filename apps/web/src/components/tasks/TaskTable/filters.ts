@@ -1,5 +1,6 @@
 import type { Task } from "../../../api/types.ts";
 import { STATUSES, PRIORITIES, DEFAULT_EFFORTS, TYPES } from "./constants.ts";
+import { effectiveStatus } from "./utils.ts";
 
 export interface FilterState {
   selectedStatuses: Set<string>;
@@ -21,7 +22,7 @@ export function applyFilters(
   efforts: string[] = DEFAULT_EFFORTS,
 ): Task[] {
   return tasks.filter((task) => {
-    if (!filters.selectedStatuses.has(task.status)) return false;
+    if (!filters.selectedStatuses.has(effectiveStatus(task))) return false;
     if (task.priority && !filters.selectedPriorities.has(task.priority))
       return false;
     if (task.type && !filters.selectedTypes.has(task.type)) return false;

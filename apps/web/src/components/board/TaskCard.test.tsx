@@ -167,3 +167,21 @@ describe("TaskCard", () => {
     expect(card).toHaveAttribute("data-focused", "false");
   });
 });
+
+describe("TaskCard worktree provenance", () => {
+  it("shows the worktree badge when the winning copy is remote", () => {
+    renderCard({ task: makeTask({ worktree: "agent-b" }) });
+    expect(screen.getByText("agent-b")).toBeInTheDocument();
+  });
+
+  it("shows the badge for remote-only tasks", () => {
+    renderCard({ task: makeTask({ remote_only: true }) });
+    expect(screen.getByText("sibling")).toBeInTheDocument();
+  });
+
+  it("shows no worktree badge without provenance", () => {
+    renderCard();
+    expect(screen.queryByText("agent-b")).not.toBeInTheDocument();
+    expect(screen.queryByText("sibling")).not.toBeInTheDocument();
+  });
+});

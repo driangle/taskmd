@@ -8,6 +8,7 @@ import { SearchDialog } from "../search/SearchDialog.tsx";
 import { DesktopNav, HeaderActions, MobileMenu } from "./NavTabs.tsx";
 import { PhaseSelector } from "./PhaseSelector.tsx";
 import { ProjectSelector } from "./ProjectSelector.tsx";
+import { HeaderStatus } from "./HeaderStatus.tsx";
 
 interface ShellProps {
   children: ReactNode;
@@ -15,7 +16,7 @@ interface ShellProps {
 
 export function Shell({ children }: ShellProps) {
   const { project } = useProject();
-  const { readonly, version } = useConfig(project);
+  const { readonly, version, worktree } = useConfig(project);
   const { theme, toggle } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -151,16 +152,7 @@ export function Shell({ children }: ShellProps) {
               >
                 taskmd
               </Link>
-              {version && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {version}
-                </span>
-              )}
-              {readonly && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                  Read Only
-                </span>
-              )}
+              <HeaderStatus version={version} readonly={readonly} worktree={worktree} />
               <ProjectSelector />
               <PhaseSelector />
             </div>

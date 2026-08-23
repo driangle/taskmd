@@ -54,6 +54,27 @@ func (dp *DataProvider) GetOverlay() (*worktree.Overlay, error) {
 	return overlay, err
 }
 
+// OverlayInfo reports the active overlay's shape for /api/config: the local
+// worktree's name and the sibling worktree count. Nil when the overlay is
+// inactive, so single-worktree responses are unchanged.
+func (dp *DataProvider) OverlayInfo() (*WorktreeOverlayInfo, error) {
+	if dp == nil {
+		return nil, nil
+	}
+	overlay, err := dp.GetOverlay()
+	if err != nil || overlay == nil {
+		return nil, err
+	}
+	info := &WorktreeOverlayInfo{}
+	if id, err := gitmeta.Resolve(dp.scanDir); err == nil && id != nil {
+		info.Name = filepath.Base(id.WorktreeRoot)
+	}
+	if siblings, err := dp.wt.Siblings(dp.scanDir); err == nil {
+		info.Siblings = len(siblings)
+	}
+	return info, nil
+}
+
 // GetEffectiveTasks returns the merged task list with effective statuses when
 // the overlay is active, and the local tasks otherwise. Status-aggregating
 // endpoints (board, graph, stats, next, tracks, validate, search) serve this.

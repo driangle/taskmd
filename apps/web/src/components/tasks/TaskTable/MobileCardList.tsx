@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
 import type { Row } from "@tanstack/react-table";
 import type { Task } from "../../../api/types.ts";
-import { StatusBadge, PriorityBadge, PhaseBadge } from "./Badges.tsx";
+import { StatusBadge, PriorityBadge, PhaseBadge, WorktreeBadge } from "./Badges.tsx";
 import { KeyboardList } from "../../shared/KeyboardList.tsx";
+import { effectiveStatus } from "./utils.ts";
 
 interface MobileCardListProps {
   rows: Row<Task>[];
@@ -47,7 +48,14 @@ export function MobileCardList({ rows, onClearFilters, showPhase = true }: Mobil
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="font-mono text-xs text-gray-400">{task.id}</span>
                 <div className="flex items-center gap-1.5">
-                  <StatusBadge status={task.status} />
+                  <StatusBadge status={effectiveStatus(task)} />
+                  {(task.worktree || task.remote_only) && (
+                    <WorktreeBadge
+                      worktree={task.worktree}
+                      branch={task.branch}
+                      remoteOnly={task.remote_only}
+                    />
+                  )}
                   {task.priority && <PriorityBadge priority={task.priority} />}
                 </div>
               </div>

@@ -164,3 +164,28 @@ describe("TaskDetailPage edit flow", () => {
     expect(screen.queryByText("Err")).not.toBeInTheDocument();
   });
 });
+
+describe("TaskDetailPage sibling-only write guard", () => {
+  beforeEach(() => {
+    mockTask = makeTask();
+    mockError = undefined;
+    mockLoading = false;
+    mockMutate.mockReset();
+    mockUpdateTask.mockReset();
+  });
+
+  it("shows the guard error naming the worktree when the edit is blocked", async () => {
+    const guardMessage =
+      "task 042 exists only in worktree ../agent-b (branch dnc/042/parser); run taskmd there";
+    mockUpdateTask.mockRejectedValueOnce(new ApiRequestError(guardMessage));
+    renderPage();
+    await userEvent.click(screen.getByText("Edit"));
+    const titleInput = screen.getByDisplayValue("Test task");
+    await userEvent.clear(titleInput);
+    await userEvent.type(titleInput, "Renamed");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(screen.getByText(guardMessage)).toBeInTheDocument();
+    });
+  });
+});

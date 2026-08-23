@@ -1,7 +1,7 @@
 ---
 title: "Web UI: render worktree provenance and surface the write guard"
 id: "01m0nr902"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["worktrees", "web", "frontend"]
@@ -9,6 +9,7 @@ created: "2026-08-22"
 dependencies: ["01m0n67bx"]
 effort: small
 phase: worktree-support
+completed_at: 2026-08-23
 ---
 
 # Web UI: render worktree provenance and surface the write guard
@@ -22,12 +23,12 @@ Spec: `docs/specs/worktree-support.md` §9.
 
 ## Tasks
 
-- [ ] Extend the TypeScript API types with the provenance fields (`effective_status`, `effective_owner`, `worktree`, `branch`, `remote_only`)
-- [ ] Worktree badge on task list rows and board cards when a task's winning copy is remote
-- [ ] Task detail page: per-worktree copies section (status/owner/branch per copy) when copies differ, mirroring `get`
-- [ ] Header indicator when the overlay is active ("worktree `agent-b` — 3 siblings")
-- [ ] Surface the sibling-only guard error from mutation responses as a visible failure (toast/inline error), never a silent no-op
-- [ ] Component tests for badge, detail section, and guard-error rendering
+- [x] Extend the TypeScript API types with the provenance fields (`effective_status`, `effective_owner`, `worktree`, `branch`, `remote_only`)
+- [x] Worktree badge on task list rows and board cards when a task's winning copy is remote
+- [x] Task detail page: per-worktree copies section (status/owner/branch per copy) when copies differ, mirroring `get`
+- [x] Header indicator when the overlay is active ("worktree `agent-b` — 3 siblings")
+- [x] Surface the sibling-only guard error from mutation responses as a visible failure (toast/inline error), never a silent no-op
+- [x] Component tests for badge, detail section, and guard-error rendering
 
 ## Acceptance Criteria
 

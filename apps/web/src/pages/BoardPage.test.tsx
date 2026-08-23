@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { BoardPage } from "./BoardPage.tsx";
 import {
   createBoardTask,
@@ -185,6 +185,37 @@ describe("BoardPage", () => {
       const select = screen.getByRole("combobox") as HTMLSelectElement;
       fireEvent.change(select, { target: { value: "status" } });
       expect(select.value).toBe("status");
+    });
+  });
+
+  describe("sibling-only write guard", () => {
+    function dropTask(taskId: string, sourceGroup: string, targetColumn: HTMLElement) {
+      const dropEvent = new Event("drop", { bubbles: true }) as unknown as DragEvent;
+      const store: Record<string, string> = {
+        "text/plain": taskId,
+        "application/x-source-group": sourceGroup,
+      };
+      Object.defineProperty(dropEvent, "dataTransfer", {
+        value: { getData: (key: string) => store[key] ?? "" },
+      });
+      Object.defineProperty(dropEvent, "preventDefault", { value: vi.fn() });
+      fireEvent(targetColumn, dropEvent);
+    }
+
+    it("surfaces the guard error naming the worktree when a move is blocked", async () => {
+      const guardMessage =
+        "task 001 exists only in worktree ../agent-b (branch dnc/001/parser); run taskmd there";
+      mockUpdateTask.mockRejectedValueOnce(new Error(guardMessage));
+      renderPage();
+
+      const columns = screen.getAllByRole("group");
+      dropTask("001", "pending", columns[1]);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(`Failed to move task 001: ${guardMessage}`),
+        ).toBeInTheDocument();
+      });
     });
   });
 });
