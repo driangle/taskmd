@@ -56,7 +56,7 @@ func runProjects(_ *cobra.Command, _ []string) error {
 	}
 
 	if len(projects) == 0 {
-		fmt.Fprintln(os.Stderr, "No projects registered. Add projects to ~/.taskmd/config.yaml:")
+		fmt.Fprintln(os.Stderr, "No projects registered. Run 'taskmd projects register' in a project, or add projects to ~/.taskmd.yaml:")
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "  projects:")
 		fmt.Fprintln(os.Stderr, "    - id: my-project")

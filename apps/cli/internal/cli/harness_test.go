@@ -88,6 +88,9 @@ func resetCLIState() {
 	// command tests stay hermetic and fast. Overlay tests install their own
 	// stub via RunWith's configure hook (which runs after this reset).
 	discoverSiblingWorktrees = func(string) ([]gitmeta.Worktree, error) { return nil, nil }
+	// Same for repo-identity resolution: default to "not a git repo" so
+	// registry tests stay hermetic. Identity tests install their own stub.
+	resolveRepoIdentity = func(string) *gitmeta.Identity { return nil }
 }
 
 // resetFlagTree restores every flag in the command tree to its registered

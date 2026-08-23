@@ -1,7 +1,7 @@
 ---
 title: "Repo-identity resolution in projects registry and all-projects dedupe"
 id: "01m0n1nxx"
-status: pending
+status: completed
 priority: high
 type: feature
 tags: ["worktrees", "projects", "registry"]
@@ -9,6 +9,7 @@ created: "2026-08-22"
 dependencies: ["01m0n8cpm"]
 effort: medium
 phase: worktree-support
+completed_at: 2026-08-23
 ---
 
 # Repo-identity resolution in projects registry and all-projects dedupe
@@ -22,13 +23,13 @@ Spec: `docs/specs/worktree-support.md` §7.
 
 ## Tasks
 
-- [ ] `projects register` resolves repo identity via `gitmeta` and stores the primary worktree's root as `path`, even when run from a linked worktree
-- [ ] Registering a second worktree of an already-registered repo is a friendly no-op ("already registered as `<id>`")
-- [ ] cwd → project matching (`resolveTaskDir`, `--project` no-op detection) compares repo identity, not path prefixes, when cwd is inside a git repo
-- [ ] `--project <id>` from any worktree scopes to the *current worktree's* task dir (local base + overlay), never the primary's
-- [ ] `--all-projects` scans each repo once: the current worktree when inside that repo, else the registered primary
-- [ ] Fix the stale `~/.taskmd/config.yaml` hint in `projects.go` while touching the file
-- [ ] Registry tests: register-from-linked-worktree, duplicate-registration no-op, identity-based cwd matching; e2e with `git worktree add`
+- [x] `projects register` resolves repo identity via `gitmeta` and stores the primary worktree's root as `path`, even when run from a linked worktree
+- [x] Registering a second worktree of an already-registered repo is a friendly no-op ("already registered as `<id>`")
+- [x] cwd → project matching (`resolveTaskDir`, `--project` no-op detection) compares repo identity, not path prefixes, when cwd is inside a git repo
+- [x] `--project <id>` from any worktree scopes to the *current worktree's* task dir (local base + overlay), never the primary's
+- [x] `--all-projects` scans each repo once: the current worktree when inside that repo, else the registered primary
+- [x] Fix the stale `~/.taskmd/config.yaml` hint in `projects.go` while touching the file
+- [x] Registry tests: register-from-linked-worktree, duplicate-registration no-op, identity-based cwd matching; e2e with `git worktree add`
 
 ## Acceptance Criteria
 

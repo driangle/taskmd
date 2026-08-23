@@ -30,6 +30,10 @@ func scanAllProjects() ([]*ProjectTask, error) {
 		return nil, fmt.Errorf("no projects registered in global registry")
 	}
 
+	// Scan each repository once, from the current worktree when the command
+	// runs inside it (ADR 0005 §1).
+	entries = dedupeRepoEntries(entries)
+
 	var all []*ProjectTask
 	for _, entry := range entries {
 		tasks, err := scanProjectTasks(entry)

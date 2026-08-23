@@ -297,7 +297,14 @@ func resolveProjectDir(projectID string) (string, error) {
 		return "", fmt.Errorf("project %q path does not exist: %s", projectID, entry.Path)
 	}
 
-	return resolveProjectTaskDir(entry.Path)
+	projectPath := entry.Path
+	// When the cwd is inside another worktree of the registered repo, scope to
+	// the current checkout's files, never the primary's (ADR 0005 §1).
+	if local := localWorktreePathFor(projectPath); local != "" {
+		projectPath = local
+	}
+
+	return resolveProjectTaskDir(projectPath)
 }
 
 // findProjectEntry searches for a project by ID in the registry entries.

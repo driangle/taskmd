@@ -65,6 +65,9 @@ func runProjectRegister(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	// Project identity is repository identity (ADR 0005 §1): registering from
+	// a linked worktree stores the primary worktree's path.
+	targetPath = canonicalRegisterPath(targetPath)
 	if err := validateProjectDir(targetPath); err != nil {
 		return err
 	}
@@ -120,6 +123,10 @@ func registerProject(id, name, targetPath string) error {
 	doc, err := readGlobalConfigNode(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read global config: %w", err)
+	}
+	if existing, ok := findRegisteredRepo(doc, targetPath, filepath.Dir(configPath)); ok {
+		fmt.Printf("Already registered as %q (path: %s)\n", existing.ID, existing.Path)
+		return nil
 	}
 	if err := checkDuplicateID(doc, id); err != nil {
 		return err
@@ -260,6 +267,27 @@ func nodeToProjectEntry(node *yaml.Node) GlobalProjectEntry {
 		}
 	}
 	return entry
+}
+
+// findRegisteredRepo reports whether targetPath's repository is already
+// registered, matching by repo identity so any worktree of a registered repo
+// is recognized (ADR 0005 §1). Non-git targets never match — non-git projects
+// keep today's ID-only duplicate handling.
+func findRegisteredRepo(doc *yaml.Node, targetPath, cfgDir string) (GlobalProjectEntry, bool) {
+	target := resolveRepoIdentity(targetPath)
+	if target == nil {
+		return GlobalProjectEntry{}, false
+	}
+	for _, e := range extractProjectEntries(doc) {
+		entryPath, err := resolvePath(e.Path, cfgDir)
+		if err != nil {
+			continue
+		}
+		if entryPath == targetPath || sameRepo(target, resolveRepoIdentity(entryPath)) {
+			return e, true
+		}
+	}
+	return GlobalProjectEntry{}, false
 }
 
 func checkDuplicateID(doc *yaml.Node, id string) error {
