@@ -381,6 +381,38 @@ Valid values:
 
 Returns the updated task detail on success, or a `400` with validation errors for invalid values.
 
+### Worktree Overlay Fields
+
+When the served directory is inside a git repository with multiple worktrees
+(and `worktrees` is not set to `false` in `.taskmd.yaml`), the API serves the
+merged cross-worktree view: each worktree has its own branch-local copy of the
+task files, and the server combines their coordination state.
+
+Task payloads from `/api/tasks` and `/api/tasks/{id}` gain additive fields —
+existing fields keep their meaning (`status` and `owner` still describe the
+local copy):
+
+| Field | Description |
+|-------|-------------|
+| `effective_status` | Most advanced status across all worktree copies (`pending < blocked < in-progress < in-review < cancelled < completed`; ties broken by newest file) |
+| `effective_owner` | `owner` on the winning copy |
+| `worktree` | Basename of the winning copy's worktree (empty when the local copy wins) |
+| `branch` | Branch checked out in that worktree |
+| `remote_only` | `true` when the task exists only in a sibling worktree |
+| `worktrees` | Per-copy breakdown (`worktree`, `branch`, `status`, `owner`, `local`) on the detail endpoint when copies diverge |
+
+Aggregate endpoints (`/api/board`, `/api/graph`, `/api/stats`, `/api/next`,
+`/api/tracks`, `/api/search`) operate on effective statuses, and `/api/next`
+never recommends a task claimed in a sibling worktree. Edits stay strictly
+local: a `PUT` targeting a task that exists only in a sibling worktree returns
+`409 Conflict` with the guard message instead of writing.
+
+Live reload covers sibling worktrees too — a claim made in another worktree
+reaches connected browsers over the SSE stream, and `git worktree add`/
+`remove` is picked up without restarting the server. Static exports bake the
+effective view in at export time. In single-worktree repos none of these
+fields appear and behavior is unchanged.
+
 ## Advanced Usage
 
 ### Remote Access

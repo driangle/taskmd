@@ -271,6 +271,35 @@ Get the task dependency graph as JSON with nodes, edges, and cycle detection.
 }
 ```
 
+## Worktree Overlay Fields
+
+When the task directory is inside a git repository with multiple worktrees (and
+`worktrees` is not set to `false` in `.taskmd.yaml`), read tools serve the
+merged cross-worktree view: each worktree has its own branch-local copy of the
+task files, and the server combines their coordination state so an agent never
+picks up a task already claimed in a sibling checkout.
+
+Task objects returned by `list`, `get`, and `status` gain additive fields —
+existing fields keep their meaning (`status` and `owner` still describe the
+local copy):
+
+| Field | Description |
+|-------|-------------|
+| `effective_status` | Most advanced status across all worktree copies (`pending < blocked < in-progress < in-review < cancelled < completed`; ties broken by newest file) |
+| `effective_owner` | `owner` on the winning copy |
+| `worktree` | Basename of the winning copy's worktree (empty when the local copy wins) |
+| `branch` | Branch checked out in that worktree |
+| `remote_only` | `true` when the task exists only in a sibling worktree |
+| `worktrees` | Per-copy breakdown (`worktree`, `branch`, `status`, `owner`, `local`) when copies diverge |
+
+`next` recommends against effective status, so a task that is `in-progress`
+in any sibling worktree is not suggested. `set` always writes to the current
+worktree's files: targeting a task that exists only in a sibling fails with
+`task <id> exists only in worktree <path> (branch <branch>); run taskmd there`.
+
+In single-worktree repos (or with the overlay disabled) none of these fields
+appear and behavior is unchanged.
+
 ## Troubleshooting
 
 **"taskmd: command not found"**
