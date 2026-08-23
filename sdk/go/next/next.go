@@ -76,6 +76,11 @@ type Options struct {
 	// Efforts is the project's effort vocabulary. The zero value means the
 	// default small, medium, large.
 	Efforts effort.Scale
+	// Excluded maps task IDs to a reason they must not be recommended even
+	// when otherwise actionable. Excluded tasks still participate in
+	// dependency and children resolution. Recommend uses only the keys; the
+	// reason text belongs to the caller.
+	Excluded map[string]string
 }
 
 type scoredTask struct {
@@ -205,6 +210,9 @@ func filterActionable(
 	var actionable []*model.Task
 	for _, task := range candidates {
 		if reachable != nil && !reachable[task.ID] {
+			continue
+		}
+		if _, isExcluded := opts.Excluded[task.ID]; isExcluded {
 			continue
 		}
 		if IsActionable(task, taskMap, childrenMap) {

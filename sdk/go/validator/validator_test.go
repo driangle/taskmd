@@ -1639,6 +1639,19 @@ func TestValidateConfig_WorklogsIsAKnownKey(t *testing.T) {
 	}
 }
 
+// The worktrees key gates the cross-worktree overlay, so setting it must not
+// be reported as an unknown key.
+func TestValidateConfig_WorktreesIsAKnownKey(t *testing.T) {
+	v := NewValidator(false)
+	config := &ConfigData{TopKeys: []string{"worktrees"}, ConfigPath: ".taskmd.yaml"}
+
+	result := v.ValidateConfig(config)
+
+	if result.Warnings != 0 {
+		t.Errorf("Warnings = %d, want 0 (issues: %v)", result.Warnings, result.Issues)
+	}
+}
+
 // The effort key must be recognized, or every configured project would also get
 // an "unknown config key" warning.
 func TestValidateConfig_EffortIsAKnownKey(t *testing.T) {

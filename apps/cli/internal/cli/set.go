@@ -129,6 +129,11 @@ func findSetTarget(taskID string) (*model.Task, []*model.Task, error) {
 
 	task := findExactMatch(taskID, tasks)
 	if task == nil {
+		// The ID may live in a sibling worktree; writes never leave this
+		// one, so name where the task actually is instead of "not found".
+		if guardErr := siblingCopyGuard(taskID, scanDir, flags); guardErr != nil {
+			return nil, nil, guardErr
+		}
 		return nil, nil, fmt.Errorf("task not found: %s", taskID)
 	}
 

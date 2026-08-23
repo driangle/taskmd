@@ -106,7 +106,16 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 	debugLog("found %d task(s)", len(tasks))
 
+	// Built before paths are relativized: the merge stats files by path.
+	overlay, err := buildWorktreeOverlay(scanDir, tasks, flags)
+	if err != nil {
+		return err
+	}
 	makeFilePathsRelative(tasks, scanDir)
+
+	if overlay != nil {
+		return runListOverlay(overlay)
+	}
 
 	debugLog("format: %s, sort: %q, filters: %v", listFormat, listSort, listFilters)
 

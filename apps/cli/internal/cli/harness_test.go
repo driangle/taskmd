@@ -57,6 +57,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
 )
 
 // fixturesFS embeds the shared canonical task fixtures under testdata/ so tests
@@ -82,6 +84,10 @@ func resetCLIState() {
 	// Non-flag globals with test-relevant defaults.
 	taskDir = "."
 	cfgFile = ""
+	// Real worktree discovery shells out to git; default to "no siblings" so
+	// command tests stay hermetic and fast. Overlay tests install their own
+	// stub via RunWith's configure hook (which runs after this reset).
+	discoverSiblingWorktrees = func(string) ([]gitmeta.Worktree, error) { return nil, nil }
 }
 
 // resetFlagTree restores every flag in the command tree to its registered

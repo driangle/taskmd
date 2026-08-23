@@ -121,13 +121,23 @@ func runNext(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Built before paths are relativized: the merge stats files by path.
+	overlay, err := buildWorktreeOverlay(scanDir, allTasks, flags)
+	if err != nil {
+		return err
+	}
 	makeFilePathsRelative(allTasks, scanDir)
+
+	recTasks := allTasks
+	var worktreeExcluded map[string]string
+	if overlay != nil {
+		recTasks, worktreeExcluded = overlay.recommendationInputs()
+	}
 
 	expandNextShortcutFilters()
 
-	phaseOrder := loadPhaseOrder()
-
-	recs, err := next.Recommend(allTasks, next.Options{
+	recs, err := next.Recommend(recTasks, next.Options{
 		Limit:          nextLimit,
 		Filters:        nextFilters,
 		QuickWins:      nextQuickWins,
@@ -137,24 +147,56 @@ func runNext(cmd *cobra.Command, args []string) error {
 		Root:           nextRoot,
 		ArchivedTasks:  archivedTasks,
 		Phase:          nextPhase,
-		PhaseOrder:     phaseOrder,
+		PhaseOrder:     loadPhaseOrder(),
 		StrictPhases:   nextStrictPhases,
 		StrictPriority: nextStrictPriority,
 		Efforts:        resolveEffortScale(),
+		Excluded:       worktreeExcluded,
 	})
 	if err != nil {
 		return err
 	}
 
+	return outputNext(recs, worktreeExcluded)
+}
+
+// outputNext renders recommendations in the requested format, appending the
+// worktree exclusion section to --explain table output.
+func outputNext(recs []Recommendation, worktreeExcluded map[string]string) error {
 	switch nextFormat {
 	case "json":
 		return outputNextJSON(recs)
 	case "yaml":
 		return outputNextYAML(recs)
 	case "table":
-		return outputNextTable(recs)
+		if err := outputNextTable(recs); err != nil {
+			return err
+		}
+		printWorktreeExclusions(worktreeExcluded)
+		return nil
 	default:
 		return ValidateFormat(nextFormat, []string{"table", "json", "yaml"})
+	}
+}
+
+// printWorktreeExclusions lists, under --explain, tasks the worktree overlay
+// kept out of the recommendations and which sibling worktree excludes them.
+func printWorktreeExclusions(excluded map[string]string) {
+	if !nextExplain || len(excluded) == 0 {
+		return
+	}
+
+	ids := make([]string, 0, len(excluded))
+	for id := range excluded {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	r := getRenderer()
+	fmt.Println()
+	fmt.Println(formatLabel("Excluded by sibling worktrees:", r))
+	for _, id := range ids {
+		fmt.Printf("  %s  %s\n", formatTaskID(id, r), excluded[id])
 	}
 }
 

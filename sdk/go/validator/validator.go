@@ -511,18 +511,19 @@ func scopeLabel(name, description string) string {
 }
 
 var knownConfigKeys = map[string]bool{
-	"dir":      true,
-	"task-dir": true,
-	"web":      true,
-	"scopes":   true,
-	"sync":     true,
-	"ignore":   true,
-	"workflow": true,
-	"todos":    true,
-	"id":       true,
-	"phases":   true,
-	"effort":   true,
-	"worklogs": true,
+	"dir":       true,
+	"task-dir":  true,
+	"web":       true,
+	"scopes":    true,
+	"sync":      true,
+	"ignore":    true,
+	"workflow":  true,
+	"todos":     true,
+	"id":        true,
+	"phases":    true,
+	"effort":    true,
+	"worklogs":  true,
+	"worktrees": true,
 }
 
 // checkUnknownConfigKeys warns about unrecognized top-level config keys.

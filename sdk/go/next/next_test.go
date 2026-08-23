@@ -1293,3 +1293,30 @@ func TestScoreTaskBreakdown_DefaultVocabularyScoringUnchanged(t *testing.T) {
 		})
 	}
 }
+
+func TestRecommend_ExcludedTasksSkippedButResolveDependencies(t *testing.T) {
+	// 001 and 002 are both actionable; 001 is excluded (e.g. claimed in a
+	// sibling worktree). 003 depends on the excluded, non-completed 001, so
+	// it must stay blocked — exclusion removes a task from the candidates,
+	// not from dependency resolution.
+	tasks := []*model.Task{
+		makeTask("001", model.StatusPending, model.PriorityHigh, nil),
+		makeTask("002", model.StatusPending, model.PriorityHigh, nil),
+		makeTask("003", model.StatusPending, model.PriorityHigh, []string{"001"}),
+	}
+
+	recs, err := Recommend(tasks, Options{
+		Excluded: map[string]string{"001": "in-progress in worktree agent-b"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(recs) != 1 || recs[0].ID != "002" {
+		ids := make([]string, len(recs))
+		for i, r := range recs {
+			ids[i] = r.ID
+		}
+		t.Errorf("recommendations = %v, want only 002", ids)
+	}
+}
