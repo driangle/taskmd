@@ -126,7 +126,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 	recTasks := allTasks
 	var worktreeExcluded map[string]string
 	if overlay != nil {
-		recTasks, worktreeExcluded = overlay.recommendationInputs()
+		recTasks, worktreeExcluded = overlay.RecommendationInputs()
 	}
 
 	expandNextShortcutFilters()

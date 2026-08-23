@@ -8,10 +8,10 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // ListInput defines the input schema for the list tool.
@@ -21,43 +21,32 @@ type ListInput struct {
 	Sort    string   `json:"sort,omitempty" jsonschema:"sort field: id, title, status, priority, effort, created"`
 }
 
-func registerListTool(server *gomcp.Server, efforts effort.Scale) {
+func registerListTool(server *gomcp.Server, efforts effort.Scale, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "list",
 		Description: "List and filter tasks in a taskmd project",
 	}, func(ctx context.Context, req *gomcp.CallToolRequest, input ListInput) (*gomcp.CallToolResult, any, error) {
-		return handleList(ctx, req, input, efforts)
+		return handleList(ctx, req, input, efforts, wt)
 	})
 }
 
-func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput, efforts effort.Scale, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
 
-	tasks := result.Tasks
-
-	if len(input.Filters) > 0 {
-		tasks, err = filter.Apply(tasks, input.Filters, efforts)
-		if err != nil {
-			return nil, nil, fmt.Errorf("filter error: %w", err)
-		}
+	var out any
+	if overlay != nil {
+		out, err = overlayListRows(overlay, input, efforts)
+	} else {
+		out, err = listRows(tasks, input, efforts)
+	}
+	if err != nil {
+		return nil, nil, err
 	}
 
-	if input.Sort != "" {
-		if err := sortTasks(tasks, input.Sort, efforts); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	data, err := json.Marshal(tasks)
+	data, err := json.Marshal(out)
 	if err != nil {
 		return nil, nil, fmt.Errorf("json marshal failed: %w", err)
 	}
@@ -65,6 +54,49 @@ func handleList(_ context.Context, _ *gomcp.CallToolRequest, input ListInput, ef
 	return &gomcp.CallToolResult{
 		Content: []gomcp.Content{&gomcp.TextContent{Text: string(data)}},
 	}, nil, nil
+}
+
+// listRows applies the list tool's filters and sort to a plain task list.
+func listRows(tasks []*model.Task, input ListInput, efforts effort.Scale) ([]*model.Task, error) {
+	if len(input.Filters) > 0 {
+		filtered, err := filter.Apply(tasks, input.Filters, efforts)
+		if err != nil {
+			return nil, fmt.Errorf("filter error: %w", err)
+		}
+		tasks = filtered
+	}
+	if input.Sort != "" {
+		if err := sortTasks(tasks, input.Sort, efforts); err != nil {
+			return nil, err
+		}
+	}
+	return tasks, nil
+}
+
+// overlayListRows filters and sorts on shallow copies with the effective
+// status substituted (so status filters match the merged view), then maps the
+// surviving copies back to their overlay tasks so the output carries the
+// additive provenance fields.
+func overlayListRows(overlay *worktree.Overlay, input ListInput, efforts effort.Scale) ([]*worktree.Task, error) {
+	copies := make([]*model.Task, len(overlay.Tasks))
+	index := make(map[*model.Task]*worktree.Task, len(overlay.Tasks))
+	for i, ot := range overlay.Tasks {
+		effective := *ot.Task
+		effective.Status = ot.EffectiveStatus
+		copies[i] = &effective
+		index[&effective] = ot
+	}
+
+	filtered, err := listRows(copies, input, efforts)
+	if err != nil {
+		return nil, err
+	}
+
+	rows := make([]*worktree.Task, 0, len(filtered))
+	for _, t := range filtered {
+		rows = append(rows, index[t])
+	}
+	return rows, nil
 }
 
 // effortRank orders an effort value by its position in the project's vocabulary.

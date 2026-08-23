@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 )
 
 // ProjectEntry represents a registered project for the API.
@@ -35,16 +37,19 @@ type projectContext struct {
 type ProjectResolver struct {
 	resolve ProjectResolverFunc
 	verbose bool
+	wt      worktree.Builder
 
 	mu    sync.RWMutex
 	cache map[string]*projectContext
 }
 
-// NewProjectResolver creates a resolver with lazy caching.
-func NewProjectResolver(resolve ProjectResolverFunc, verbose bool) *ProjectResolver {
+// NewProjectResolver creates a resolver with lazy caching. Each project's
+// DataProvider builds the worktree overlay for its own scan dir.
+func NewProjectResolver(resolve ProjectResolverFunc, verbose bool, wt worktree.Builder) *ProjectResolver {
 	return &ProjectResolver{
 		resolve: resolve,
 		verbose: verbose,
+		wt:      wt,
 		cache:   make(map[string]*projectContext),
 	}
 }
@@ -72,7 +77,7 @@ func (pr *ProjectResolver) get(id string) (*projectContext, error) {
 	}
 
 	ctx := &projectContext{
-		dp:     NewDataProvider(scanDir, pr.verbose),
+		dp:     NewDataProviderWithWorktrees(scanDir, pr.verbose, pr.wt),
 		phases: phases,
 	}
 	pr.cache[id] = ctx

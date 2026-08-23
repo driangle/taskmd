@@ -7,8 +7,8 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 	"github.com/driangle/taskmd/sdk/go/validator"
 )
 
@@ -33,30 +33,31 @@ type validateIssue struct {
 	Message  string `json:"message"`
 }
 
-func registerValidateTool(server *gomcp.Server, efforts effort.Scale) {
+func registerValidateTool(server *gomcp.Server, efforts effort.Scale, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "validate",
 		Description: "Validate task files for correctness, checking required fields, enum values, dependencies, and cycles",
 	}, func(ctx context.Context, req *gomcp.CallToolRequest, input ValidateInput) (*gomcp.CallToolResult, any, error) {
-		return handleValidate(ctx, req, input, efforts)
+		return handleValidate(ctx, req, input, efforts, wt)
 	})
 }
 
-func handleValidate(_ context.Context, _ *gomcp.CallToolRequest, input ValidateInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+func handleValidate(_ context.Context, _ *gomcp.CallToolRequest, input ValidateInput, efforts effort.Scale, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
+	// Validate the local tasks after sibling-root attribution, so a checkout
+	// nested in the scan root is not flagged as duplicate IDs (spec §8).
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
 
 	v := validator.NewValidator(input.Strict)
 	v.SetEffortScale(efforts)
-	vr := v.Validate(result.Tasks)
+	vr := v.Validate(tasks)
+	if overlay != nil {
+		for _, warning := range overlay.Warnings {
+			vr.AddIssue(validator.LevelWarning, warning.TaskID, "", warning.Message)
+		}
+	}
 
 	out := buildValidateOutput(vr)
 

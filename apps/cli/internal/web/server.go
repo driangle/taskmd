@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/driangle/taskmd/apps/cli/internal/watcher"
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
 )
 
@@ -33,6 +34,9 @@ type Config struct {
 	// Efforts is the project's effort vocabulary. The zero value means the
 	// default small, medium, large.
 	Efforts effort.Scale
+	// Worktrees builds the cross-worktree overlay for the data layer. The
+	// zero value disables it.
+	Worktrees worktree.Builder
 
 	// ListProjects returns registered projects from the global registry.
 	// Nil means multi-project support is disabled.
@@ -53,17 +57,23 @@ type Server struct {
 
 // NewServer creates a new web server.
 func NewServer(cfg Config) *Server {
-	dp := NewDataProvider(cfg.ScanDir, cfg.Verbose)
+	dp := NewDataProviderWithWorktrees(cfg.ScanDir, cfg.Verbose, cfg.Worktrees)
 	broker := NewSSEBroker()
 
-	w := watcher.New(cfg.ScanDir, func() {
+	// On any change: refresh caches and clients, then re-sync the watch set —
+	// a claim in a sibling worktree must reach browsers, and a `git worktree
+	// add`/`remove` must (un)watch that sibling without a restart.
+	var w *watcher.Watcher
+	w = watcher.New(cfg.ScanDir, func() {
 		dp.Invalidate()
 		broker.Broadcast()
+		w.SetDirs(dp.WatchDirs(), dp.WatchMetaDirs())
 	}, 200*time.Millisecond)
+	w.SetDirs(dp.WatchDirs(), dp.WatchMetaDirs())
 
 	var resolver *ProjectResolver
 	if cfg.ResolveProject != nil {
-		resolver = NewProjectResolver(cfg.ResolveProject, cfg.Verbose)
+		resolver = NewProjectResolver(cfg.ResolveProject, cfg.Verbose, cfg.Worktrees)
 	}
 
 	return &Server{

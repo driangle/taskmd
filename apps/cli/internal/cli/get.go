@@ -105,7 +105,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 
 	var wtCopies []worktreeCopyEntry
 	if overlay != nil {
-		wtCopies = overlay.worktreeCopies(task.ID)
+		wtCopies = overlay.Copies(task.ID)
 	}
 
 	return outputGet(task, depInfo, ctxFiles, wlInfo, wtCopies, getFormat)

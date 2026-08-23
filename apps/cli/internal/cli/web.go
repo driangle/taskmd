@@ -81,6 +81,11 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 	open := viper.GetBool("web.auto_open_browser")
 	flags := GetGlobalFlags()
 
+	builder, err := worktreeBuilder(flags)
+	if err != nil {
+		return err
+	}
+
 	srv := web.NewServer(web.Config{
 		Port:           port,
 		ScanDir:        absDir,
@@ -90,6 +95,7 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 		Version:        FullVersion(),
 		Phases:         parsePhasesForWeb(),
 		Efforts:        resolveEffortScale(),
+		Worktrees:      builder,
 		ListProjects:   buildListProjects(),
 		ResolveProject: buildResolveProject(),
 	})

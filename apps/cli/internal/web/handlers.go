@@ -9,6 +9,7 @@ import (
 
 	"os/exec"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/board"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/feed"
@@ -70,16 +71,11 @@ func handleConfig(cfg Config) http.HandlerFunc {
 	}
 }
 
-// getFilteredTasks returns tasks from the provider, optionally filtered by a
-// "phase" query parameter.
-func getFilteredTasks(dp *DataProvider, r *http.Request) ([]*model.Task, error) {
-	tasks, err := dp.GetTasks()
-	if err != nil {
-		return nil, err
-	}
-	phase := r.URL.Query().Get("phase")
+// filterByPhase returns the tasks matching the phase, or all tasks when the
+// phase is empty.
+func filterByPhase(tasks []*model.Task, phase string) []*model.Task {
 	if phase == "" {
-		return tasks, nil
+		return tasks
 	}
 	filtered := make([]*model.Task, 0, len(tasks))
 	for _, t := range tasks {
@@ -87,7 +83,18 @@ func getFilteredTasks(dp *DataProvider, r *http.Request) ([]*model.Task, error) 
 			filtered = append(filtered, t)
 		}
 	}
-	return filtered, nil
+	return filtered
+}
+
+// getFilteredTasks returns effective tasks (merged across worktrees when the
+// overlay is active) from the provider, optionally filtered by a "phase"
+// query parameter. Status-aggregating endpoints serve this view.
+func getFilteredTasks(dp *DataProvider, r *http.Request) ([]*model.Task, error) {
+	tasks, err := dp.GetEffectiveTasks()
+	if err != nil {
+		return nil, err
+	}
+	return filterByPhase(tasks, r.URL.Query().Get("phase")), nil
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -99,12 +106,21 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 }
 
-// TaskDetail includes the body field for individual task detail views
+// TaskDetail includes the body field for individual task detail views. The
+// provenance fields are populated only when the worktree overlay is active,
+// keeping the shape unchanged otherwise.
 type TaskDetail struct {
 	*model.Task
 	Body           string `json:"body"`
 	WorklogEntries int    `json:"worklog_entries,omitempty"`
 	WorklogUpdated string `json:"worklog_updated,omitempty"`
+
+	EffectiveStatus string               `json:"effective_status,omitempty"`
+	EffectiveOwner  string               `json:"effective_owner,omitempty"`
+	Worktree        string               `json:"worktree,omitempty"`
+	Branch          string               `json:"branch,omitempty"`
+	RemoteOnly      bool                 `json:"remote_only,omitempty"`
+	Worktrees       []worktree.CopyEntry `json:"worktrees,omitempty"`
 }
 
 func handleSearch(dp *DataProvider) http.HandlerFunc {
@@ -134,12 +150,30 @@ func handleSearch(dp *DataProvider) http.HandlerFunc {
 func handleTasks(dp *DataProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
-		tasks, err := getFilteredTasks(dp, r)
+		overlay, err := dp.GetOverlay()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, tasks)
+		phase := r.URL.Query().Get("phase")
+
+		if overlay != nil {
+			rows := make([]*worktree.Task, 0, len(overlay.Tasks))
+			for _, ot := range overlay.Tasks {
+				if phase == "" || ot.Phase == phase {
+					rows = append(rows, ot)
+				}
+			}
+			writeJSON(w, rows)
+			return
+		}
+
+		tasks, err := dp.GetTasks()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, filterByPhase(tasks, phase))
 	}
 }
 
@@ -152,21 +186,11 @@ func handleTaskByID(dp *DataProvider) http.HandlerFunc {
 			return
 		}
 
-		tasks, err := dp.GetTasks()
+		foundTask, overlay, err := findMergedTask(dp, taskID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		// Find task by ID
-		var foundTask *model.Task
-		for _, task := range tasks {
-			if task.ID == taskID {
-				foundTask = task
-				break
-			}
-		}
-
 		if foundTask == nil {
 			http.Error(w, "task not found", http.StatusNotFound)
 			return
@@ -177,6 +201,7 @@ func handleTaskByID(dp *DataProvider) http.HandlerFunc {
 			Task: foundTask,
 			Body: foundTask.Body,
 		}
+		detail.applyProvenance(overlay, taskID)
 
 		wlPath := worklog.WorklogPath(foundTask.FilePath, taskID)
 		if worklog.Exists(wlPath) {
@@ -270,11 +295,23 @@ func handleStats(dp *DataProvider) http.HandlerFunc {
 func handleNext(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
-		tasks, err := getFilteredTasks(dp, r)
+		overlay, err := dp.GetOverlay()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Recommend against the merged view: sibling-claimed and sibling-only
+		// tasks are excluded but still resolve dependencies.
+		var tasks []*model.Task
+		var excluded map[string]string
+		if overlay != nil {
+			tasks, excluded = overlay.RecommendationInputs()
+		} else if tasks, err = dp.GetTasks(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		tasks = filterByPhase(tasks, r.URL.Query().Get("phase"))
 
 		archivedTasks, err := dp.GetArchivedTasks()
 		if err != nil {
@@ -296,6 +333,7 @@ func handleNext(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 			Filters:       filters,
 			ArchivedTasks: archivedTasks,
 			Efforts:       efforts,
+			Excluded:      excluded,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -348,15 +386,24 @@ func handleTracks(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 func handleValidate(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
-		tasks, err := getFilteredTasks(dp, r)
+		// Validate the local tasks (after sibling-root attribution), not the
+		// merged view — a sibling's copy of a task is never a duplicate here.
+		tasks, err := dp.GetTasks()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		tasks = filterByPhase(tasks, r.URL.Query().Get("phase"))
 
 		v := validator.NewValidator(false)
 		v.SetEffortScale(efforts)
 		result := v.Validate(tasks)
+
+		if overlay, oErr := dp.GetOverlay(); oErr == nil && overlay != nil {
+			for _, warning := range overlay.Warnings {
+				result.AddIssue(validator.LevelWarning, warning.TaskID, "", warning.Message)
+			}
+		}
 		writeJSON(w, result)
 	}
 }
@@ -430,7 +477,7 @@ func handleUpdateTask(dp *DataProvider, readonly bool, efforts effort.Scale) htt
 
 		found := findTaskByID(tasks, taskID)
 		if found == nil {
-			writeError(w, http.StatusNotFound, "task not found: "+taskID, nil)
+			writeMutationMiss(w, dp, taskID)
 			return
 		}
 
@@ -500,13 +547,11 @@ func handleWorklog(dp *DataProvider) http.HandlerFunc {
 			return
 		}
 
-		tasks, err := dp.GetTasks()
+		found, _, err := findMergedTask(dp, taskID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		found := findTaskByID(tasks, taskID)
 		if found == nil {
 			http.Error(w, "task not found", http.StatusNotFound)
 			return

@@ -9,6 +9,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 	"github.com/driangle/taskmd/sdk/go/scanner"
@@ -30,16 +31,16 @@ type SetInput struct {
 	RemPRs   []string `json:"rem_prs,omitempty" jsonschema:"PR URLs to remove"`
 }
 
-func registerSetTool(server *gomcp.Server, efforts effort.Scale) {
+func registerSetTool(server *gomcp.Server, efforts effort.Scale, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "set",
 		Description: "Update fields on a task (status, priority, effort, owner, tags)",
 	}, func(ctx context.Context, req *gomcp.CallToolRequest, input SetInput) (*gomcp.CallToolResult, any, error) {
-		return handleSet(ctx, req, input, efforts)
+		return handleSet(ctx, req, input, efforts, wt)
 	})
 }
 
-func handleSet(_ context.Context, _ *gomcp.CallToolRequest, input SetInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
+func handleSet(_ context.Context, _ *gomcp.CallToolRequest, input SetInput, efforts effort.Scale, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
 	if input.TaskID == "" {
 		return nil, nil, fmt.Errorf("task_id is required")
 	}
@@ -67,6 +68,11 @@ func handleSet(_ context.Context, _ *gomcp.CallToolRequest, input SetInput, effo
 
 	task := findTaskByID(input.TaskID, result.Tasks)
 	if task == nil {
+		// Writes stay strictly local: a task that exists only in a sibling
+		// worktree gets the guard error, never a redirected write.
+		if guardErr := wt.SiblingGuard(input.TaskID, taskDir); guardErr != nil {
+			return nil, nil, guardErr
+		}
 		return nil, nil, fmt.Errorf("task not found: %s", input.TaskID)
 	}
 

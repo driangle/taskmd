@@ -65,7 +65,7 @@ func runTracks(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if overlay != nil {
-		allTasks = overlay.effectiveTasks()
+		allTasks = overlay.EffectiveTasks()
 	}
 	makeFilePathsRelative(allTasks, scanDir)
 

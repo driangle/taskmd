@@ -3,12 +3,11 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
@@ -16,12 +15,10 @@ import (
 // flag / TASKMD_WORKTREES env). auto activates the overlay only when the scan
 // dir is inside a git repo with sibling worktrees; false disables it entirely.
 const (
-	worktreeModeAuto  = "auto"
-	worktreeModeTrue  = "true"
-	worktreeModeFalse = "false"
+	worktreeModeAuto  = worktree.ModeAuto
+	worktreeModeTrue  = worktree.ModeTrue
+	worktreeModeFalse = worktree.ModeFalse
 )
-
-var validWorktreeModes = []string{worktreeModeAuto, worktreeModeTrue, worktreeModeFalse}
 
 func init() {
 	// gitmeta stays free of flag/viper state; route its logging through the
@@ -52,31 +49,29 @@ func resolveWorktreeMode() (string, error) {
 	case worktreeModeFalse:
 		return worktreeModeFalse, nil
 	default:
-		return "", invalidValueError("worktrees", v, validWorktreeModes)
+		return "", invalidValueError("worktrees", v, worktree.ValidModes)
 	}
 }
 
 // discoverSiblingWorktrees lists the sibling worktrees of the repo containing
 // scanDir (nil when scanDir is not in a repo). It is a seam so overlay tests
 // can inject worktrees without git.
-var discoverSiblingWorktrees = defaultDiscoverSiblings
+var discoverSiblingWorktrees worktree.Discoverer = worktree.DiscoverSiblings
 
-func defaultDiscoverSiblings(scanDir string) ([]gitmeta.Worktree, error) {
-	id, err := gitmeta.Resolve(scanDir)
-	if err != nil || id == nil {
-		return nil, err
-	}
-	worktrees, err := gitmeta.ListWorktrees(id)
+// worktreeBuilder resolves the activation mode into an overlay builder wired
+// to the CLI's discovery seam. Commands hand it to the shared overlay code
+// and to the MCP/web servers.
+func worktreeBuilder(flags GlobalFlags) (worktree.Builder, error) {
+	mode, err := resolveWorktreeMode()
 	if err != nil {
-		return nil, err
+		return worktree.Builder{}, err
 	}
-	var siblings []gitmeta.Worktree
-	for _, wt := range worktrees {
-		if !wt.IsLocal {
-			siblings = append(siblings, wt)
-		}
-	}
-	return siblings, nil
+	return worktree.Builder{
+		Mode:       mode,
+		Discover:   discoverSiblingWorktrees,
+		Verbose:    flags.Verbose,
+		IgnoreDirs: flags.IgnoreDirs,
+	}, nil
 }
 
 // buildWorktreeOverlay builds the cross-worktree overlay for the local task
@@ -85,56 +80,16 @@ func defaultDiscoverSiblings(scanDir string) ([]gitmeta.Worktree, error) {
 // identical to today's). Call it before makeFilePathsRelative — the merge
 // stats task files by their absolute paths to break status ties by mtime.
 func buildWorktreeOverlay(scanDir string, localTasks []*model.Task, flags GlobalFlags) (*worktreeOverlay, error) {
-	mode, err := resolveWorktreeMode()
+	builder, err := worktreeBuilder(flags)
 	if err != nil {
 		return nil, err
 	}
-	if mode == worktreeModeFalse {
-		return nil, nil
+	overlay, err := builder.Build(scanDir, localTasks)
+	if err != nil || overlay == nil {
+		return nil, err
 	}
-
-	siblings, err := discoverSiblingWorktrees(scanDir)
-	if err != nil {
-		debugLog("worktree discovery failed, overlay inactive: %v", err)
-		return nil, nil
-	}
-	if len(siblings) == 0 {
-		return nil, nil
-	}
-
-	scanned := scanSiblingWorktrees(siblings, flags)
-	localTasks = attributeNestedSiblingCopies(localTasks, siblings)
-	overlay := mergeOverlay(localTasks, scanned)
-	for _, st := range scanned {
-		makeFilePathsRelative(st.tasks, st.wt.TasksDir)
-	}
+	overlay.RelativizeSiblingPaths()
 	return overlay, nil
-}
-
-// attributeNestedSiblingCopies drops local-scan copies whose file path lies
-// inside a sibling worktree's root: a non-hidden checkout nested in the scan
-// root gets double-scanned, and those files belong to that worktree, not this
-// one (spec §8). The sibling's own scan already carries them, so dropping the
-// local-scan copies attributes them instead of flagging duplicates.
-func attributeNestedSiblingCopies(local []*model.Task, siblings []gitmeta.Worktree) []*model.Task {
-	attributed := make([]*model.Task, 0, len(local))
-	for _, task := range local {
-		if !insideAnyWorktreeRoot(task.FilePath, siblings) {
-			attributed = append(attributed, task)
-		}
-	}
-	return attributed
-}
-
-// insideAnyWorktreeRoot reports whether path lies under any sibling's root.
-func insideAnyWorktreeRoot(path string, siblings []gitmeta.Worktree) bool {
-	cleaned := filepath.Clean(path)
-	for _, wt := range siblings {
-		if strings.HasPrefix(cleaned, filepath.Clean(wt.Root)+string(filepath.Separator)) {
-			return true
-		}
-	}
-	return false
 }
 
 // printOverlayWarnings reports cross-worktree consistency warnings to stderr.
@@ -149,64 +104,14 @@ func printOverlayWarnings(overlay *worktreeOverlay, flags GlobalFlags) {
 	}
 }
 
-// scanSiblingWorktrees scans each sibling's tasks dir, skipping siblings that
-// fail to scan. Sibling duplicate-ID warnings are that worktree's own concern
-// and are not reported here.
-func scanSiblingWorktrees(siblings []gitmeta.Worktree, flags GlobalFlags) []siblingTasks {
-	var scanned []siblingTasks
-	for _, wt := range siblings {
-		result, err := newTaskScanner(wt.TasksDir, flags).Scan()
-		if err != nil {
-			if flags.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: skipping worktree %s: %v\n", wt.Root, err)
-			}
-			continue
-		}
-		scanned = append(scanned, siblingTasks{wt: wt, tasks: result.Tasks})
-	}
-	return scanned
-}
-
 // siblingCopyGuard returns the guard error when taskID exists in a sibling
 // worktree; callers invoke it after a local lookup misses, so mutations name
 // where the task actually lives instead of reporting "not found". Writes are
 // never redirected — the caller must fail.
 func siblingCopyGuard(taskID, scanDir string, flags GlobalFlags) error {
-	mode, err := resolveWorktreeMode()
-	if err != nil || mode == worktreeModeFalse {
+	builder, err := worktreeBuilder(flags)
+	if err != nil {
 		return nil
 	}
-	siblings, discoverErr := discoverSiblingWorktrees(scanDir)
-	if discoverErr != nil {
-		return nil
-	}
-
-	for _, st := range scanSiblingWorktrees(siblings, flags) {
-		for _, t := range st.tasks {
-			if t.ID == taskID {
-				branch := st.wt.Branch
-				if branch == "" {
-					branch = "detached"
-				}
-				return fmt.Errorf("task %s exists only in worktree %s (branch %s); run taskmd there",
-					taskID, displayWorktreePath(st.wt.Root), branch)
-			}
-		}
-	}
-	return nil
-}
-
-// displayWorktreePath renders a worktree root relative to the current
-// directory when possible (matching how users navigate between worktrees),
-// falling back to the absolute path.
-func displayWorktreePath(root string) string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return root
-	}
-	rel, err := filepath.Rel(cwd, root)
-	if err != nil {
-		return root
-	}
-	return rel
+	return builder.SiblingGuard(taskID, scanDir)
 }

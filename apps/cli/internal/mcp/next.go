@@ -7,6 +7,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/next"
 	"github.com/driangle/taskmd/sdk/go/scanner"
@@ -21,30 +22,29 @@ type NextInput struct {
 	Critical  bool     `json:"critical,omitempty" jsonschema:"only show tasks on the critical path"`
 }
 
-func registerNextTool(server *gomcp.Server, efforts effort.Scale) {
+func registerNextTool(server *gomcp.Server, efforts effort.Scale, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "next",
 		Description: "Get ranked task recommendations based on priority, dependencies, and critical path analysis",
 	}, func(ctx context.Context, req *gomcp.CallToolRequest, input NextInput) (*gomcp.CallToolResult, any, error) {
-		return handleNext(ctx, req, input, efforts)
+		return handleNext(ctx, req, input, efforts, wt)
 	})
 }
 
-func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, efforts effort.Scale, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
 
-	archivedTasks, err := taskScanner.ScanArchive()
+	archivedTasks, err := scanner.NewScanner(resolveTaskDir(input.TaskDir), false, nil).ScanArchive()
 	if err != nil {
 		return nil, nil, fmt.Errorf("archive scan failed: %w", err)
+	}
+
+	var excluded map[string]string
+	if overlay != nil {
+		tasks, excluded = overlay.RecommendationInputs()
 	}
 
 	opts := next.Options{
@@ -54,9 +54,10 @@ func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, ef
 		Critical:      input.Critical,
 		ArchivedTasks: archivedTasks,
 		Efforts:       efforts,
+		Excluded:      excluded,
 	}
 
-	recs, err := next.Recommend(result.Tasks, opts)
+	recs, err := next.Recommend(tasks, opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recommendation failed: %w", err)
 	}

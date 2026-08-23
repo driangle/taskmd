@@ -7,7 +7,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/driangle/taskmd/sdk/go/scanner"
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/search"
 )
 
@@ -17,30 +17,26 @@ type SearchInput struct {
 	Query   string `json:"query" jsonschema:"required,search query for full-text search across task titles and bodies"`
 }
 
-func registerSearchTool(server *gomcp.Server) {
+func registerSearchTool(server *gomcp.Server, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "search",
 		Description: "Full-text search across task titles and bodies, returning matches with snippets",
-	}, handleSearch)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input SearchInput) (*gomcp.CallToolResult, any, error) {
+		return handleSearch(ctx, req, input, wt)
+	})
 }
 
-func handleSearch(_ context.Context, _ *gomcp.CallToolRequest, input SearchInput) (*gomcp.CallToolResult, any, error) {
+func handleSearch(_ context.Context, _ *gomcp.CallToolRequest, input SearchInput, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
 	if input.Query == "" {
 		return nil, nil, fmt.Errorf("query is required")
 	}
 
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
 
-	results := search.Search(result.Tasks, input.Query)
+	results := search.Search(effectiveOrLocal(tasks, overlay), input.Query)
 
 	data, err := json.Marshal(results)
 	if err != nil {

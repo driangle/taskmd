@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/board"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/metrics"
@@ -1399,7 +1400,7 @@ func TestHandleTasks_WithProject(t *testing.T) {
 			return projectDir, nil, nil
 		}
 		return "", nil, ErrProjectNotFound
-	}, false)
+	}, false, worktree.Builder{})
 
 	handler := setupProjectMiddleware(resolver, handleTasks(defaultDP))
 
@@ -1429,7 +1430,7 @@ func TestHandleTasks_WithoutProject_ReturnsDefault(t *testing.T) {
 	defaultDP := NewDataProvider(defaultDir, false)
 	resolver := NewProjectResolver(func(_ string) (string, []PhaseInfo, error) {
 		return "", nil, ErrProjectNotFound
-	}, false)
+	}, false, worktree.Builder{})
 
 	handler := setupProjectMiddleware(resolver, handleTasks(defaultDP))
 
@@ -1456,7 +1457,7 @@ func TestProjectNotFound_Returns404(t *testing.T) {
 	defaultDP := NewDataProvider(defaultDir, false)
 	resolver := NewProjectResolver(func(_ string) (string, []PhaseInfo, error) {
 		return "", nil, ErrProjectNotFound
-	}, false)
+	}, false, worktree.Builder{})
 
 	handler := setupProjectMiddleware(resolver, handleTasks(defaultDP))
 
@@ -1487,7 +1488,7 @@ func TestHandleConfig_WithProject(t *testing.T) {
 			return projectDir, projectPhases, nil
 		}
 		return "", nil, ErrProjectNotFound
-	}, false)
+	}, false, worktree.Builder{})
 
 	cfg := Config{ReadOnly: false, Version: "test", Phases: defaultPhases}
 	handler := setupProjectMiddleware(resolver, handleConfig(cfg))
@@ -1545,7 +1546,7 @@ func TestHandleBoard_WithProject(t *testing.T) {
 			return projectDir, []PhaseInfo{{ID: "proj-phase"}}, nil
 		}
 		return "", nil, ErrProjectNotFound
-	}, false)
+	}, false, worktree.Builder{})
 
 	handler := setupProjectMiddleware(resolver, handleBoard(defaultDP, defaultPhases, effort.Default()))
 

@@ -7,11 +7,11 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/filter"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // GraphInput defines the input schema for the graph tool.
@@ -22,28 +22,21 @@ type GraphInput struct {
 	Filters       []string `json:"filters,omitempty" jsonschema:"filter expressions, e.g. status=pending, priority=high"`
 }
 
-func registerGraphTool(server *gomcp.Server, efforts effort.Scale) {
+func registerGraphTool(server *gomcp.Server, efforts effort.Scale, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "graph",
 		Description: "Get the task dependency graph as JSON with nodes, edges, and cycle detection",
 	}, func(ctx context.Context, req *gomcp.CallToolRequest, input GraphInput) (*gomcp.CallToolResult, any, error) {
-		return handleGraph(ctx, req, input, efforts)
+		return handleGraph(ctx, req, input, efforts, wt)
 	})
 }
 
-func handleGraph(_ context.Context, _ *gomcp.CallToolRequest, input GraphInput, efforts effort.Scale) (*gomcp.CallToolResult, any, error) {
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+func handleGraph(_ context.Context, _ *gomcp.CallToolRequest, input GraphInput, efforts effort.Scale, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
+	localTasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
-
-	tasks := result.Tasks
+	tasks := effectiveOrLocal(localTasks, overlay)
 
 	if len(input.Filters) > 0 {
 		tasks, err = filter.Apply(tasks, input.Filters, efforts)

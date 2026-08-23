@@ -7,8 +7,8 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // StatusInput defines the input schema for the status tool.
@@ -17,7 +17,9 @@ type StatusInput struct {
 	TaskID  string `json:"task_id" jsonschema:"required,task ID to retrieve"`
 }
 
-// statusOutput is the lightweight metadata struct (no body, no resolved deps).
+// statusOutput is the lightweight metadata struct (no body, no resolved
+// deps). The embedded provenance fields are populated only when the worktree
+// overlay is active.
 type statusOutput struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
@@ -31,37 +33,40 @@ type statusOutput struct {
 	Dependencies []string `json:"dependencies"`
 	Group        string   `json:"group,omitempty"`
 	FilePath     string   `json:"file_path"`
+	provenanceFields
 }
 
-func registerStatusTool(server *gomcp.Server) {
+func registerStatusTool(server *gomcp.Server, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "status",
 		Description: "Get lightweight metadata for a task (no body content, no resolved dependencies)",
-	}, handleStatus)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input StatusInput) (*gomcp.CallToolResult, any, error) {
+		return handleStatus(ctx, req, input, wt)
+	})
 }
 
-func handleStatus(_ context.Context, _ *gomcp.CallToolRequest, input StatusInput) (*gomcp.CallToolResult, any, error) {
+func handleStatus(_ context.Context, _ *gomcp.CallToolRequest, input StatusInput, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
 	if input.TaskID == "" {
 		return nil, nil, fmt.Errorf("task_id is required")
 	}
 
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
 
-	task := findTaskByID(input.TaskID, result.Tasks)
+	task := findTaskByID(input.TaskID, tasks)
+	if task == nil && overlay != nil {
+		if ot := overlay.Get(input.TaskID); ot != nil {
+			task = ot.Task
+		}
+	}
 	if task == nil {
 		return nil, nil, fmt.Errorf("task not found: %s", input.TaskID)
 	}
 
 	out := buildStatusOutput(task)
+	out.provenanceFields = provenanceFor(overlay, input.TaskID)
 
 	data, err := json.Marshal(out)
 	if err != nil {

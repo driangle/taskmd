@@ -7,9 +7,9 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/graph"
 	"github.com/driangle/taskmd/sdk/go/model"
-	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
 // GetInput defines the input schema for the get tool.
@@ -18,7 +18,9 @@ type GetInput struct {
 	TaskID  string `json:"task_id" jsonschema:"required,task ID to retrieve"`
 }
 
-// getOutput is the JSON representation of a task with body included.
+// getOutput is the JSON representation of a task with body included. The
+// embedded provenance fields are populated only when the worktree overlay is
+// active, keeping the shape unchanged otherwise.
 type getOutput struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
@@ -35,6 +37,7 @@ type getOutput struct {
 	DependsOn    []depRef `json:"depends_on"`
 	Blocks       []depRef `json:"blocks"`
 	Children     []depRef `json:"children,omitempty"`
+	provenanceFields
 }
 
 // depRef is a lightweight dependency reference.
@@ -43,35 +46,38 @@ type depRef struct {
 	Title string `json:"title"`
 }
 
-func registerGetTool(server *gomcp.Server) {
+func registerGetTool(server *gomcp.Server, wt worktree.Builder) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "get",
 		Description: "Get full details of a single task by ID, including body content and dependency information",
-	}, handleGet)
+	}, func(ctx context.Context, req *gomcp.CallToolRequest, input GetInput) (*gomcp.CallToolResult, any, error) {
+		return handleGet(ctx, req, input, wt)
+	})
 }
 
-func handleGet(_ context.Context, _ *gomcp.CallToolRequest, input GetInput) (*gomcp.CallToolResult, any, error) {
+func handleGet(_ context.Context, _ *gomcp.CallToolRequest, input GetInput, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
 	if input.TaskID == "" {
 		return nil, nil, fmt.Errorf("task_id is required")
 	}
 
-	taskDir := input.TaskDir
-	if taskDir == "" {
-		taskDir = "."
-	}
-
-	taskScanner := scanner.NewScanner(taskDir, false, nil)
-	result, err := taskScanner.Scan()
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
 	if err != nil {
-		return nil, nil, fmt.Errorf("scan failed: %w", err)
+		return nil, nil, err
 	}
 
-	task := findTaskByID(input.TaskID, result.Tasks)
+	task := findTaskByID(input.TaskID, tasks)
+	if task == nil && overlay != nil {
+		// Sibling-only tasks are part of the merged read view.
+		if ot := overlay.Get(input.TaskID); ot != nil {
+			task = ot.Task
+		}
+	}
 	if task == nil {
 		return nil, nil, fmt.Errorf("task not found: %s", input.TaskID)
 	}
 
-	out := buildGetOutput(task, result.Tasks)
+	out := buildGetOutput(task, effectiveOrLocal(tasks, overlay))
+	out.provenanceFields = provenanceFor(overlay, input.TaskID)
 
 	data, err := json.Marshal(out)
 	if err != nil {

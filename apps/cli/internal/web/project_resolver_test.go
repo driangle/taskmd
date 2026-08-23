@@ -4,6 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 )
 
 func TestProjectResolver_Get_CachesResult(t *testing.T) {
@@ -11,7 +13,7 @@ func TestProjectResolver_Get_CachesResult(t *testing.T) {
 	resolver := NewProjectResolver(func(_ string) (string, []PhaseInfo, error) {
 		callCount.Add(1)
 		return t.TempDir(), []PhaseInfo{{ID: "p1"}}, nil
-	}, false)
+	}, false, worktree.Builder{})
 
 	// First call should invoke resolve.
 	ctx1, err := resolver.get("proj-a")
@@ -41,7 +43,7 @@ func TestProjectResolver_Get_CachesResult(t *testing.T) {
 func TestProjectResolver_Get_DifferentProjects(t *testing.T) {
 	resolver := NewProjectResolver(func(_ string) (string, []PhaseInfo, error) {
 		return t.TempDir(), nil, nil
-	}, false)
+	}, false, worktree.Builder{})
 
 	ctxA, err := resolver.get("a")
 	if err != nil {
@@ -59,7 +61,7 @@ func TestProjectResolver_Get_DifferentProjects(t *testing.T) {
 func TestProjectResolver_Get_NotFoundError(t *testing.T) {
 	resolver := NewProjectResolver(func(_ string) (string, []PhaseInfo, error) {
 		return "", nil, ErrProjectNotFound
-	}, false)
+	}, false, worktree.Builder{})
 
 	_, err := resolver.get("unknown")
 	if err == nil {
@@ -75,7 +77,7 @@ func TestProjectResolver_Get_ConcurrentAccess(t *testing.T) {
 	resolver := NewProjectResolver(func(_ string) (string, []PhaseInfo, error) {
 		callCount.Add(1)
 		return t.TempDir(), nil, nil
-	}, false)
+	}, false, worktree.Builder{})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {

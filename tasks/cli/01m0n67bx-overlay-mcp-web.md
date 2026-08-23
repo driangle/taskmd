@@ -1,7 +1,7 @@
 ---
 title: "Serve merged worktree view in MCP server and web API"
 id: "01m0n67bx"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["worktrees", "mcp", "web"]
@@ -9,6 +9,7 @@ created: "2026-08-22"
 dependencies: ["01m0nk00d"]
 effort: medium
 phase: worktree-support
+completed_at: 2026-08-23
 ---
 
 # Serve merged worktree view in MCP server and web API
@@ -22,14 +23,14 @@ frontend rendering is a separate task. Spec: `docs/specs/worktree-support.md` §
 
 ## Tasks
 
-- [ ] MCP read tools return effective status/owner plus provenance fields (`worktree`, `branch`, `remote_only`) when the overlay is active; no breaking shape change to existing fields
-- [ ] MCP mutation tools keep local-only writes and return the sibling-only guard error
-- [ ] Web `DataProvider` builds the overlay so every endpoint (list, board, graph, stats, detail) serves effective status; task payloads carry the additive provenance fields
-- [ ] Web mutation endpoints keep local-only writes and return the guard error in the response
-- [ ] Extend the filesystem watcher to sibling worktrees' tasks dirs (same invalidate + SSE broadcast path and debounce)
-- [ ] Re-enumerate worktrees on membership change: watch `<common-dir>/worktrees/`, with re-list-on-invalidation as fallback
-- [ ] Static export bakes effective status and provenance at export time
-- [ ] Tests: MCP/web handler tests with injected discovery; live-refresh e2e — edit a task in a sibling worktree, assert cache invalidation, SSE broadcast, and updated effective status in the next payload
+- [x] MCP read tools return effective status/owner plus provenance fields (`worktree`, `branch`, `remote_only`) when the overlay is active; no breaking shape change to existing fields
+- [x] MCP mutation tools keep local-only writes and return the sibling-only guard error
+- [x] Web `DataProvider` builds the overlay so every endpoint (list, board, graph, stats, detail) serves effective status; task payloads carry the additive provenance fields
+- [x] Web mutation endpoints keep local-only writes and return the guard error in the response
+- [x] Extend the filesystem watcher to sibling worktrees' tasks dirs (same invalidate + SSE broadcast path and debounce)
+- [x] Re-enumerate worktrees on membership change: watch `<common-dir>/worktrees/`, with re-list-on-invalidation as fallback
+- [x] Static export bakes effective status and provenance at export time
+- [x] Tests: MCP/web handler tests with injected discovery; live-refresh e2e — edit a task in a sibling worktree, assert cache invalidation, SSE broadcast, and updated effective status in the next payload
 
 ## Acceptance Criteria
 

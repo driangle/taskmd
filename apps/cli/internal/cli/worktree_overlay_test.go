@@ -7,13 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/viper"
 
 	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
+
+// Merge-level tests (status ladder, provenance, mtime tie-break, remote-only,
+// divergence warnings) live in internal/worktree, next to the merge layer.
+// This file covers the CLI wiring: activation, next/list behavior, and the
+// mutation guard.
 
 // overlayTaskMD renders a minimal task file for overlay tests.
 func overlayTaskMD(id, title, status string, extraFrontmatter ...string) string {
@@ -63,7 +67,7 @@ func stubSiblings(siblings []gitmeta.Worktree, viperSets map[string]any) func() 
 	}
 }
 
-// scanDirTasks scans a directory into model tasks for direct merge tests.
+// scanDirTasks scans a directory into model tasks for direct overlay tests.
 func scanDirTasks(t *testing.T, dir string) []*model.Task {
 	t.Helper()
 	result, err := newTaskScanner(dir, GlobalFlags{}).Scan()
@@ -71,164 +75,6 @@ func scanDirTasks(t *testing.T, dir string) []*model.Task {
 		t.Fatalf("scan %s: %v", dir, err)
 	}
 	return result.Tasks
-}
-
-func TestStatusLadderRank_Ordering(t *testing.T) {
-	t.Parallel()
-	ladder := []model.Status{
-		model.StatusPending, model.StatusBlocked, model.StatusInProgress,
-		model.StatusInReview, model.StatusCancelled, model.StatusCompleted,
-	}
-	for i := 1; i < len(ladder); i++ {
-		if statusLadderRank(ladder[i-1]) >= statusLadderRank(ladder[i]) {
-			t.Errorf("statusLadderRank(%s) should be below %s", ladder[i-1], ladder[i])
-		}
-	}
-	if statusLadderRank(model.Status("bogus")) != statusLadderRank(model.StatusPending) {
-		t.Error("unknown status should rank alongside pending")
-	}
-}
-
-func TestMergeOverlay_RemoteWinnerProvenance(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "pending"),
-	})
-	sibling := newSiblingWorktree(t, "agent-b", "dnc/001/parser", map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "in-progress", `owner: "agent-b"`),
-	})
-
-	local := scanDirTasks(t, repo.Dir)
-	overlay := mergeOverlay(local, []siblingTasks{{wt: sibling, tasks: scanDirTasks(t, sibling.TasksDir)}})
-
-	ot := overlay.byID["001"]
-	if ot == nil {
-		t.Fatal("task 001 missing from overlay")
-	}
-	if ot.EffectiveStatus != model.StatusInProgress {
-		t.Errorf("EffectiveStatus = %s, want in-progress", ot.EffectiveStatus)
-	}
-	if ot.EffectiveOwner != "agent-b" {
-		t.Errorf("EffectiveOwner = %q, want agent-b", ot.EffectiveOwner)
-	}
-	if ot.Worktree != "agent-b" || ot.Branch != "dnc/001/parser" {
-		t.Errorf("provenance = (%q, %q), want (agent-b, dnc/001/parser)", ot.Worktree, ot.Branch)
-	}
-	if ot.Status != model.StatusPending {
-		t.Errorf("base copy status = %s, want the local pending", ot.Status)
-	}
-	if ot.LocalOnly || ot.RemoteOnly {
-		t.Errorf("LocalOnly/RemoteOnly = %v/%v, want false/false", ot.LocalOnly, ot.RemoteOnly)
-	}
-}
-
-func TestMergeOverlay_LocalWinnerHasNoProvenance(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "completed"),
-		"002-solo.md":  overlayTaskMD("002", "Solo", "pending"),
-	})
-	sibling := newSiblingWorktree(t, "agent-b", "b", map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "pending"),
-	})
-
-	local := scanDirTasks(t, repo.Dir)
-	overlay := mergeOverlay(local, []siblingTasks{{wt: sibling, tasks: scanDirTasks(t, sibling.TasksDir)}})
-
-	if ot := overlay.byID["001"]; ot.EffectiveStatus != model.StatusCompleted || ot.Worktree != "" {
-		t.Errorf("001 = (%s, worktree %q), want local completed winner with no provenance",
-			ot.EffectiveStatus, ot.Worktree)
-	}
-	if ot := overlay.byID["002"]; !ot.LocalOnly {
-		t.Error("002 has no sibling copy and should be LocalOnly")
-	}
-	if len(overlay.Warnings) != 0 {
-		t.Errorf("unexpected warnings: %v", overlay.Warnings)
-	}
-}
-
-func TestMergeOverlay_MtimeBreaksStatusTies(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "in-progress", `owner: "local"`),
-	})
-	sibling := newSiblingWorktree(t, "agent-b", "b", map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "in-progress", `owner: "remote"`),
-	})
-
-	old := time.Now().Add(-2 * time.Hour)
-	recent := time.Now().Add(-1 * time.Minute)
-	localPath := repo.Path("001-alpha.md")
-	siblingPath := filepath.Join(sibling.TasksDir, "001-alpha.md")
-
-	// Sibling copy newer → remote wins the tie.
-	if err := os.Chtimes(localPath, old, old); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chtimes(siblingPath, recent, recent); err != nil {
-		t.Fatal(err)
-	}
-	overlay := mergeOverlay(scanDirTasks(t, repo.Dir), []siblingTasks{{wt: sibling, tasks: scanDirTasks(t, sibling.TasksDir)}})
-	if ot := overlay.byID["001"]; ot.Worktree != "agent-b" || ot.EffectiveOwner != "remote" {
-		t.Errorf("newer sibling copy should win tie, got worktree %q owner %q", ot.Worktree, ot.EffectiveOwner)
-	}
-
-	// Local copy newer → local wins the tie.
-	if err := os.Chtimes(localPath, recent, recent); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chtimes(siblingPath, old, old); err != nil {
-		t.Fatal(err)
-	}
-	overlay = mergeOverlay(scanDirTasks(t, repo.Dir), []siblingTasks{{wt: sibling, tasks: scanDirTasks(t, sibling.TasksDir)}})
-	if ot := overlay.byID["001"]; ot.Worktree != "" || ot.EffectiveOwner != "local" {
-		t.Errorf("newer local copy should win tie, got worktree %q owner %q", ot.Worktree, ot.EffectiveOwner)
-	}
-}
-
-func TestMergeOverlay_RemoteOnlyAppendedSorted(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"002-local.md": overlayTaskMD("002", "Local", "pending"),
-	})
-	sibling := newSiblingWorktree(t, "agent-b", "b", map[string]string{
-		"003-remote.md": overlayTaskMD("003", "Remote C", "pending"),
-		"001-remote.md": overlayTaskMD("001", "Remote A", "in-progress"),
-	})
-
-	overlay := mergeOverlay(scanDirTasks(t, repo.Dir), []siblingTasks{{wt: sibling, tasks: scanDirTasks(t, sibling.TasksDir)}})
-
-	var order []string
-	for _, ot := range overlay.Tasks {
-		order = append(order, ot.Task.ID)
-	}
-	// Local scan order first, then remote-only sorted by ID.
-	if len(order) != 3 || order[0] != "002" || order[1] != "001" || order[2] != "003" {
-		t.Fatalf("overlay order = %v, want [002 001 003]", order)
-	}
-	for _, id := range []string{"001", "003"} {
-		ot := overlay.byID[id]
-		if !ot.RemoteOnly || ot.Worktree != "agent-b" {
-			t.Errorf("%s: RemoteOnly=%v worktree=%q, want remote-only with provenance", id, ot.RemoteOnly, ot.Worktree)
-		}
-	}
-}
-
-func TestMergeOverlay_DivergentTerminalStatesWarn(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "cancelled"),
-	})
-	sibling := newSiblingWorktree(t, "agent-b", "b", map[string]string{
-		"001-alpha.md": overlayTaskMD("001", "Alpha", "completed"),
-	})
-
-	overlay := mergeOverlay(scanDirTasks(t, repo.Dir), []siblingTasks{{wt: sibling, tasks: scanDirTasks(t, sibling.TasksDir)}})
-
-	if ot := overlay.byID["001"]; ot.EffectiveStatus != model.StatusCompleted {
-		t.Errorf("EffectiveStatus = %s, want completed (ladder winner)", ot.EffectiveStatus)
-	}
-	if len(overlay.Warnings) != 1 || !strings.Contains(overlay.Warnings[0].Message, "completed in worktree agent-b but cancelled in this worktree") {
-		t.Errorf("Warnings = %v, want one divergent-terminal warning", overlay.Warnings)
-	}
-	if overlay.Warnings[0].TaskID != "001" {
-		t.Errorf("warning TaskID = %q, want 001", overlay.Warnings[0].TaskID)
-	}
 }
 
 func TestBuildWorktreeOverlay_ActivationMatrix(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/board"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/graph"
@@ -30,6 +31,10 @@ type ExportConfig struct {
 	// Efforts is the project's effort vocabulary. The zero value means the
 	// default small, medium, large.
 	Efforts effort.Scale
+	// Worktrees builds the cross-worktree overlay; the export bakes effective
+	// status and provenance in at export time. The zero value disables it,
+	// leaving single-worktree exports unchanged.
+	Worktrees worktree.Builder
 }
 
 // Export generates a self-contained static site from task data.
@@ -59,10 +64,14 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	}
 
 	// Scan tasks
-	dp := NewDataProvider(cfg.ScanDir, cfg.Verbose)
+	dp := NewDataProviderWithWorktrees(cfg.ScanDir, cfg.Verbose, cfg.Worktrees)
 	tasks, err := dp.GetTasks()
 	if err != nil {
 		return fmt.Errorf("failed to scan tasks: %w", err)
+	}
+	overlay, err := dp.GetOverlay()
+	if err != nil {
+		return fmt.Errorf("failed to build worktree overlay: %w", err)
 	}
 
 	archivedTasks, err := dp.GetArchivedTasks()
@@ -71,7 +80,7 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	}
 
 	// Generate static JSON data files
-	if err := generateDataFiles(cfg, tasks, archivedTasks); err != nil {
+	if err := generateDataFiles(cfg, tasks, archivedTasks, overlay); err != nil {
 		return err
 	}
 
@@ -87,7 +96,7 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	}
 
 	// Generate SPA route fallback files
-	if err := generateSPAFallbacks(cfg.OutputDir, patched, tasks); err != nil {
+	if err := generateSPAFallbacks(cfg.OutputDir, patched, exportTaskList(tasks, overlay)); err != nil {
 		return err
 	}
 
@@ -95,7 +104,7 @@ func ExportWithFS(cfg ExportConfig, embeddedFS fs.FS) error {
 	return nil
 }
 
-func generateDataFiles(cfg ExportConfig, tasks []*model.Task, archivedTasks []*model.Task) error {
+func generateDataFiles(cfg ExportConfig, tasks, archivedTasks []*model.Task, overlay *worktree.Overlay) error {
 	apiDir := filepath.Join(cfg.OutputDir, "api")
 	efforts := cfg.Efforts
 
@@ -107,24 +116,49 @@ func generateDataFiles(cfg ExportConfig, tasks []*model.Task, archivedTasks []*m
 		return err
 	}
 
-	if err := writeJSONFile(apiDir, "tasks.json", tasks); err != nil {
+	// The exported site is a snapshot: with the overlay active, tasks.json
+	// carries the additive provenance fields and the aggregate files bake in
+	// effective statuses. Single-worktree exports are unchanged.
+	effective := tasks
+	var tasksPayload any = tasks
+	if overlay != nil {
+		effective = overlay.EffectiveTasks()
+		tasksPayload = overlay.Tasks
+	}
+
+	if err := writeJSONFile(apiDir, "tasks.json", tasksPayload); err != nil {
 		return err
 	}
 
-	if err := generateTaskDetailFiles(filepath.Join(apiDir, "tasks"), tasks); err != nil {
+	if err := generateTaskDetailFiles(filepath.Join(apiDir, "tasks"), exportTaskList(tasks, overlay), overlay); err != nil {
 		return err
 	}
 
-	if err := generateBoardFiles(filepath.Join(apiDir, "board"), tasks, efforts); err != nil {
+	if err := generateBoardFiles(filepath.Join(apiDir, "board"), effective, efforts); err != nil {
 		return err
 	}
 
-	return generateAnalyticsFiles(apiDir, tasks, archivedTasks, efforts)
+	return generateAnalyticsFiles(apiDir, effective, archivedTasks, efforts)
 }
 
-func generateTaskDetailFiles(tasksDir string, tasks []*model.Task) error {
+// exportTaskList returns the tasks that get detail files and SPA routes:
+// the merged view (including sibling-only tasks) when the overlay is active,
+// else the local scan.
+func exportTaskList(tasks []*model.Task, overlay *worktree.Overlay) []*model.Task {
+	if overlay == nil {
+		return tasks
+	}
+	merged := make([]*model.Task, 0, len(overlay.Tasks))
+	for _, ot := range overlay.Tasks {
+		merged = append(merged, ot.Task)
+	}
+	return merged
+}
+
+func generateTaskDetailFiles(tasksDir string, tasks []*model.Task, overlay *worktree.Overlay) error {
 	for _, t := range tasks {
 		detail := buildTaskDetail(t)
+		detail.applyProvenance(overlay, t.ID)
 		if err := writeJSONFile(tasksDir, t.ID+".json", detail); err != nil {
 			return err
 		}

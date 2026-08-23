@@ -26,7 +26,7 @@ func scanTasksWithOverlay(scanDir string, flags GlobalFlags) ([]*model.Task, *wo
 
 	tasks := result.Tasks
 	if overlay != nil {
-		tasks = overlay.local
+		tasks = overlay.Local()
 	}
 	warnDuplicateIDs(tasks)
 	printOverlayWarnings(overlay, flags)
@@ -43,7 +43,7 @@ func scanTasksEffective(scanDir string, flags GlobalFlags) ([]*model.Task, error
 		return nil, err
 	}
 	if overlay != nil {
-		return overlay.effectiveTasks(), nil
+		return overlay.EffectiveTasks(), nil
 	}
 	return tasks, nil
 }

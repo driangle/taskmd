@@ -9,6 +9,7 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
 )
@@ -85,10 +86,17 @@ created: 2026-01-04
 
 func setupTestServer(t *testing.T) *gomcp.ClientSession {
 	t.Helper()
+	return setupTestServerWith(t, worktree.Builder{})
+}
+
+// setupTestServerWith starts an in-memory MCP session with the given worktree
+// overlay builder, for tests that inject sibling discovery.
+func setupTestServerWith(t *testing.T, wt worktree.Builder) *gomcp.ClientSession {
+	t.Helper()
 
 	ctx := context.Background()
 
-	server := NewServer("test", effort.Default())
+	server := NewServer("test", effort.Default(), wt)
 	client := gomcp.NewClient(&gomcp.Implementation{
 		Name:    "test-client",
 		Version: "1.0",

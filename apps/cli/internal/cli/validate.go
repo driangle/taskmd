@@ -97,7 +97,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if overlay != nil {
-		tasks = overlay.local
+		tasks = overlay.Local()
 	}
 
 	// Scan archive directories for task IDs to avoid false-positive dependency errors

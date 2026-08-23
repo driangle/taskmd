@@ -58,6 +58,11 @@ func runWebExport(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("invalid output path: %w", err)
 	}
 
+	builder, err := worktreeBuilder(flags)
+	if err != nil {
+		return err
+	}
+
 	return web.Export(web.ExportConfig{
 		OutputDir: absOutput,
 		ScanDir:   absDir,
@@ -65,5 +70,6 @@ func runWebExport(_ *cobra.Command, _ []string) error {
 		Verbose:   flags.Verbose,
 		Version:   FullVersion(),
 		Efforts:   resolveEffortScale(),
+		Worktrees: builder,
 	})
 }
