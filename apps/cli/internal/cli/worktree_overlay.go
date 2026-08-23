@@ -50,7 +50,19 @@ type OverlayTask struct {
 type worktreeOverlay struct {
 	Tasks    []*OverlayTask
 	byID     map[string]*OverlayTask
-	Warnings []string
+	Warnings []overlayWarning
+	// local is the local task list after sibling-root attribution (§8):
+	// copies scanned from a checkout nested inside the scan root belong to
+	// that worktree and are absent here.
+	local []*model.Task
+	// copies indexes every copy of every task by ID, local copy first.
+	copies map[string][]taskCopy
+}
+
+// overlayWarning is a cross-worktree consistency warning tied to a task.
+type overlayWarning struct {
+	TaskID  string
+	Message string
 }
 
 // branchLabel names the winning copy's branch for messages, standing in for
@@ -83,8 +95,21 @@ func (ot *OverlayTask) exclusionReason() string {
 // tasks are mapped to a human-readable exclusion reason; they stay in the task
 // list so dependency, children, and critical-path resolution still see them.
 func (o *worktreeOverlay) recommendationInputs() ([]*model.Task, map[string]string) {
-	tasks := make([]*model.Task, 0, len(o.Tasks))
 	excluded := make(map[string]string)
+	for _, ot := range o.Tasks {
+		if reason := ot.exclusionReason(); reason != "" {
+			excluded[ot.Task.ID] = reason
+		}
+	}
+	return o.effectiveTasks(), excluded
+}
+
+// effectiveTasks returns the merged task list with the effective status
+// substituted on shallow copies: local tasks in scan order, then sibling-only
+// tasks. Status-aggregating views (board, stats, graph, report, tracks,
+// phases) render this; content still comes from the base copy.
+func (o *worktreeOverlay) effectiveTasks() []*model.Task {
+	tasks := make([]*model.Task, 0, len(o.Tasks))
 	for _, ot := range o.Tasks {
 		task := ot.Task
 		if ot.EffectiveStatus != task.Status {
@@ -93,11 +118,55 @@ func (o *worktreeOverlay) recommendationInputs() ([]*model.Task, map[string]stri
 			task = &effective
 		}
 		tasks = append(tasks, task)
-		if reason := ot.exclusionReason(); reason != "" {
-			excluded[task.ID] = reason
+	}
+	return tasks
+}
+
+// worktreeCopyEntry is one copy of a task in one worktree, shaped for get's
+// Worktrees section and its JSON/YAML output.
+type worktreeCopyEntry struct {
+	Worktree string `json:"worktree,omitempty" yaml:"worktree,omitempty"`
+	Branch   string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Status   string `json:"status" yaml:"status"`
+	Owner    string `json:"owner,omitempty" yaml:"owner,omitempty"`
+	Local    bool   `json:"local,omitempty" yaml:"local,omitempty"`
+}
+
+// worktreeCopies returns an entry for every copy of id across worktrees when
+// the copies disagree on status or owner, local copy first; nil when there is
+// a single copy or all copies agree (get renders the section only on
+// divergence).
+func (o *worktreeOverlay) worktreeCopies(id string) []worktreeCopyEntry {
+	copies := o.copies[id]
+	if len(copies) < 2 {
+		return nil
+	}
+	first := copies[0].task
+	differ := false
+	for _, c := range copies[1:] {
+		if c.task.Status != first.Status || c.task.Owner != first.Owner {
+			differ = true
+			break
 		}
 	}
-	return tasks, excluded
+	if !differ {
+		return nil
+	}
+
+	entries := make([]worktreeCopyEntry, 0, len(copies))
+	for _, c := range copies {
+		entry := worktreeCopyEntry{
+			Status: string(c.task.Status),
+			Owner:  c.task.Owner,
+			Local:  c.wt == nil,
+		}
+		if c.wt != nil {
+			entry.Worktree = filepath.Base(c.wt.Root)
+			entry.Branch = c.wt.Branch
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }
 
 // siblingTasks pairs a sibling worktree with the tasks scanned from it.
@@ -117,12 +186,16 @@ type taskCopy struct {
 func mergeOverlay(local []*model.Task, siblings []siblingTasks) *worktreeOverlay {
 	copies := indexCopies(local, siblings)
 
-	overlay := &worktreeOverlay{byID: make(map[string]*OverlayTask, len(copies))}
+	overlay := &worktreeOverlay{
+		byID:   make(map[string]*OverlayTask, len(copies)),
+		local:  local,
+		copies: copies,
+	}
 	add := func(ot *OverlayTask) {
 		overlay.Tasks = append(overlay.Tasks, ot)
 		overlay.byID[ot.Task.ID] = ot
 		if warning := divergentTerminalWarning(ot.Task.ID, copies[ot.Task.ID]); warning != "" {
-			overlay.Warnings = append(overlay.Warnings, warning)
+			overlay.Warnings = append(overlay.Warnings, overlayWarning{TaskID: ot.Task.ID, Message: warning})
 		}
 	}
 
@@ -230,5 +303,5 @@ func divergentTerminalWarning(id string, all []taskCopy) string {
 	if completedIn == "" || cancelledIn == "" {
 		return ""
 	}
-	return fmt.Sprintf("Warning: task %s is completed in %s but cancelled in %s", id, completedIn, cancelledIn)
+	return fmt.Sprintf("task %s is completed in %s but cancelled in %s", id, completedIn, cancelledIn)
 }

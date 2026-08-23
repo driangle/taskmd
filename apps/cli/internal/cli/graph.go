@@ -99,7 +99,7 @@ func runGraph(cmd *cobra.Command, args []string) error {
 		graphExcludeStatus = []string{}
 	}
 
-	tasks, err := scanTasks(ResolveScanDir(args), flags)
+	tasks, err := scanTasksEffective(ResolveScanDir(args), flags)
 	if err != nil {
 		return err
 	}

@@ -56,7 +56,7 @@ func runStats(cmd *cobra.Command, args []string) error {
 	scanDir := ResolveScanDir(args)
 
 	// Scan for tasks
-	tasks, err := scanTasks(scanDir, flags)
+	tasks, err := scanTasksEffective(scanDir, flags)
 	if err != nil {
 		return err
 	}

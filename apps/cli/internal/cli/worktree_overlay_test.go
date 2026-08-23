@@ -223,8 +223,11 @@ func TestMergeOverlay_DivergentTerminalStatesWarn(t *testing.T) {
 	if ot := overlay.byID["001"]; ot.EffectiveStatus != model.StatusCompleted {
 		t.Errorf("EffectiveStatus = %s, want completed (ladder winner)", ot.EffectiveStatus)
 	}
-	if len(overlay.Warnings) != 1 || !strings.Contains(overlay.Warnings[0], "completed in worktree agent-b but cancelled in this worktree") {
+	if len(overlay.Warnings) != 1 || !strings.Contains(overlay.Warnings[0].Message, "completed in worktree agent-b but cancelled in this worktree") {
 		t.Errorf("Warnings = %v, want one divergent-terminal warning", overlay.Warnings)
+	}
+	if overlay.Warnings[0].TaskID != "001" {
+		t.Errorf("warning TaskID = %q, want 001", overlay.Warnings[0].TaskID)
 	}
 }
 

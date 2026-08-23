@@ -117,13 +117,7 @@ func runNext(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(args)
 
-	allTasks, archivedTasks, err := scanActiveAndArchived(scanDir, flags)
-	if err != nil {
-		return err
-	}
-
-	// Built before paths are relativized: the merge stats files by path.
-	overlay, err := buildWorktreeOverlay(scanDir, allTasks, flags)
+	allTasks, archivedTasks, overlay, err := scanActiveAndArchivedWithOverlay(scanDir, flags)
 	if err != nil {
 		return err
 	}

@@ -99,18 +99,13 @@ func runList(cmd *cobra.Command, args []string) error {
 	scanDir := ResolveScanDir(args)
 	debugLog("scan directory: %s", scanDir)
 
-	// Scan for tasks
-	tasks, err := scanTasks(scanDir, flags)
+	// Scan for tasks; the overlay is built before paths are relativized —
+	// the merge stats files by path.
+	tasks, overlay, err := scanTasksWithOverlay(scanDir, flags)
 	if err != nil {
 		return err
 	}
 	debugLog("found %d task(s)", len(tasks))
-
-	// Built before paths are relativized: the merge stats files by path.
-	overlay, err := buildWorktreeOverlay(scanDir, tasks, flags)
-	if err != nil {
-		return err
-	}
 	makeFilePathsRelative(tasks, scanDir)
 
 	if overlay != nil {

@@ -59,7 +59,7 @@ func runBoard(cmd *cobra.Command, args []string) error {
 
 	scanDir := ResolveScanDir(args)
 
-	tasks, err := scanTasks(scanDir, flags)
+	tasks, err := scanTasksEffective(scanDir, flags)
 	if err != nil {
 		return err
 	}

@@ -89,6 +89,17 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// With the overlay active, copies scanned from a sibling checkout nested
+	// in the scan root belong to that worktree — validating them here would
+	// flag cross-worktree copies as duplicate IDs (spec §8).
+	overlay, err := buildWorktreeOverlay(scanDir, tasks, flags)
+	if err != nil {
+		return err
+	}
+	if overlay != nil {
+		tasks = overlay.local
+	}
+
 	// Scan archive directories for task IDs to avoid false-positive dependency errors
 	v := validator.NewValidator(validateStrict)
 	v.SetEffortScale(resolveEffortScale())
@@ -99,6 +110,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	// Run validation
 	validationResult := v.Validate(tasks)
 	validateConfig(v, validationResult, tasks)
+	addOverlayWarnings(validationResult, overlay)
 
 	// Output results
 	switch validateFormat {
@@ -120,6 +132,18 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// addOverlayWarnings merges the overlay's cross-worktree consistency warnings
+// (divergent terminal states, spec §3) into the validation result. No-op when
+// the overlay is inactive.
+func addOverlayWarnings(result *validator.ValidationResult, overlay *worktreeOverlay) {
+	if overlay == nil {
+		return
+	}
+	for _, warning := range overlay.Warnings {
+		result.AddIssue(validator.LevelWarning, warning.TaskID, "", warning.Message)
+	}
 }
 
 // outputValidationText outputs validation results in human-readable text format

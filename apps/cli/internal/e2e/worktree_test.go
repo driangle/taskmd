@@ -211,3 +211,69 @@ func TestWorktree_SingleWorktreeBehaviorUnchanged(t *testing.T) {
 		}
 	}
 }
+
+func TestWorktree_BoardShowsSiblingCompletion(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md":  {id: "001", title: "First task", status: "pending"},
+		"002-second.md": {id: "002", title: "Second task", status: "pending"},
+	})
+	agentB := addLinkedWorktree(t, repo, "agent-b")
+	mustRun(t, agentB, "set", "001", "--status", "completed")
+
+	// board in the primary reports 001 as completed even though the local
+	// copy is still pending.
+	res := mustRun(t, repo, "board")
+	var completedSection string
+	for _, section := range strings.Split(res.Stdout, "## ") {
+		if strings.HasPrefix(section, "completed") {
+			completedSection = section
+		}
+	}
+	if completedSection == "" {
+		t.Fatalf("no completed section in board output:\n%s", res.Stdout)
+	}
+	if !strings.Contains(completedSection, "001") {
+		t.Errorf("completed section missing 001 (completed in sibling):\n%s", res.Stdout)
+	}
+	if strings.Contains(completedSection, "002") {
+		t.Errorf("002 leaked into the completed section:\n%s", res.Stdout)
+	}
+}
+
+func TestWorktree_GetListsDivergingCopies(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md": {id: "001", title: "First task", status: "pending"},
+	})
+	agentB := addLinkedWorktree(t, repo, "agent-b")
+	mustRun(t, agentB, "set", "001", "--status", "in-progress")
+
+	res := mustRun(t, repo, "get", "001")
+	if !strings.Contains(res.Stdout, "Worktrees:") {
+		t.Fatalf("get output missing Worktrees section:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Stdout, "this worktree: pending") {
+		t.Errorf("Worktrees section missing the local copy line:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Stdout, "agent-b (branch agent-b): in-progress") {
+		t.Errorf("Worktrees section missing the sibling copy line:\n%s", res.Stdout)
+	}
+}
+
+func TestWorktree_ValidateDivergentTerminalStates(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md": {id: "001", title: "First task", status: "pending"},
+	})
+	agentB := addLinkedWorktree(t, repo, "agent-b")
+	mustRun(t, repo, "set", "001", "--status", "cancelled")
+	mustRun(t, agentB, "set", "001", "--status", "completed")
+
+	// Non-strict: the divergence is a warning, not an error, and the same ID
+	// across worktrees is never a duplicate.
+	res := mustRun(t, repo, "validate")
+	if !strings.Contains(res.Stdout, "completed in worktree agent-b but cancelled in this worktree") {
+		t.Errorf("validate output missing divergent-terminal-state warning:\n%s", res.Stdout)
+	}
+	if strings.Contains(res.Stdout, "duplicate") || strings.Contains(res.Stdout, "Duplicate") {
+		t.Errorf("validate reported a duplicate-ID issue across worktrees:\n%s", res.Stdout)
+	}
+}

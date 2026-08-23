@@ -1,7 +1,7 @@
 ---
 title: "Extend worktree overlay to remaining read views and validate"
 id: "01m0n989x"
-status: pending
+status: completed
 priority: high
 type: feature
 tags: ["worktrees", "overlay"]
@@ -9,6 +9,7 @@ created: "2026-08-22"
 dependencies: ["01m0nk00d"]
 effort: medium
 phase: worktree-support
+completed_at: 2026-08-23
 ---
 
 # Extend worktree overlay to remaining read views and validate
@@ -21,11 +22,11 @@ with provenance. Spec: `docs/specs/worktree-support.md` §4, §8.
 
 ## Tasks
 
-- [ ] `board`, `stats`, `graph`, `report`, `metrics`, `tracks`, `phases` operate on effective status when the overlay is active
-- [ ] `get`: show the local copy plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ
-- [ ] `validate`: warn on divergent terminal states across worktrees; keep duplicate-ID errors scoped to a single worktree
-- [ ] Attribute same-ID copies whose path lies inside a sibling worktree root (non-hidden checkout inside the scan root) to that worktree instead of flagging duplicates (§8)
-- [ ] Unit tests per view for effective-status rendering; e2e spot-checks for `board` and `get`
+- [x] `board`, `stats`, `graph`, `report`, `metrics`, `tracks`, `phases` operate on effective status when the overlay is active
+- [x] `get`: show the local copy plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ
+- [x] `validate`: warn on divergent terminal states across worktrees; keep duplicate-ID errors scoped to a single worktree
+- [x] Attribute same-ID copies whose path lies inside a sibling worktree root (non-hidden checkout inside the scan root) to that worktree instead of flagging duplicates (§8)
+- [x] Unit tests per view for effective-status rendering; e2e spot-checks for `board` and `get`
 
 ## Acceptance Criteria
 

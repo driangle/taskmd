@@ -60,9 +60,12 @@ func runTracks(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(args)
 
-	allTasks, archivedTasks, err := scanActiveAndArchived(scanDir, flags)
+	allTasks, archivedTasks, overlay, err := scanActiveAndArchivedWithOverlay(scanDir, flags)
 	if err != nil {
 		return err
+	}
+	if overlay != nil {
+		allTasks = overlay.effectiveTasks()
 	}
 	makeFilePathsRelative(allTasks, scanDir)
 

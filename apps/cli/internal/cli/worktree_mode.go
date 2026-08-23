@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 
@@ -102,17 +103,50 @@ func buildWorktreeOverlay(scanDir string, localTasks []*model.Task, flags Global
 	}
 
 	scanned := scanSiblingWorktrees(siblings, flags)
+	localTasks = attributeNestedSiblingCopies(localTasks, siblings)
 	overlay := mergeOverlay(localTasks, scanned)
 	for _, st := range scanned {
 		makeFilePathsRelative(st.tasks, st.wt.TasksDir)
 	}
+	return overlay, nil
+}
 
-	if !flags.Quiet {
-		for _, warning := range overlay.Warnings {
-			fmt.Fprintln(os.Stderr, warning)
+// attributeNestedSiblingCopies drops local-scan copies whose file path lies
+// inside a sibling worktree's root: a non-hidden checkout nested in the scan
+// root gets double-scanned, and those files belong to that worktree, not this
+// one (spec §8). The sibling's own scan already carries them, so dropping the
+// local-scan copies attributes them instead of flagging duplicates.
+func attributeNestedSiblingCopies(local []*model.Task, siblings []gitmeta.Worktree) []*model.Task {
+	attributed := make([]*model.Task, 0, len(local))
+	for _, task := range local {
+		if !insideAnyWorktreeRoot(task.FilePath, siblings) {
+			attributed = append(attributed, task)
 		}
 	}
-	return overlay, nil
+	return attributed
+}
+
+// insideAnyWorktreeRoot reports whether path lies under any sibling's root.
+func insideAnyWorktreeRoot(path string, siblings []gitmeta.Worktree) bool {
+	cleaned := filepath.Clean(path)
+	for _, wt := range siblings {
+		if strings.HasPrefix(cleaned, filepath.Clean(wt.Root)+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
+// printOverlayWarnings reports cross-worktree consistency warnings to stderr.
+// Callers that surface them elsewhere (validate merges them into the
+// validation result) skip this.
+func printOverlayWarnings(overlay *worktreeOverlay, flags GlobalFlags) {
+	if overlay == nil || flags.Quiet {
+		return
+	}
+	for _, warning := range overlay.Warnings {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", warning.Message)
+	}
 }
 
 // scanSiblingWorktrees scans each sibling's tasks dir, skipping siblings that

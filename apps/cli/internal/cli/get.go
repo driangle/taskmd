@@ -74,7 +74,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 
 	scanDir := ResolveScanDir(nil)
 
-	tasks, err := scanTasks(scanDir, flags)
+	tasks, overlay, err := scanTasksWithOverlay(scanDir, flags)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,12 @@ func runGet(cmd *cobra.Command, args []string) error {
 
 	wlInfo := loadWorklogInfo(task, scanDir)
 
-	return outputGet(task, depInfo, ctxFiles, wlInfo, getFormat)
+	var wtCopies []worktreeCopyEntry
+	if overlay != nil {
+		wtCopies = overlay.worktreeCopies(task.ID)
+	}
+
+	return outputGet(task, depInfo, ctxFiles, wlInfo, wtCopies, getFormat)
 }
 
 // worklogInfo holds optional worklog metadata for display.
@@ -356,20 +361,20 @@ func buildDependencyInfo(task *model.Task, allTasks []*model.Task) dependencyInf
 }
 
 // outputGet routes to the appropriate formatter.
-func outputGet(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, format string) error {
+func outputGet(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, format string) error {
 	switch format {
 	case "text":
-		return outputGetText(task, deps, ctxFiles, wl, os.Stdout)
+		return outputGetText(task, deps, ctxFiles, wl, wtCopies, os.Stdout)
 	case "json":
-		return outputGetJSON(task, deps, ctxFiles, wl, os.Stdout)
+		return outputGetJSON(task, deps, ctxFiles, wl, wtCopies, os.Stdout)
 	case "yaml":
-		return outputGetYAML(task, deps, ctxFiles, wl, os.Stdout)
+		return outputGetYAML(task, deps, ctxFiles, wl, wtCopies, os.Stdout)
 	default:
 		return fmt.Errorf("unsupported format: %s (supported: text, json, yaml)", format)
 	}
 }
 
-func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, w io.Writer) error {
+func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, w io.Writer) error {
 	r := getRenderer()
 
 	fmt.Fprintf(w, "%s %s\n", formatLabel("Task:", r), formatTaskID(task.ID, r))
@@ -389,11 +394,36 @@ func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext
 	}
 	fmt.Fprintf(w, "%s %s\n", formatLabel("File:", r), formatDim(task.FilePath, r))
 	printWorklogInfo(w, wl, r)
+	printWorktreeCopies(w, wtCopies, r)
 	printDescription(w, task.Body, r, getRawMarkdown)
 	printDependencies(w, deps, r)
 	printChildren(w, deps.Children, r)
 	printGetContextFiles(w, ctxFiles, r)
 	return nil
+}
+
+// printWorktreeCopies renders the Worktrees section: one line per copy of the
+// task across worktrees, shown only when copies diverge in status or owner.
+func printWorktreeCopies(w io.Writer, copies []worktreeCopyEntry, r *lipgloss.Renderer) {
+	if len(copies) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "\n%s\n", formatLabel("Worktrees:", r))
+	for _, c := range copies {
+		label := "this worktree"
+		if !c.Local {
+			branch := c.Branch
+			if branch == "" {
+				branch = "detached"
+			}
+			label = fmt.Sprintf("%s (branch %s)", c.Worktree, branch)
+		}
+		line := fmt.Sprintf("  %s: %s", label, formatStatus(c.Status, r))
+		if c.Owner != "" {
+			line += fmt.Sprintf(" (owner: %s)", c.Owner)
+		}
+		fmt.Fprintln(w, line)
+	}
 }
 
 func printWorklogInfo(w io.Writer, wl *worklogInfo, r *lipgloss.Renderer) {
@@ -511,6 +541,7 @@ type getOutput struct {
 	Children     []depEntry              `json:"children,omitempty" yaml:"children,omitempty"`
 	ContextFiles []taskcontext.FileEntry `json:"context_files,omitempty" yaml:"context_files,omitempty"`
 	Worklog      *worklogInfo            `json:"worklog,omitempty" yaml:"worklog,omitempty"`
+	Worktrees    []worktreeCopyEntry     `json:"worktrees,omitempty" yaml:"worktrees,omitempty"`
 }
 
 type getDepsJSON struct {
@@ -518,7 +549,7 @@ type getDepsJSON struct {
 	Blocks    []depEntry `json:"blocks" yaml:"blocks"`
 }
 
-func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo) getOutput {
+func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry) getOutput {
 	created := ""
 	if !task.Created.IsZero() {
 		created = task.Created.Format("2006-01-02")
@@ -541,8 +572,9 @@ func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontex
 			DependsOn: deps.DependsOn,
 			Blocks:    deps.Blocks,
 		},
-		Children: deps.Children,
-		Worklog:  wl,
+		Children:  deps.Children,
+		Worklog:   wl,
+		Worktrees: wtCopies,
 	}
 	if len(ctxFiles) > 0 {
 		out.ContextFiles = ctxFiles
@@ -550,12 +582,12 @@ func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontex
 	return out
 }
 
-func outputGetJSON(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, w io.Writer) error {
-	return WriteJSON(w, buildGetOutput(task, deps, ctxFiles, wl))
+func outputGetJSON(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, w io.Writer) error {
+	return WriteJSON(w, buildGetOutput(task, deps, ctxFiles, wl, wtCopies))
 }
 
-func outputGetYAML(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, w io.Writer) error {
-	return WriteYAML(w, buildGetOutput(task, deps, ctxFiles, wl))
+func outputGetYAML(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, w io.Writer) error {
+	return WriteYAML(w, buildGetOutput(task, deps, ctxFiles, wl, wtCopies))
 }
 
 // printGetContextFiles appends context file information to the text output.
