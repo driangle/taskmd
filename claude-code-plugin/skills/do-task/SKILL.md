@@ -21,6 +21,13 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
 > status in the wrong checkout. taskmd resolves its task directory from the current
 > directory, so running in place is what keeps the write in *this* worktree. (Outside
 > a git repo, running in place is already correct.)
+>
+> The CLI backs this up: in a multi-worktree repo, `taskmd set` **refuses** to write
+> when the task exists only in a sibling worktree (`task <id> exists only in worktree
+> <path> …; run taskmd there`). If you hit that error, you are in the wrong checkout —
+> do not work around it by `cd`-ing; run the command from the worktree that owns the
+> task. Setting a task `in-progress` in your worktree is also the **claim**: sibling
+> worktrees see the merged view, so their `taskmd next` will not hand out the same task.
 
 1. **Look up the task**: Run `taskmd get $ARGUMENTS` to find the task
    - If not found, run `taskmd list` to show available tasks and ask the user which one they meant

@@ -50,6 +50,13 @@ Tasks are scored based on priority, critical path position, downstream impact,
 effort, and phase ordering (from .taskmd.yaml). Only actionable tasks
 (pending or in-progress with all dependencies completed) are shown.
 
+In a git repository with multiple worktrees, next recommends against the merged
+cross-worktree view: a task that is in-progress (or further along) in a sibling
+worktree is never recommended, so setting a task in-progress in one worktree
+claims it for the whole repository. --explain lists the excluded tasks and the
+worktree that excludes each one. Control the overlay with the global --worktrees
+flag or the 'worktrees' config key (auto, true, or false; default auto).
+
 --strict-priority guarantees priority is the primary sort key: no
 lower-priority task is ranked above an actionable higher-priority one
 (critical > high > medium > low/unset), with the existing score breaking ties

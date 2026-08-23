@@ -212,6 +212,10 @@ taskmd scores tasks based on:
 - **Phase proximity**: Tasks in phases with nearer due dates score higher
 - **Actionability**: Only tasks with satisfied dependencies
 
+In a multi-worktree git repository, `next` also excludes tasks claimed in a
+sibling worktree — see [Git Worktrees](#git-worktrees). `--explain` lists the
+excluded tasks and which worktree excludes each one.
+
 ```bash
 # Get top 5 recommendations
 taskmd next
@@ -531,7 +535,10 @@ taskmd get sho --exact
 
 > **Alias:** `update` is a deprecated alias for `set`. Use `set` instead.
 
-Modify a task's frontmatter fields by ID.
+Modify a task's frontmatter fields by ID. Writes always target the current git
+worktree's files: in a multi-worktree repository, `set` fails with a guard error
+when the task exists only in a sibling worktree — see
+[Git Worktrees](#git-worktrees).
 
 ```bash
 # Change status
@@ -1627,6 +1634,63 @@ taskmd completion powershell | Out-String | Invoke-Expression
 After installing completions, start a new shell session for them to take effect. For Zsh, ensure `compinit` is loaded: `echo "autoload -U compinit; compinit" >> ~/.zshrc`
 :::
 
+## Git Worktrees {#git-worktrees}
+
+When the task directory is inside a git repository with **multiple worktrees**, each
+worktree has its own branch-local copy of the task files, so a task's status diverges
+between checkouts until branches merge. taskmd merges this automatically: read
+commands build a **cross-worktree overlay** so every checkout sees one coherent view.
+
+**Effective status.** For each task, the overlay computes the most advanced status
+across all worktree copies, using the ladder:
+
+```
+pending < blocked < in-progress < in-review < cancelled < completed
+```
+
+Read views (`list`, `board`, `stats`, `get`, `graph`, `next`, …) operate on effective
+status. When the winning copy lives in a sibling worktree, the task is annotated with
+provenance — the worktree name and branch. `list` adds a `WORKTREE` column, and `get`
+shows a per-worktree breakdown when copies diverge. Tasks that exist only in a
+sibling worktree appear in read views, marked as remote-only.
+
+**The claim convention.** Marking a task `in-progress` in your worktree *claims* it
+for the whole repository:
+
+```bash
+taskmd set 042 --status in-progress
+```
+
+Because `next` recommends against effective status, a task that is `in-progress` (or
+further along) in **any** worktree is never handed to an agent in another worktree.
+`next --explain` lists the excluded tasks under "Excluded by sibling worktrees".
+
+**Writes stay local.** Mutations (`set`, `add`, `rm`, `archive`) always write to the
+current worktree's files — never to a sibling's. Targeting a task that exists only in
+a sibling worktree fails with a guard error naming where the task lives:
+
+```
+task 042 exists only in worktree ../agent-b (branch dnc/042/parser); run taskmd there
+```
+
+**Activation.** Controlled by the `worktrees` key in `.taskmd.yaml`
+([reference](/reference/configuration#worktrees-configuration)), the global
+`--worktrees` flag, or the `TASKMD_WORKTREES` environment variable:
+
+```bash
+taskmd list --worktrees=false   # this worktree only
+taskmd next --worktrees=true    # force the overlay on
+```
+
+The default `auto` activates the overlay only in multi-worktree repos; single-worktree
+repos and non-git directories behave exactly as before. One project identity spans all
+worktrees: registering a linked worktree registers the repository once, and
+`--all-projects` counts each repository once.
+
+The MCP server and web dashboard serve the same merged view — see the
+[MCP guide](/guide/mcp) and [web guide](/guide/web) for the provenance fields their
+APIs expose.
+
 ## Global Flags
 
 Available for all commands:
@@ -1642,6 +1706,7 @@ Available for all commands:
 --no-color            # Disable colored output
 --project string      # Operate on a registered project by ID
 --all-projects        # Aggregate tasks from all registered projects
+--worktrees string    # Cross-worktree overlay: auto (default), true, or false
 ```
 
 ## Common Workflows

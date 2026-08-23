@@ -1,10 +1,14 @@
 # Git Worktree Support
 
-**Status:** Draft
+**Status:** Implemented (2026-08-23; owner-aware `next` implemented and reverted — see §6)
 **Date:** 2026-08-22
 **Related ADRs:** [0004 — Local git metadata is core](../adr/0004-local-git-metadata-is-core.md),
 [0005 — Worktrees are facets of one project](../adr/0005-worktrees-are-facets-of-one-project.md)
 **Related design docs:** [projects.md](../design/projects.md)
+**Shipped behavior:** [CLI guide — Git Worktrees](../../apps/docs/guide/cli.md#git-worktrees),
+[configuration reference](../../apps/docs/reference/configuration.md#worktrees-configuration),
+[MCP guide](../../apps/docs/guide/mcp.md), [web guide](../../apps/docs/guide/web.md);
+code in `apps/cli/internal/gitmeta` and `apps/cli/internal/cli/worktree_*.go`
 
 ## Problem
 

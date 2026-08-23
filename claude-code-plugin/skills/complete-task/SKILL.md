@@ -22,6 +22,12 @@ The user's query is in `$ARGUMENTS` (a task ID like `077`). If `$ARGUMENTS` is e
 > resolves its task directory from the current directory, so running in place is what
 > keeps the write in *this* worktree. (Outside a git repo, running in place is already
 > correct.)
+>
+> The CLI backs this up: in a multi-worktree repo, `taskmd set` **refuses** to write
+> when the task exists only in a sibling worktree (`task <id> exists only in worktree
+> <path> …; run taskmd there`). If you hit that error, you are in the wrong checkout —
+> do not work around it by `cd`-ing; run the command from the worktree that owns the
+> task.
 
 1. **Read the task file** to understand the full task scope:
    - Run `taskmd get <ID>` to get the task contents

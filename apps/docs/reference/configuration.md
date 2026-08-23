@@ -40,6 +40,7 @@ Command-line flags always override config file values.
 | `ignore` | string[] | `[]` | Additional directories to skip when scanning (beyond the built-in skip list) |
 | `worklogs` | boolean | `false` | Allow writing worklog entries; set to `true` to opt in |
 | `workflow` | string | `"solo"` | Workflow mode: `"solo"` or `"pr-review"` |
+| `worktrees` | string | `"auto"` | Cross-worktree overlay: `"auto"`, `"true"`, or `"false"` ([details](#worktrees-configuration)) |
 | `todos.exclude` | string[] | `[]` | Glob patterns to exclude from TODO/FIXME scanning |
 | `web.port` | integer | `8080` | Web server port |
 | `web.auto_open_browser` | boolean | `false` | Auto-open browser on `web start` |
@@ -147,6 +148,41 @@ Each scope entry has the following fields:
 
 - When scopes are configured, any `touches` value in a task that does not match a configured scope produces a warning.
 - When no scopes config exists, all `touches` values are accepted silently.
+
+## Worktrees Configuration {#worktrees-configuration}
+
+The `worktrees` key controls the cross-worktree overlay: when the task directory is
+inside a git repository with multiple worktrees, taskmd can merge task state across
+all of them so each checkout sees one coherent view.
+
+```yaml
+# .taskmd.yaml
+worktrees: auto   # auto | true | false
+```
+
+| Value | Behavior |
+|-------|----------|
+| `auto` (default) | Overlay activates when the directory is inside a git repo with more than one worktree. Single-worktree repos and non-git directories behave exactly as with `false`. |
+| `true` | Always attempt the overlay (still inert outside a git repo). |
+| `false` | Never merge; each worktree sees only its own task files. |
+
+**When the overlay is active:**
+
+- Read commands (`list`, `next`, `board`, `stats`, `get`, `graph`, …) show each
+  task's **effective status** — the most advanced status across all worktree
+  copies — with provenance for the worktree that owns it.
+- `taskmd next` never recommends a task that is `in-progress` (or further along)
+  in a sibling worktree, so marking a task `in-progress` in one worktree claims
+  it for the whole repository.
+- Mutations (`set`, `add`, `rm`, `archive`) always write to the **current**
+  worktree's files; `taskmd set` fails with a guard error when the target task
+  exists only in a sibling worktree.
+- All worktrees of one repository resolve to a single registered project — no
+  duplicate entries or double-counting in `--all-projects`.
+
+Override per invocation with the global `--worktrees` flag or the
+`TASKMD_WORKTREES` environment variable. See the
+[CLI guide](/guide/cli#git-worktrees) for the full behavior reference.
 
 ## Usage Examples
 

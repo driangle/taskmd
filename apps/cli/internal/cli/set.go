@@ -47,6 +47,10 @@ var setCmd = &cobra.Command{
 
 The task is identified by a positional argument or --task-id (exact match only).
 
+Writes always target the current git worktree's files. In a repository with
+multiple worktrees, setting a task that exists only in a sibling worktree fails
+with an error naming that worktree — run taskmd there instead.
+
 --title updates the frontmatter title and the matching "# " heading in the body.
 The file itself is left where it is unless you also pass --rename, which moves it
 to <id>-<new-slug>.md — renaming is opt-in because the old path may be referenced

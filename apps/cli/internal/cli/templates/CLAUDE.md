@@ -75,6 +75,21 @@ taskmd verify <id>                       # Run acceptance checks
 - A task with unmet dependencies should stay `pending` or `blocked`
 - Circular dependencies are invalid -- use `taskmd validate` to detect them
 
+### Git Worktrees
+
+When the repository has multiple git worktrees, taskmd merges task state across them
+(configure with `worktrees: auto|true|false` in `.taskmd.yaml`; default `auto`):
+
+- Reads (`list`, `next`, `board`, ...) show each task's most advanced status across
+  all worktrees, so `taskmd next` never recommends a task already claimed in a
+  sibling worktree
+- Claiming a task = `taskmd set <id> --status in-progress` run in your own worktree.
+  Always run taskmd writes from your current directory -- never `cd` to another
+  checkout first
+- Writes stay local, and the CLI enforces it: `taskmd set` refuses a task that exists
+  only in a sibling worktree. If you see that error, you are in the wrong checkout --
+  run the command from the worktree that owns the task
+
 ### Organizing Tasks
 
 Five fields group tasks; they are not interchangeable. Ask: does this grouping end, and

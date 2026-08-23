@@ -45,6 +45,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077` or a task name/keyword
      - Its **assigned branch name** (e.g. `dnc/<task-id>/<workstream-slug>`) and its **base branch** (the task base, or a predecessor's branch for serialized work)
      - These non-negotiable rules for the subagent:
        - "**Work only inside your own worktree** (your cwd). Do **not** read-modify-write, `cd` into, or otherwise touch the primary repo checkout at any other path."
+       - "Run any `taskmd` command from your own worktree. Reads see the merged cross-worktree view (a task claimed `in-progress` in a sibling worktree is excluded from `taskmd next`), and writes are CLI-guarded: `taskmd set` refuses a task that exists only in a sibling worktree — if you hit that error, leave the task alone and report back instead of `cd`-ing to work around it."
        - "First run `git checkout -b <assigned-branch> <base-branch>` so all your commits land on your branch."
        - "When done, **commit your work** to your branch with a clear message, then **run all verification steps** relevant to your changes (build, tests, lint — e.g. `make check`) and fix anything that fails before committing the fix."
        - "Report back: your branch name, final commit SHA, a summary of what changed, and the verification results (pass/fail with details)."
