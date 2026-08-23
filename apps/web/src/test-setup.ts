@@ -18,6 +18,39 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
+// Node 26 defines a global localStorage that is undefined unless the process
+// runs with --localstorage-file, and because the key already exists, vitest's
+// jsdom environment does not overlay jsdom's working implementation (window
+// is the same augmented global, so window.localStorage is equally undefined).
+// Back-fill an in-memory Storage so bare `localStorage` works on any Node.
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: () => store.clear(),
+    getItem: (key: string) => store.get(key) ?? null,
+    key: (index: number) => [...store.keys()][index] ?? null,
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      store.set(key, String(value));
+    },
+  } as Storage;
+}
+
+for (const name of ["localStorage", "sessionStorage"] as const) {
+  if (!globalThis[name]) {
+    Object.defineProperty(globalThis, name, {
+      value: createMemoryStorage(),
+      configurable: true,
+      writable: true,
+    });
+  }
+}
+
 afterEach(() => {
   cleanup();
 });
