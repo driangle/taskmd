@@ -11,15 +11,6 @@ import (
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-// Worktree overlay activation modes (the "worktrees" config key / --worktrees
-// flag / TASKMD_WORKTREES env). auto activates the overlay only when the scan
-// dir is inside a git repo with sibling worktrees; false disables it entirely.
-const (
-	worktreeModeAuto  = worktree.ModeAuto
-	worktreeModeTrue  = worktree.ModeTrue
-	worktreeModeFalse = worktree.ModeFalse
-)
-
 func init() {
 	// gitmeta stays free of flag/viper state; route its logging through the
 	// CLI's --debug and --verbose channels.
@@ -31,25 +22,34 @@ func init() {
 	}
 }
 
-// resolveWorktreeMode reads the overlay activation mode. Viper gives the
-// intended precedence for free once the --worktrees flag is bound: changed
-// flag > TASKMD_WORKTREES env > config key > flag default (auto).
-func resolveWorktreeMode() (string, error) {
-	v := viper.GetString("worktrees")
-	// An explicitly passed --worktrees wins even when the viper binding is
-	// absent (tests reset viper), mirroring resolveTaskDir.
-	if f := rootCmd.PersistentFlags().Lookup("worktrees"); f != nil && f.Changed {
-		v = worktreesFlag
+// Worktree scope values (the "worktree_scope" config key / --worktree-scope
+// flag / TASKMD_WORKTREE_SCOPE env). unified merges task state across sibling
+// worktrees; isolated reads only the current checkout's files.
+const (
+	worktreeScopeUnified  = "unified"
+	worktreeScopeIsolated = "isolated"
+)
+
+// resolveWorktreeScope reads the worktree scope and reports whether the
+// overlay is enabled. Viper gives the intended precedence for free once the
+// --worktree-scope flag is bound: changed flag > TASKMD_WORKTREE_SCOPE env >
+// config key > flag default (unified). Enabled does not mean active: the
+// overlay still only forms in a multi-worktree git repo.
+func resolveWorktreeScope() (bool, error) {
+	v := viper.GetString("worktree_scope")
+	// An explicitly passed --worktree-scope wins even when the viper binding
+	// is absent (tests reset viper), mirroring resolveTaskDir.
+	if f := rootCmd.PersistentFlags().Lookup("worktree-scope"); f != nil && f.Changed {
+		v = worktreeScopeFlag
 	}
 	switch v {
-	case "", worktreeModeAuto:
-		return worktreeModeAuto, nil
-	case worktreeModeTrue:
-		return worktreeModeTrue, nil
-	case worktreeModeFalse:
-		return worktreeModeFalse, nil
+	case "", worktreeScopeUnified:
+		return true, nil
+	case worktreeScopeIsolated:
+		return false, nil
 	default:
-		return "", invalidValueError("worktrees", v, worktree.ValidModes)
+		return false, invalidValueError("worktree_scope", v,
+			[]string{worktreeScopeUnified, worktreeScopeIsolated})
 	}
 }
 
@@ -58,16 +58,16 @@ func resolveWorktreeMode() (string, error) {
 // can inject worktrees without git.
 var discoverSiblingWorktrees worktree.Discoverer = worktree.DiscoverSiblings
 
-// worktreeBuilder resolves the activation mode into an overlay builder wired
+// worktreeBuilder resolves the worktree scope into an overlay builder wired
 // to the CLI's discovery seam. Commands hand it to the shared overlay code
 // and to the MCP/web servers.
 func worktreeBuilder(flags GlobalFlags) (worktree.Builder, error) {
-	mode, err := resolveWorktreeMode()
+	enabled, err := resolveWorktreeScope()
 	if err != nil {
 		return worktree.Builder{}, err
 	}
 	return worktree.Builder{
-		Mode:       mode,
+		Enabled:    enabled,
 		Discover:   discoverSiblingWorktrees,
 		Verbose:    flags.Verbose,
 		IgnoreDirs: flags.IgnoreDirs,
@@ -75,7 +75,7 @@ func worktreeBuilder(flags GlobalFlags) (worktree.Builder, error) {
 }
 
 // buildWorktreeOverlay builds the cross-worktree overlay for the local task
-// list, or returns nil when the overlay is inactive: mode false, scanDir not
+// list, or returns nil when the overlay is inactive: disabled, scanDir not
 // in a git repo, or no sibling worktrees to merge (in which case behavior is
 // identical to today's). Call it before makeFilePathsRelative — the merge
 // stats task files by their absolute paths to break status ties by mtime.

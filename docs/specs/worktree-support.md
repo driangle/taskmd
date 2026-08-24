@@ -203,17 +203,26 @@ warning when the overlay is active.
 
 ```yaml
 # .taskmd.yaml
-worktrees: auto   # auto | true | false   (default: auto)
+worktree_scope: unified   # unified | isolated (default: unified)
 ```
 
-- `auto` — overlay activates when the directory is inside a git repo with more than
-  one worktree. Single-worktree repos and non-repos: zero behavior change, zero
+- `unified` (default) — reads merge task state across all worktrees. The overlay
+  still only forms when the directory is inside a git repo with more than one
+  worktree; single-worktree repos and non-repos see zero behavior change, zero
   extra git invocations beyond the one identity probe.
-- `true` — always attempt (still inert outside a repo).
-- `false` — never; today's behavior.
+- `isolated` — each worktree reads only its own task files; today's behavior.
+  For users whose worktrees keep intentionally independent task states.
 
-Per-invocation override: a persistent `--worktrees=<auto|true|false>` global flag,
-mirroring how other global flags work in `root.go`. Env: `TASKMD_WORKTREES`.
+Per-invocation override: a persistent `--worktree-scope` global flag, mirroring
+how other global flags work in `root.go`. Env: `TASKMD_WORKTREE_SCOPE`.
+
+> Originally specified (and first implemented) as `worktrees: auto|true|false`.
+> Renamed before release: `auto` and `true` were indistinguishable in practice —
+> they differed only in single-worktree repos, where the overlay merges
+> nothing — so "activate only when siblings exist" became simply how the feature
+> works rather than a mode. And a bare `worktrees: false` didn't say *what* about
+> worktrees was being switched off; `worktree_scope: isolated | unified` names
+> both the thing being controlled and each resulting behavior.
 
 ### 6. Owner-aware `next` — removed
 
@@ -308,7 +317,7 @@ Per the CLI testing policy (CLAUDE.md):
 
 - **Unit tests** (`internal/cli`): overlay merge rules (status ladder, mtime
   tie-break, remote-only/local-only, divergent terminal states), owner-aware
-  recommender rules in `sdk/go/next`, activation matrix (`auto`/`true`/`false` ×
+  recommender rules in `sdk/go/next`, activation matrix (enabled/disabled ×
   repo/no-repo/one-worktree/many). Worktree discovery is injected so merge logic
   tests need no git.
 - **E2E tests** (`internal/e2e`, `-tags e2e`): build the binary, create a real repo
@@ -323,9 +332,9 @@ Per the CLI testing policy (CLAUDE.md):
 
 ## Migration
 
-None. The feature is additive and defaults to `auto`, which only changes behavior
+None. The feature is additive and on by default, which only changes behavior
 in multi-worktree repos — where current behavior is the bug being fixed. Users who
-depend on per-worktree isolation set `worktrees: false`.
+depend on per-worktree isolation set `worktree_scope: isolated`.
 
 ## Implementation order
 

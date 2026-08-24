@@ -176,19 +176,19 @@ func TestWorktree_OptOutRestoresLocalView(t *testing.T) {
 		t.Fatalf("overlay should suppress 001, got %v", ids)
 	}
 
-	// --worktrees=false restores the purely local view.
-	ids := nextIDs(t, mustRun(t, agentB, "--worktrees", "false", "next", "--format", "json"))
+	// --worktree-scope isolated restores the purely local view.
+	ids := nextIDs(t, mustRun(t, agentB, "--worktree-scope", "isolated", "next", "--format", "json"))
 	if len(ids) != 1 || ids[0] != "001" {
-		t.Errorf("--worktrees=false: ids = %v, want [001]", ids)
+		t.Errorf("--worktree-scope isolated: ids = %v, want [001]", ids)
 	}
 
-	// TASKMD_WORKTREES=false does the same.
-	res := runWithEnv(t, agentB, []string{"TASKMD_WORKTREES=false"}, "next", "--format", "json")
+	// TASKMD_WORKTREE_SCOPE=isolated does the same.
+	res := runWithEnv(t, agentB, []string{"TASKMD_WORKTREE_SCOPE=isolated"}, "next", "--format", "json")
 	if res.ExitCode != 0 {
 		t.Fatalf("next failed: %s", res.Stderr)
 	}
 	if ids := nextIDs(t, res); len(ids) != 1 || ids[0] != "001" {
-		t.Errorf("TASKMD_WORKTREES=false: ids = %v, want [001]", ids)
+		t.Errorf("TASKMD_WORKTREE_SCOPE=isolated: ids = %v, want [001]", ids)
 	}
 }
 
@@ -203,11 +203,11 @@ func TestWorktree_SingleWorktreeBehaviorUnchanged(t *testing.T) {
 		{"list"},
 		{"list", "--format", "json"},
 	} {
-		auto := mustRun(t, repo, args...)
-		off := mustRun(t, repo, append([]string{"--worktrees", "false"}, args...)...)
-		if auto.Stdout != off.Stdout {
-			t.Errorf("taskmd %v: single-worktree output differs between auto and false:\n--- auto ---\n%s\n--- false ---\n%s",
-				args, auto.Stdout, off.Stdout)
+		unified := mustRun(t, repo, args...)
+		isolated := mustRun(t, repo, append([]string{"--worktree-scope", "isolated"}, args...)...)
+		if unified.Stdout != isolated.Stdout {
+			t.Errorf("taskmd %v: single-worktree output differs between unified and isolated:\n--- unified ---\n%s\n--- isolated ---\n%s",
+				args, unified.Stdout, isolated.Stdout)
 		}
 	}
 }

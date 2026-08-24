@@ -78,7 +78,7 @@ taskmd verify <id>                       # Run acceptance checks
 ### Git Worktrees
 
 When the repository has multiple git worktrees, taskmd merges task state across them
-(configure with `worktrees: auto|true|false` in `.taskmd.yaml`; default `auto`):
+(the default `worktree_scope: unified`; set `worktree_scope: isolated` in `.taskmd.yaml` to opt out):
 
 - Reads (`list`, `next`, `board`, ...) show each task's most advanced status across
   all worktrees, so `taskmd next` never recommends a task already claimed in a

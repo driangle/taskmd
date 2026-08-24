@@ -274,7 +274,7 @@ Get the task dependency graph as JSON with nodes, edges, and cycle detection.
 ## Worktree Overlay Fields
 
 When the task directory is inside a git repository with multiple worktrees (and
-`worktrees` is not set to `false` in `.taskmd.yaml`), read tools serve the
+`worktree_scope` is not set to `isolated` in `.taskmd.yaml`), read tools serve the
 merged cross-worktree view: each worktree has its own branch-local copy of the
 task files, and the server combines their coordination state so an agent never
 picks up a task already claimed in a sibling checkout.

@@ -86,25 +86,25 @@ func TestBuildWorktreeOverlay_ActivationMatrix(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		mode       any  // viper "worktrees" value; nil = unset
+		scope      any  // viper "worktree_scope" value; nil = unset
 		siblings   bool // discovery returns a sibling
 		wantActive bool
 		wantErr    bool
 	}{
-		{name: "default auto with siblings", mode: nil, siblings: true, wantActive: true},
-		{name: "default auto without siblings", mode: nil, siblings: false},
-		{name: "auto with siblings", mode: "auto", siblings: true, wantActive: true},
-		{name: "true with siblings", mode: true, siblings: true, wantActive: true},
-		{name: "true without siblings", mode: true, siblings: false},
-		{name: "false with siblings", mode: "false", siblings: true},
-		{name: "invalid value", mode: "sometimes", siblings: true, wantErr: true},
+		{name: "default unified with siblings", scope: nil, siblings: true, wantActive: true},
+		{name: "default unified without siblings", scope: nil, siblings: false},
+		{name: "unified with siblings", scope: "unified", siblings: true, wantActive: true},
+		{name: "unified without siblings", scope: "unified", siblings: false},
+		{name: "isolated with siblings", scope: "isolated", siblings: true},
+		{name: "invalid value", scope: "sometimes", siblings: true, wantErr: true},
+		{name: "former boolean value is invalid", scope: "false", siblings: true, wantErr: true},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			resetCLIState()
-			if tc.mode != nil {
-				viper.Set("worktrees", tc.mode)
+			if tc.scope != nil {
+				viper.Set("worktree_scope", tc.scope)
 			}
 			if tc.siblings {
 				sibs := sibling(t)
@@ -116,7 +116,7 @@ func TestBuildWorktreeOverlay_ActivationMatrix(t *testing.T) {
 
 			if tc.wantErr {
 				if err == nil {
-					t.Fatal("expected error for invalid worktrees value")
+					t.Fatal("expected error for invalid worktree_scope value")
 				}
 				return
 			}
@@ -282,7 +282,7 @@ func TestNextCommand_WorktreesFalseFlagRestoresTodayBehavior(t *testing.T) {
 		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "in-progress"),
 	})}
 
-	res := repo.RunWith(stubSiblings(siblings, nil), "next", "--worktrees", "false", "--format", "json")
+	res := repo.RunWith(stubSiblings(siblings, nil), "next", "--worktree-scope", "isolated", "--format", "json")
 	if res.Err != nil {
 		t.Fatalf("next failed: %v", res.Err)
 	}
@@ -291,7 +291,7 @@ func TestNextCommand_WorktreesFalseFlagRestoresTodayBehavior(t *testing.T) {
 		t.Fatalf("parse output: %v\n%s", err, res.Stdout)
 	}
 	if len(recs) != 1 || recs[0].ID != "001" {
-		t.Errorf("with --worktrees=false, 001 should be recommended as today; got %+v", recs)
+		t.Errorf("with --worktree-scope isolated, 001 should be recommended as today; got %+v", recs)
 	}
 }
 

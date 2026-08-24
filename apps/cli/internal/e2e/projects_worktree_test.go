@@ -105,7 +105,7 @@ func TestProjectFlag_FromWorktreeScansCurrentCheckout(t *testing.T) {
 	mustRun(t, wt, "set", "001", "--status", "in-progress")
 
 	// --project from inside the worktree scans the worktree's own files.
-	res := runWithEnv(t, wt, env, "list", "--project", "proj", "--worktrees", "false", "--format", "json")
+	res := runWithEnv(t, wt, env, "list", "--project", "proj", "--worktree-scope", "isolated", "--format", "json")
 	if res.ExitCode != 0 {
 		t.Fatalf("list --project from worktree failed (%d): %s", res.ExitCode, res.Stderr)
 	}
@@ -115,7 +115,7 @@ func TestProjectFlag_FromWorktreeScansCurrentCheckout(t *testing.T) {
 
 	// From outside the repo, --project scans the registered primary.
 	neutral := t.TempDir()
-	res = runWithEnv(t, neutral, env, "list", "--project", "proj", "--worktrees", "false", "--format", "json")
+	res = runWithEnv(t, neutral, env, "list", "--project", "proj", "--worktree-scope", "isolated", "--format", "json")
 	if res.ExitCode != 0 {
 		t.Fatalf("list --project from outside failed (%d): %s", res.ExitCode, res.Stderr)
 	}

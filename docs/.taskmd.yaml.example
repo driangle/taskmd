@@ -30,15 +30,14 @@ web:
 # Set to false to disable worklog behavior in agent workflows.
 worklogs: true
 
-# Cross-worktree overlay: merge task state across git worktrees of this repo.
-# auto (default) - active when the directory is inside a git repo with more
-#                  than one worktree; otherwise behaves exactly like false
-# true           - always attempt (still inert outside a git repo)
-# false          - never; each worktree sees only its own task files
-# When active, read commands show each task's most advanced status across all
-# worktrees and 'next' skips tasks claimed in a sibling worktree. Writes always
-# stay in the current worktree. Override per invocation with --worktrees.
-# worktrees: auto
+# Worktree scope: unified (default) or isolated. In a git repo with multiple
+# worktrees, 'unified' merges task state across all of them for reads: each
+# task shows its most advanced status, and 'next' skips tasks claimed in a
+# sibling worktree. Writes always stay in the current worktree, and
+# single-worktree repos and non-git directories are unaffected. Set to
+# 'isolated' if your worktrees keep intentionally independent task states;
+# override per invocation with --worktree-scope isolated.
+# worktree_scope: unified
 
 # Additional directories to skip when scanning (beyond built-in skip list)
 # ignore:

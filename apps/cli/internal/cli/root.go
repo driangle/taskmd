@@ -20,16 +20,16 @@ var (
 	GitDirty  = ""
 
 	// Global flags
-	cfgFile         string
-	stdin           bool
-	quiet           bool
-	verbose         bool
-	debug           bool
-	noColor         bool
-	taskDir         string
-	projectFlag     string
-	allProjectsFlag bool
-	worktreesFlag   string
+	cfgFile           string
+	stdin             bool
+	quiet             bool
+	verbose           bool
+	debug             bool
+	noColor           bool
+	taskDir           string
+	projectFlag       string
+	allProjectsFlag   bool
+	worktreeScopeFlag string
 )
 
 // rootCmd represents the base command
@@ -98,7 +98,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable colored output")
 	rootCmd.PersistentFlags().StringVarP(&taskDir, "task-dir", "d", ".", "task directory to scan")
 
-	rootCmd.PersistentFlags().StringVar(&worktreesFlag, "worktrees", worktreeModeAuto, "cross-worktree overlay: auto (active in multi-worktree repos), true, or false")
+	rootCmd.PersistentFlags().StringVar(&worktreeScopeFlag, "worktree-scope", worktreeScopeUnified, "unified merges task state across sibling git worktrees; isolated reads this checkout's files only")
 
 	rootCmd.PersistentFlags().StringVar(&projectFlag, "project", "", "operate on a registered project by id")
 	rootCmd.PersistentFlags().BoolVar(&allProjectsFlag, "all-projects", false, "aggregate tasks from all registered projects")
@@ -115,7 +115,7 @@ func init() {
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	viper.BindPFlag("no-color", rootCmd.PersistentFlags().Lookup("no-color"))
 	viper.BindPFlag("task-dir", rootCmd.PersistentFlags().Lookup("task-dir"))
-	viper.BindPFlag("worktrees", rootCmd.PersistentFlags().Lookup("worktrees"))
+	viper.BindPFlag("worktree_scope", rootCmd.PersistentFlags().Lookup("worktree-scope"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
 }
 

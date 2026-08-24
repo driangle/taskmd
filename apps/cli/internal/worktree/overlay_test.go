@@ -238,23 +238,21 @@ func TestBuilder_Build_ActivationMatrix(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		mode       string
+		enabled    bool
 		discover   Discoverer
 		wantActive bool
 	}{
-		{name: "auto with siblings", mode: ModeAuto, discover: some, wantActive: true},
-		{name: "auto without siblings", mode: ModeAuto, discover: none},
-		{name: "true with siblings", mode: ModeTrue, discover: some, wantActive: true},
-		{name: "true without siblings", mode: ModeTrue, discover: none},
-		{name: "false with siblings", mode: ModeFalse, discover: some},
-		{name: "zero-value mode is disabled", mode: "", discover: some},
-		{name: "discovery failure deactivates", mode: ModeAuto, discover: failing, wantActive: false},
+		{name: "enabled with siblings", enabled: true, discover: some, wantActive: true},
+		{name: "enabled without siblings", enabled: true, discover: none},
+		{name: "disabled with siblings", discover: some},
+		{name: "zero value is disabled", discover: some},
+		{name: "discovery failure deactivates", enabled: true, discover: failing, wantActive: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			localDir := writeTaskDir(t, map[string]string{"001-alpha.md": taskMD("001", "Alpha", "pending")})
-			b := Builder{Mode: tc.mode, Discover: tc.discover}
+			b := Builder{Enabled: tc.enabled, Discover: tc.discover}
 			overlay, err := b.Build(localDir, scanDirTasks(t, localDir))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -300,7 +298,7 @@ func TestBuilder_SiblingGuard_ScansSiblings(t *testing.T) {
 	sibling := newSiblingWorktree(t, "agent-b", "", map[string]string{
 		"099-sibling.md": taskMD("099", "Sibling only", "pending"),
 	})
-	b := Builder{Mode: ModeAuto, Discover: func(string) ([]gitmeta.Worktree, error) {
+	b := Builder{Enabled: true, Discover: func(string) ([]gitmeta.Worktree, error) {
 		return []gitmeta.Worktree{sibling}, nil
 	}}
 

@@ -1673,19 +1673,20 @@ a sibling worktree fails with a guard error naming where the task lives:
 task 042 exists only in worktree ../agent-b (branch dnc/042/parser); run taskmd there
 ```
 
-**Activation.** Controlled by the `worktrees` key in `.taskmd.yaml`
-([reference](/reference/configuration#worktrees-configuration)), the global
-`--worktrees` flag, or the `TASKMD_WORKTREES` environment variable:
+**Worktree scope.** The merged view is the default scope (`unified`) and
+activates by itself only when sibling worktrees actually exist — single-worktree
+repos and non-git directories behave exactly as before. If your worktrees keep
+intentionally independent task states, switch to `isolated` with
+`worktree_scope: isolated` in `.taskmd.yaml`
+([reference](/reference/configuration#worktree-scope-configuration)), the global
+`--worktree-scope` flag, or `TASKMD_WORKTREE_SCOPE=isolated`:
 
 ```bash
-taskmd list --worktrees=false   # this worktree only
-taskmd next --worktrees=true    # force the overlay on
+taskmd list --worktree-scope isolated   # this checkout's files only
 ```
 
-The default `auto` activates the overlay only in multi-worktree repos; single-worktree
-repos and non-git directories behave exactly as before. One project identity spans all
-worktrees: registering a linked worktree registers the repository once, and
-`--all-projects` counts each repository once.
+One project identity spans all worktrees: registering a linked worktree registers
+the repository once, and `--all-projects` counts each repository once.
 
 The MCP server and web dashboard serve the same merged view — see the
 [MCP guide](/guide/mcp) and [web guide](/guide/web) for the provenance fields their
@@ -1706,7 +1707,7 @@ Available for all commands:
 --no-color            # Disable colored output
 --project string      # Operate on a registered project by ID
 --all-projects        # Aggregate tasks from all registered projects
---worktrees string    # Cross-worktree overlay: auto (default), true, or false
+--worktree-scope string  # unified (default) merges task state across git worktrees; isolated reads this checkout only
 ```
 
 ## Common Workflows

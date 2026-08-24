@@ -1639,11 +1639,11 @@ func TestValidateConfig_WorklogsIsAKnownKey(t *testing.T) {
 	}
 }
 
-// The worktrees key gates the cross-worktree overlay, so setting it must not
-// be reported as an unknown key.
-func TestValidateConfig_WorktreesIsAKnownKey(t *testing.T) {
+// The worktree_scope key gates the cross-worktree overlay, so setting it must
+// not be reported as an unknown key.
+func TestValidateConfig_WorktreeScopeIsAKnownKey(t *testing.T) {
 	v := NewValidator(false)
-	config := &ConfigData{TopKeys: []string{"worktrees"}, ConfigPath: ".taskmd.yaml"}
+	config := &ConfigData{TopKeys: []string{"worktree_scope"}, ConfigPath: ".taskmd.yaml"}
 
 	result := v.ValidateConfig(config)
 

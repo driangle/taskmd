@@ -11,18 +11,6 @@ import (
 	"github.com/driangle/taskmd/sdk/go/scanner"
 )
 
-// Overlay activation modes (the "worktrees" config key / --worktrees flag /
-// TASKMD_WORKTREES env). ModeAuto activates the overlay only when the scan dir
-// is inside a git repo with sibling worktrees; ModeFalse disables it entirely.
-const (
-	ModeAuto  = "auto"
-	ModeTrue  = "true"
-	ModeFalse = "false"
-)
-
-// ValidModes lists the accepted activation mode values.
-var ValidModes = []string{ModeAuto, ModeTrue, ModeFalse}
-
 // Discoverer lists the sibling worktrees of the repo containing scanDir
 // (nil when scanDir is not in a repo). It is a seam so overlay consumers can
 // inject worktrees in tests without git.
@@ -48,22 +36,19 @@ func DiscoverSiblings(scanDir string) ([]gitmeta.Worktree, error) {
 }
 
 // Builder builds the cross-worktree overlay for a scan directory. The zero
-// value is a disabled builder (empty Mode reads as ModeFalse) so surfaces that
-// never configure worktrees keep exactly today's behavior.
+// value is a disabled builder, so surfaces that never configure worktrees keep
+// exactly today's behavior.
 type Builder struct {
-	// Mode is the resolved activation mode; "" behaves as ModeFalse.
-	Mode string
+	// Enabled activates the overlay (worktree_scope "unified", the default;
+	// "isolated" disables). Even when true, the overlay only forms when the
+	// scan dir is inside a git repo with sibling worktrees.
+	Enabled bool
 	// Discover lists sibling worktrees; nil means DiscoverSiblings.
 	Discover Discoverer
 	// Verbose enables warnings about skipped sibling scans on stderr.
 	Verbose bool
 	// IgnoreDirs is passed through to sibling scans, matching the local scan.
 	IgnoreDirs []string
-}
-
-// Enabled reports whether the builder may activate the overlay at all.
-func (b Builder) Enabled() bool {
-	return b.Mode == ModeAuto || b.Mode == ModeTrue
 }
 
 // discoverer returns the configured Discoverer, defaulting to git discovery.
@@ -75,7 +60,7 @@ func (b Builder) discoverer() Discoverer {
 }
 
 // Build builds the overlay for the local task list, or returns nil when the
-// overlay is inactive: mode false, scanDir not in a git repo, or no sibling
+// overlay is inactive: disabled, scanDir not in a git repo, or no sibling
 // worktrees to merge (in which case behavior is identical to today's).
 // Sibling task file paths are left absolute; callers that display them
 // relativize afterwards.
@@ -103,7 +88,7 @@ func (b Builder) Overlay(siblings []gitmeta.Worktree, localTasks []*model.Task) 
 // Siblings discovers sibling worktrees when the builder is enabled. Discovery
 // failures deactivate the overlay rather than failing the command.
 func (b Builder) Siblings(scanDir string) ([]gitmeta.Worktree, error) {
-	if !b.Enabled() {
+	if !b.Enabled {
 		return nil, nil
 	}
 	siblings, err := b.discoverer()(scanDir)

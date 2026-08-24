@@ -157,7 +157,7 @@ func (dp *DataProvider) WatchDirs() []string {
 // signals a worktree membership change: the repo's <common-dir>/worktrees.
 // Empty when the overlay is disabled or the scan dir is not in a git repo.
 func (dp *DataProvider) WatchMetaDirs() []string {
-	if !dp.wt.Enabled() {
+	if !dp.wt.Enabled {
 		return nil
 	}
 	id, err := gitmeta.Resolve(dp.scanDir)

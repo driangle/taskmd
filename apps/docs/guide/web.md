@@ -384,7 +384,7 @@ Returns the updated task detail on success, or a `400` with validation errors fo
 ### Worktree Overlay Fields
 
 When the served directory is inside a git repository with multiple worktrees
-(and `worktrees` is not set to `false` in `.taskmd.yaml`), the API serves the
+(and `worktree_scope` is not set to `isolated` in `.taskmd.yaml`), the API serves the
 merged cross-worktree view: each worktree has its own branch-local copy of the
 task files, and the server combines their coordination state.
 

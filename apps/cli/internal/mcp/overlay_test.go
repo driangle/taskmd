@@ -54,7 +54,7 @@ func newSiblingWorktree(t *testing.T, name, branch string, files map[string]stri
 // siblings — no git involved.
 func overlayBuilder(siblings ...gitmeta.Worktree) worktree.Builder {
 	return worktree.Builder{
-		Mode:     worktree.ModeAuto,
+		Enabled:  true,
 		Discover: func(string) ([]gitmeta.Worktree, error) { return siblings, nil },
 	}
 }

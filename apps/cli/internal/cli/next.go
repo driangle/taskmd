@@ -54,8 +54,8 @@ In a git repository with multiple worktrees, next recommends against the merged
 cross-worktree view: a task that is in-progress (or further along) in a sibling
 worktree is never recommended, so setting a task in-progress in one worktree
 claims it for the whole repository. --explain lists the excluded tasks and the
-worktree that excludes each one. Control the overlay with the global --worktrees
-flag or the 'worktrees' config key (auto, true, or false; default auto).
+worktree that excludes each one. Pass --worktree-scope isolated (or set
+'worktree_scope: isolated' in .taskmd.yaml) to read only this checkout's files.
 
 --strict-priority guarantees priority is the primary sort key: no
 lower-priority task is ranked above an actionable higher-priority one
