@@ -94,6 +94,68 @@ func TestProjectsRegister_FromLinkedWorktreeStoresPrimary(t *testing.T) {
 	}
 }
 
+// TestProjectsRegister_FromSecondLinkedWorktreeIsNoOp covers the spec's exact
+// scenario: register from linked worktree A, then re-register from a
+// *different* linked worktree B. Both resolve to the same repo identity, so
+// the second call is a friendly no-op and the stored path is still the primary
+// root — neither worktree path ever reaches the registry.
+func TestProjectsRegister_FromSecondLinkedWorktreeIsNoOp(t *testing.T) {
+	requireGit(t)
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md": {id: "001", title: "First task", status: "pending"},
+	})
+	wtA := addLinkedWorktree(t, repo, "agent-a")
+	wtB := addLinkedWorktree(t, repo, "agent-b")
+
+	globalCfg := filepath.Join(t.TempDir(), "global.yaml")
+	env := []string{"TASKMD_HOME_CONFIG=" + globalCfg}
+
+	res := runWithEnv(t, wtA, env, "projects", "register", "--id", "myrepo")
+	if res.ExitCode != 0 {
+		t.Fatalf("register from worktree A failed (%d): %s", res.ExitCode, res.Stderr)
+	}
+
+	res = runWithEnv(t, wtB, env, "projects", "register")
+	if res.ExitCode != 0 {
+		t.Fatalf("re-register from worktree B should be a no-op (%d): %s", res.ExitCode, res.Stderr)
+	}
+	if !strings.Contains(res.Stdout, `Already registered as "myrepo"`) {
+		t.Errorf("expected friendly no-op message from worktree B, got: %q", res.Stdout)
+	}
+
+	data, err := os.ReadFile(globalCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), repo) {
+		t.Errorf("registry should still store primary path %q, got:\n%s", repo, data)
+	}
+	for _, wt := range []string{wtA, wtB} {
+		if strings.Contains(string(data), wt) {
+			t.Errorf("registry should not store worktree path %q, got:\n%s", wt, data)
+		}
+	}
+
+	// Exactly one entry, pointing at the primary.
+	res = runWithEnv(t, wtB, env, "projects", "--format", "json")
+	if res.ExitCode != 0 {
+		t.Fatalf("projects failed (%d): %s", res.ExitCode, res.Stderr)
+	}
+	var summaries []struct {
+		ID   string `json:"id"`
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(res.Stdout), &summaries); err != nil {
+		t.Fatalf("parse projects output: %v\n%s", err, res.Stdout)
+	}
+	if len(summaries) != 1 || summaries[0].ID != "myrepo" {
+		t.Fatalf("expected exactly one project myrepo, got %+v", summaries)
+	}
+	if summaries[0].Path != repo {
+		t.Errorf("registered path = %q, want the primary root %q", summaries[0].Path, repo)
+	}
+}
+
 func TestProjectFlag_FromWorktreeScansCurrentCheckout(t *testing.T) {
 	repo := initWorktreeRepo(t, map[string]taskSpec{
 		"001-first.md": {id: "001", title: "First task", status: "pending"},

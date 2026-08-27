@@ -11,6 +11,15 @@ import (
 	"testing"
 )
 
+// requireGit skips the test when git is not on PATH. Tests that drive real
+// worktrees need the binary; without it there is nothing to assert.
+func requireGit(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available on PATH")
+	}
+}
+
 // gitWT runs a git command in dir, failing the test on error.
 func gitWT(t *testing.T, dir string, args ...string) {
 	t.Helper()
