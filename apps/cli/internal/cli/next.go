@@ -54,7 +54,9 @@ In a git repository with multiple worktrees, next recommends against the merged
 cross-worktree view: a task that is in-progress (or further along) in a sibling
 worktree is never recommended, so setting a task in-progress in one worktree
 claims it for the whole repository. --explain lists the excluded tasks and the
-worktree that excludes each one. Pass --worktree-scope isolated (or set
+worktree that excludes each one; in json/yaml the output then becomes an object
+with 'recommendations' and 'excluded' (id, reason, worktree, branch, status)
+instead of the bare recommendation list. Pass --worktree-scope isolated (or set
 'worktree_scope: isolated' in .taskmd.yaml) to read only this checkout's files.
 
 --strict-priority guarantees priority is the primary sort key: no
@@ -70,7 +72,8 @@ priority ranks first.
 scoring component (priority, phase, critical path, downstream, effort) with its
 point value and a total equal to the task's score. Scaled bonuses show their
 base and multiplier so the scaling is visible. The structured score_breakdown
-is always present in json/yaml output.
+is always present in json/yaml output; worktree exclusions are added there only
+under --explain (see the worktree note above).
 
 Output formats: table (default), json, yaml
 
@@ -132,8 +135,10 @@ func runNext(cmd *cobra.Command, args []string) error {
 
 	recTasks := allTasks
 	var worktreeExcluded map[string]string
+	var exclusions []worktreeExclusion
 	if overlay != nil {
 		recTasks, worktreeExcluded = overlay.RecommendationInputs()
+		exclusions = overlay.Exclusions()
 	}
 
 	expandNextShortcutFilters()
@@ -158,46 +163,57 @@ func runNext(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return outputNext(recs, worktreeExcluded)
+	return outputNext(recs, exclusions)
 }
 
 // outputNext renders recommendations in the requested format, appending the
-// worktree exclusion section to --explain table output.
-func outputNext(recs []Recommendation, worktreeExcluded map[string]string) error {
+// worktree exclusion section to --explain output.
+func outputNext(recs []Recommendation, exclusions []worktreeExclusion) error {
 	switch nextFormat {
 	case "json":
-		return outputNextJSON(recs)
+		return WriteJSON(os.Stdout, nextPayload(recs, exclusions))
 	case "yaml":
-		return outputNextYAML(recs)
+		return WriteYAML(os.Stdout, nextPayload(recs, exclusions))
 	case "table":
 		if err := outputNextTable(recs); err != nil {
 			return err
 		}
-		printWorktreeExclusions(worktreeExcluded)
+		printWorktreeExclusions(exclusions)
 		return nil
 	default:
 		return ValidateFormat(nextFormat, []string{"table", "json", "yaml"})
 	}
 }
 
+// nextExplainOutput is the json/yaml shape used only when --explain runs with
+// an active worktree overlay that excluded something. Every other invocation
+// emits the bare recommendation list, unchanged.
+type nextExplainOutput struct {
+	Recommendations []Recommendation    `json:"recommendations" yaml:"recommendations"`
+	Excluded        []worktreeExclusion `json:"excluded" yaml:"excluded"`
+}
+
+// nextPayload returns the value to serialize: the bare recommendation list, or
+// the explain wrapper carrying the worktree exclusions alongside it.
+func nextPayload(recs []Recommendation, exclusions []worktreeExclusion) any {
+	if !nextExplain || len(exclusions) == 0 {
+		return recs
+	}
+	return nextExplainOutput{Recommendations: recs, Excluded: exclusions}
+}
+
 // printWorktreeExclusions lists, under --explain, tasks the worktree overlay
 // kept out of the recommendations and which sibling worktree excludes them.
-func printWorktreeExclusions(excluded map[string]string) {
-	if !nextExplain || len(excluded) == 0 {
+func printWorktreeExclusions(exclusions []worktreeExclusion) {
+	if !nextExplain || len(exclusions) == 0 {
 		return
 	}
-
-	ids := make([]string, 0, len(excluded))
-	for id := range excluded {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 
 	r := getRenderer()
 	fmt.Println()
 	fmt.Println(formatLabel("Excluded by sibling worktrees:", r))
-	for _, id := range ids {
-		fmt.Printf("  %s  %s\n", formatTaskID(id, r), excluded[id])
+	for _, e := range exclusions {
+		fmt.Printf("  %s  %s\n", formatTaskID(e.ID, r), e.Reason)
 	}
 }
 
@@ -376,14 +392,6 @@ func loadPhaseOrder() []string {
 		}
 	}
 	return ids
-}
-
-func outputNextJSON(recs []Recommendation) error {
-	return WriteJSON(os.Stdout, recs)
-}
-
-func outputNextYAML(recs []Recommendation) error {
-	return WriteYAML(os.Stdout, recs)
 }
 
 // validNextColumns lists all valid column names for the next command.

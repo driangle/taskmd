@@ -15,4 +15,7 @@ type (
 	// worktreeCopyEntry is one copy of a task in one worktree, for get's
 	// Worktrees section.
 	worktreeCopyEntry = worktree.CopyEntry
+	// worktreeExclusion is one task the overlay keeps out of next's
+	// recommendations, with the provenance that explains why.
+	worktreeExclusion = worktree.Exclusion
 )

@@ -270,6 +270,28 @@ The structured `score_breakdown` array is **always** included in `json` and
 `yaml` output (independent of `--explain`), and its component points always sum
 to `score`.
 
+Worktree exclusions, by contrast, appear in `json`/`yaml` **only** under
+`--explain` in a repository where the overlay excluded something. In that one
+case the payload becomes an object instead of the bare recommendation array:
+
+```json
+{
+  "recommendations": [{ "rank": 1, "id": "002", "title": "Free" }],
+  "excluded": [
+    {
+      "id": "001",
+      "reason": "in-progress in worktree agent-b (branch dnc/001)",
+      "worktree": "agent-b",
+      "branch": "dnc/001",
+      "status": "in-progress"
+    }
+  ]
+}
+```
+
+Without `--explain`, or in a repository with no cross-worktree overlay, the
+output shape is unchanged — a plain array of recommendations.
+
 **Scoping to a task's graph with `--root`:**
 
 `--root <ID>` limits recommendations to the tasks _reachable from_ `<ID>`:
@@ -300,7 +322,7 @@ and it composes with the other filters.
 | `--status` | | Shortcut for `--filter status=<value>` |
 | `--priority` | | Shortcut for `--filter priority=<value>` |
 | `--columns` | `rank,id,title,priority,effort,file,reason` | Comma-separated columns for table output |
-| `--explain` | `false` | Show an itemized score breakdown beneath each recommendation (table format). `score_breakdown` is always present in json/yaml |
+| `--explain` | `false` | Show an itemized score breakdown beneath each recommendation (table format). `score_breakdown` is always present in json/yaml; worktree exclusions are added to json/yaml only under `--explain` |
 | `--strict-phases` | `false` | Enforce strict phase ordering (earlier phases always rank first) |
 | `--strict-priority` | `false` | Enforce strict priority ordering (higher priority always ranks first; score breaks ties within a tier). With `--strict-phases`, phase is primary and priority secondary |
 | `--quick-wins` | `false` | Show only quick wins (tasks at the lowest configured effort) |
@@ -1663,7 +1685,9 @@ taskmd set 042 --status in-progress
 
 Because `next` recommends against effective status, a task that is `in-progress` (or
 further along) in **any** worktree is never handed to an agent in another worktree.
-`next --explain` lists the excluded tasks under "Excluded by sibling worktrees".
+`next --explain` lists the excluded tasks under "Excluded by sibling worktrees", and
+carries the same provenance as an `excluded` array in `json`/`yaml` (see
+[next](#next-find-what-to-work-on)).
 
 **Writes stay local.** Mutations (`set`, `add`, `rm`, `archive`) always write to the
 current worktree's files — never to a sibling's. Targeting a task that exists only in

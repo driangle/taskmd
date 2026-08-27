@@ -1,11 +1,12 @@
 ---
 title: "Include worktree exclusions in next --explain JSON/YAML output"
 id: "01m10g4dd"
-status: pending
+status: completed
 priority: low
 type: feature
 tags: ["worktrees"]
 created: "2026-08-27"
+completed_at: 2026-08-27
 ---
 
 # Include worktree exclusions in next --explain JSON/YAML output
@@ -21,13 +22,13 @@ the exclusion provenance entirely.
 
 ## Tasks
 
-- [ ] Add worktree exclusions to the JSON/YAML `--explain` payload as
+- [x] Add worktree exclusions to the JSON/YAML `--explain` payload as
       structured fields (e.g. an `excluded` list with `id`, `reason`,
       `worktree`, `branch`), not preformatted strings
-- [ ] Keep the table output unchanged
-- [ ] Emit the fields only when the overlay is active and `--explain` is set,
+- [x] Keep the table output unchanged
+- [x] Emit the fields only when the overlay is active and `--explain` is set,
       so existing consumers see no shape change otherwise
-- [ ] Unit tests: `next --explain --format json` and `--format yaml` with a
+- [x] Unit tests: `next --explain --format json` and `--format yaml` with a
       sibling-excluded task assert the exclusion entry; without `--explain` or
       without overlay the field is absent
 

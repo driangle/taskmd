@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
 	"github.com/driangle/taskmd/sdk/go/model"
@@ -132,13 +133,7 @@ func TestBuildWorktreeOverlay_ActivationMatrix(t *testing.T) {
 }
 
 func TestNextCommand_WorktreeOverlay_ExcludesSiblingClaims(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "pending"),
-		"002-free.md":    overlayTaskMD("002", "Free", "pending"),
-	})
-	siblings := []gitmeta.Worktree{newSiblingWorktree(t, "agent-b", "dnc/001", map[string]string{
-		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "in-progress"),
-	})}
+	repo, siblings := claimedRepoWithSibling(t)
 
 	res := repo.RunWith(stubSiblings(siblings, nil), "next", "--format", "json")
 	if res.Err != nil {
@@ -159,13 +154,7 @@ func TestNextCommand_WorktreeOverlay_ExcludesSiblingClaims(t *testing.T) {
 }
 
 func TestNextCommand_WorktreeOverlay_ExplainNamesWorktree(t *testing.T) {
-	repo := newTaskRepo(t, map[string]string{
-		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "pending"),
-		"002-free.md":    overlayTaskMD("002", "Free", "pending"),
-	})
-	siblings := []gitmeta.Worktree{newSiblingWorktree(t, "agent-b", "dnc/001", map[string]string{
-		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "in-progress"),
-	})}
+	repo, siblings := claimedRepoWithSibling(t)
 
 	res := repo.RunWith(stubSiblings(siblings, nil), "next", "--explain")
 	if res.Err != nil {
@@ -176,6 +165,114 @@ func TestNextCommand_WorktreeOverlay_ExplainNamesWorktree(t *testing.T) {
 	}
 	if !strings.Contains(res.Stdout, "in-progress in worktree agent-b (branch dnc/001)") {
 		t.Errorf("--explain output does not name the excluding worktree:\n%s", res.Stdout)
+	}
+}
+
+// claimedRepoWithSibling sets up a repo where 001 is claimed in-progress by
+// sibling worktree agent-b on branch dnc/001, and 002 is free.
+func claimedRepoWithSibling(t *testing.T) (*taskRepo, []gitmeta.Worktree) {
+	t.Helper()
+	repo := newTaskRepo(t, map[string]string{
+		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "pending"),
+		"002-free.md":    overlayTaskMD("002", "Free", "pending"),
+	})
+	siblings := []gitmeta.Worktree{newSiblingWorktree(t, "agent-b", "dnc/001", map[string]string{
+		"001-claimed.md": overlayTaskMD("001", "Claimed elsewhere", "in-progress"),
+	})}
+	return repo, siblings
+}
+
+func TestNextCommand_WorktreeOverlay_ExplainJSONIncludesExclusions(t *testing.T) {
+	repo, siblings := claimedRepoWithSibling(t)
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "next", "--explain", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("next --explain --format json failed: %v", res.Err)
+	}
+
+	var out struct {
+		Recommendations []Recommendation    `json:"recommendations"`
+		Excluded        []worktreeExclusion `json:"excluded"`
+	}
+	if err := json.Unmarshal([]byte(res.Stdout), &out); err != nil {
+		t.Fatalf("parse output: %v\n%s", err, res.Stdout)
+	}
+	if len(out.Recommendations) != 1 || out.Recommendations[0].ID != "002" {
+		t.Errorf("recommendations = %+v, want only 002", out.Recommendations)
+	}
+	if len(out.Excluded) != 1 {
+		t.Fatalf("excluded = %+v, want one entry for 001", out.Excluded)
+	}
+	got := out.Excluded[0]
+	want := worktreeExclusion{
+		ID:       "001",
+		Reason:   "in-progress in worktree agent-b (branch dnc/001)",
+		Worktree: "agent-b",
+		Branch:   "dnc/001",
+		Status:   "in-progress",
+	}
+	if got != want {
+		t.Errorf("exclusion = %+v, want %+v", got, want)
+	}
+}
+
+func TestNextCommand_WorktreeOverlay_ExplainYAMLIncludesExclusions(t *testing.T) {
+	repo, siblings := claimedRepoWithSibling(t)
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "next", "--explain", "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("next --explain --format yaml failed: %v", res.Err)
+	}
+
+	var out struct {
+		Recommendations []Recommendation    `yaml:"recommendations"`
+		Excluded        []worktreeExclusion `yaml:"excluded"`
+	}
+	if err := yaml.Unmarshal([]byte(res.Stdout), &out); err != nil {
+		t.Fatalf("parse output: %v\n%s", err, res.Stdout)
+	}
+	if len(out.Recommendations) != 1 || out.Recommendations[0].ID != "002" {
+		t.Errorf("recommendations = %+v, want only 002", out.Recommendations)
+	}
+	if len(out.Excluded) != 1 || out.Excluded[0].ID != "001" || out.Excluded[0].Worktree != "agent-b" {
+		t.Errorf("excluded = %+v, want one entry for 001 in agent-b", out.Excluded)
+	}
+	if out.Excluded[0].Branch != "dnc/001" || out.Excluded[0].Status != "in-progress" {
+		t.Errorf("exclusion missing branch/status provenance: %+v", out.Excluded[0])
+	}
+}
+
+// Without --explain, or without an overlay, the json payload stays the bare
+// recommendation array it has always been.
+func TestNextCommand_JSONShapeUnchangedWithoutExplainOrOverlay(t *testing.T) {
+	cases := []struct {
+		name     string
+		siblings bool
+		args     []string
+	}{
+		{name: "overlay without explain", siblings: true, args: []string{"next", "--format", "json"}},
+		{name: "explain without overlay", args: []string{"next", "--explain", "--format", "json"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, siblings := claimedRepoWithSibling(t)
+			if !tc.siblings {
+				siblings = nil
+			}
+
+			res := repo.RunWith(stubSiblings(siblings, nil), tc.args...)
+			if res.Err != nil {
+				t.Fatalf("next failed: %v", res.Err)
+			}
+			var recs []Recommendation
+			if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+				t.Fatalf("output is not a bare recommendation array: %v\n%s", err, res.Stdout)
+			}
+			if len(recs) == 0 {
+				t.Fatalf("expected recommendations, got none:\n%s", res.Stdout)
+			}
+		})
 	}
 }
 

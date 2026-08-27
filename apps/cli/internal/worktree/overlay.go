@@ -93,17 +93,48 @@ func (t *Task) ExclusionReason() string {
 	return fmt.Sprintf("%s in worktree %s (branch %s)", t.EffectiveStatus, t.Worktree, t.branchLabel())
 }
 
+// Exclusion is one task the overlay keeps out of next's recommendations,
+// together with the provenance that explains why. Reason is the same sentence
+// the table view prints; the remaining fields carry it structurally for
+// json/yaml consumers.
+type Exclusion struct {
+	ID       string `json:"id" yaml:"id"`
+	Reason   string `json:"reason" yaml:"reason"`
+	Worktree string `json:"worktree,omitempty" yaml:"worktree,omitempty"`
+	Branch   string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Status   string `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// Exclusions returns every overlay-imposed exclusion, sorted by task ID.
+func (o *Overlay) Exclusions() []Exclusion {
+	var exclusions []Exclusion
+	for _, ot := range o.Tasks {
+		reason := ot.ExclusionReason()
+		if reason == "" {
+			continue
+		}
+		exclusions = append(exclusions, Exclusion{
+			ID:       ot.Task.ID,
+			Reason:   reason,
+			Worktree: ot.Worktree,
+			Branch:   ot.Branch,
+			Status:   string(ot.EffectiveStatus),
+		})
+	}
+	sort.Slice(exclusions, func(i, j int) bool { return exclusions[i].ID < exclusions[j].ID })
+	return exclusions
+}
+
 // RecommendationInputs returns the task list and exclusion map to feed the
 // next recommender. Effective statuses are substituted on copies (so a task
 // completed in a sibling unblocks its local dependents) and sibling-suppressed
 // tasks are mapped to a human-readable exclusion reason; they stay in the task
 // list so dependency, children, and critical-path resolution still see them.
 func (o *Overlay) RecommendationInputs() ([]*model.Task, map[string]string) {
-	excluded := make(map[string]string)
-	for _, ot := range o.Tasks {
-		if reason := ot.ExclusionReason(); reason != "" {
-			excluded[ot.Task.ID] = reason
-		}
+	exclusions := o.Exclusions()
+	excluded := make(map[string]string, len(exclusions))
+	for _, e := range exclusions {
+		excluded[e.ID] = e.Reason
 	}
 	return o.EffectiveTasks(), excluded
 }

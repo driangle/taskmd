@@ -191,7 +191,7 @@ warning when the overlay is active.
 
 | Command | Behavior with overlay active |
 |---------|------------------------------|
-| `next` | Recommends against **effective** status: a task `in-progress`/`in-review`/`completed` in any sibling is not actionable. Local `in-progress` tasks keep today's resume semantics. `--explain` names the excluding worktree. |
+| `next` | Recommends against **effective** status: a task `in-progress`/`in-review`/`completed` in any sibling is not actionable. Local `in-progress` tasks keep today's resume semantics. `--explain` names the excluding worktree — as a section in table output, and as a structured `excluded` array (id, reason, worktree, branch, status) alongside `recommendations` in json/yaml. |
 | `list` | Extra `WORKTREE` column (only rendered when the overlay is active and at least one task is annotated). `--status` filters on effective status. Sibling-only tasks included, marked. |
 | `board`, `stats`, `graph`, `report`, `metrics`, `tracks`, `phases` | Operate on effective status. |
 | `get` | Shows the local copy, plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ. |
