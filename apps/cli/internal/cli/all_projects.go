@@ -7,10 +7,17 @@ import (
 	"github.com/driangle/taskmd/sdk/go/model"
 )
 
-// ProjectTask wraps a task with its originating project ID.
+// ProjectTask wraps a task with its originating project ID. When that
+// project's worktree overlay is active the embedded task carries the effective
+// (cross-worktree) status and the provenance fields name the winning copy;
+// they are omitted entirely otherwise, so single-worktree and non-git projects
+// serialize exactly as before.
 type ProjectTask struct {
 	ProjectID string `json:"project" yaml:"project"`
 	*model.Task
+	Worktree   string `json:"worktree,omitempty" yaml:"worktree,omitempty"`
+	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	RemoteOnly bool   `json:"remote_only,omitempty" yaml:"remote_only,omitempty"`
 }
 
 // QualifiedID returns the task ID prefixed with the project ID.
@@ -36,17 +43,52 @@ func scanAllProjects() ([]*ProjectTask, error) {
 
 	var all []*ProjectTask
 	for _, entry := range entries {
-		tasks, err := scanProjectTasks(entry)
+		scan, err := scanProject(entry)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: skipping project %q: %v\n", entry.ID, err)
 			continue
 		}
-		for _, t := range tasks {
-			all = append(all, &ProjectTask{ProjectID: entry.ID, Task: t})
-		}
+		all = append(all, projectTasks(entry.ID, scan)...)
 	}
 
 	return all, nil
+}
+
+// projectTasks wraps one project's scanned tasks, attaching worktree
+// provenance when that project's overlay is active.
+func projectTasks(projectID string, scan projectScan) []*ProjectTask {
+	tasks := make([]*ProjectTask, 0, len(scan.tasks))
+	for _, t := range scan.tasks {
+		pt := &ProjectTask{ProjectID: projectID, Task: t}
+		if ot := scan.provenance(t.ID); ot != nil {
+			pt.Worktree = ot.Worktree
+			pt.Branch = ot.Branch
+			pt.RemoteOnly = ot.RemoteOnly
+		}
+		tasks = append(tasks, pt)
+	}
+	return tasks
+}
+
+// projectWorktreeCell renders a task's worktree provenance, marking
+// sibling-only tasks with a trailing * exactly as the single-project list does.
+func projectWorktreeCell(pt *ProjectTask) string {
+	cell := pt.Worktree
+	if pt.RemoteOnly {
+		cell += "*"
+	}
+	return cell
+}
+
+// annotated reports whether any task carries sibling-worktree provenance,
+// deciding whether the WORKTREE column is worth rendering.
+func annotated(ptasks []*ProjectTask) bool {
+	for _, pt := range ptasks {
+		if pt.Worktree != "" || pt.RemoteOnly {
+			return true
+		}
+	}
+	return false
 }
 
 // injectProjectColumn adds a "project" column after the first column if not already present.
@@ -65,22 +107,4 @@ func injectProjectColumn(columns []string) []string {
 	result = append(result, "project")
 	result = append(result, columns[insertIdx:]...)
 	return result
-}
-
-// scanProjectTasks scans a single project and returns its tasks with relative file paths.
-func scanProjectTasks(entry GlobalProjectEntry) ([]*model.Task, error) {
-	info, err := os.Stat(entry.Path)
-	if err != nil || !info.IsDir() {
-		return nil, fmt.Errorf("path %q is not accessible", entry.Path)
-	}
-
-	scanDir := resolveProjectScanDir(entry.Path)
-	taskScanner := newTaskScanner(scanDir, GlobalFlags{})
-	result, err := taskScanner.Scan()
-	if err != nil {
-		return nil, fmt.Errorf("scan failed: %w", err)
-	}
-
-	makeFilePathsRelative(result.Tasks, scanDir)
-	return result.Tasks, nil
 }

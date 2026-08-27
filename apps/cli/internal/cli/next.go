@@ -248,6 +248,10 @@ func collectAllProjectRecs() ([]ProjectRecommendation, error) {
 		return nil, fmt.Errorf("no projects registered in global registry")
 	}
 
+	// Scan each repository once, from the current worktree when the command
+	// runs inside it — the same dedupe list --all-projects applies.
+	entries = dedupeRepoEntries(entries)
+
 	var allRecs []ProjectRecommendation
 	for _, entry := range entries {
 		recs, recErr := recommendForProject(entry)
@@ -262,12 +266,15 @@ func collectAllProjectRecs() ([]ProjectRecommendation, error) {
 	return allRecs, nil
 }
 
-// recommendForProject scans a project and returns recommendations.
+// recommendForProject scans a project and returns recommendations. With that
+// project's worktree overlay active, tasks claimed in one of its sibling
+// worktrees are excluded just as they are inside the project itself.
 func recommendForProject(entry GlobalProjectEntry) ([]Recommendation, error) {
-	tasks, err := scanProjectTasks(entry)
+	scan, err := scanProject(entry)
 	if err != nil {
 		return nil, err
 	}
+	tasks, excluded := scan.recommendationInputs()
 	return next.Recommend(tasks, next.Options{
 		Limit:          0, // get all, we'll limit after merging
 		Filters:        nextFilters,
@@ -279,6 +286,7 @@ func recommendForProject(entry GlobalProjectEntry) ([]Recommendation, error) {
 		StrictPhases:   nextStrictPhases,
 		StrictPriority: nextStrictPriority,
 		Efforts:        resolveEffortScale(),
+		Excluded:       excluded,
 	})
 }
 

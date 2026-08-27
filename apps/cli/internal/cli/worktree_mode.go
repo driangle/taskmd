@@ -42,15 +42,7 @@ func resolveWorktreeScope() (bool, error) {
 	if f := rootCmd.PersistentFlags().Lookup("worktree-scope"); f != nil && f.Changed {
 		v = worktreeScopeFlag
 	}
-	switch v {
-	case "", worktreeScopeUnified:
-		return true, nil
-	case worktreeScopeIsolated:
-		return false, nil
-	default:
-		return false, invalidValueError("worktree_scope", v,
-			[]string{worktreeScopeUnified, worktreeScopeIsolated})
-	}
+	return worktreeScopeEnabled(v)
 }
 
 // discoverSiblingWorktrees lists the sibling worktrees of the repo containing

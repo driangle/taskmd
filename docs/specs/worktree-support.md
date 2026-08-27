@@ -247,7 +247,14 @@ A worktree is not a new project — it is another mount of the same project:
   worktree's* task dir (local base + overlay), not the primary's.
 - **`--all-projects`** counts each repo once. The scanned root for a repo is the
   worktree the command runs in when inside that repo, else the registered primary;
-  the overlay applies per-repo when active.
+  the overlay applies per-repo when active. Activation is resolved **per project**,
+  from that project's own `.taskmd.yaml` read raw (the §2 viper-bypassing pattern) —
+  the invoking project's config never leaks into the others, so one repo can be
+  `isolated` while the rest merge. A `--worktree-scope` flag or
+  `TASKMD_WORKTREE_SCOPE` env set for the invocation is a deliberate per-run
+  instruction and overrides every project. A project whose `worktree_scope` is
+  invalid is skipped with the usual `Warning: skipping project` line rather than
+  failing the whole run.
 - Registry entries are still plain `{id, name, path}` — no schema change to
   `~/.taskmd.yaml`.
 

@@ -175,3 +175,103 @@ func TestAllProjects_CountsEachRepoOnce(t *testing.T) {
 		t.Errorf("expected current worktree's status in-progress, got %q", status)
 	}
 }
+
+// TestAllProjects_OverlayAppliesPerRepo covers spec §7: with the overlay
+// active, --all-projects serves each repo's effective status, so a claim made
+// in a sibling worktree is visible from outside the repo entirely.
+func TestAllProjects_OverlayAppliesPerRepo(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md":  {id: "001", title: "First task", status: "pending"},
+		"002-second.md": {id: "002", title: "Second task", status: "pending"},
+	})
+	wt := addLinkedWorktree(t, repo, "claim-wt")
+	env := writeGlobalRegistry(t, [2]string{"proj", repo})
+
+	// An agent in the linked worktree claims 001. The primary still has it
+	// pending on disk.
+	mustRun(t, wt, "set", "001", "--status", "in-progress")
+
+	neutral := t.TempDir()
+
+	res := runWithEnv(t, neutral, env, "list", "--all-projects", "--format", "json")
+	if res.ExitCode != 0 {
+		t.Fatalf("list --all-projects failed (%d): %s", res.ExitCode, res.Stderr)
+	}
+	var tasks []struct {
+		ID       string `json:"id"`
+		Status   string `json:"status"`
+		Worktree string `json:"worktree"`
+	}
+	if err := json.Unmarshal([]byte(res.Stdout), &tasks); err != nil {
+		t.Fatalf("parse all-projects output: %v\n%s", err, res.Stdout)
+	}
+	var claimed *struct {
+		ID       string `json:"id"`
+		Status   string `json:"status"`
+		Worktree string `json:"worktree"`
+	}
+	for i := range tasks {
+		if tasks[i].ID == "001" {
+			claimed = &tasks[i]
+		}
+	}
+	if claimed == nil {
+		t.Fatalf("task 001 missing from --all-projects:\n%s", res.Stdout)
+	}
+	if claimed.Status != "in-progress" {
+		t.Errorf("expected effective status in-progress from the sibling claim, got %q", claimed.Status)
+	}
+	if claimed.Worktree != "claim-wt" {
+		t.Errorf("expected provenance worktree claim-wt, got %q", claimed.Worktree)
+	}
+
+	// next --all-projects must not hand out the already-claimed task.
+	res = runWithEnv(t, neutral, env, "next", "--all-projects", "--format", "json")
+	if res.ExitCode != 0 {
+		t.Fatalf("next --all-projects failed (%d): %s", res.ExitCode, res.Stderr)
+	}
+	var recs []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
+		t.Fatalf("parse next output: %v\n%s", err, res.Stdout)
+	}
+	for _, rec := range recs {
+		if rec.ID == "001" {
+			t.Errorf("next --all-projects recommended 001, claimed in worktree claim-wt:\n%s", res.Stdout)
+		}
+	}
+}
+
+// TestAllProjects_IsolatedProjectStaysLocal covers the per-project half of
+// spec §7: scope comes from each project's own .taskmd.yaml, so an opted-out
+// repo is served local-only no matter where the command runs.
+func TestAllProjects_IsolatedProjectStaysLocal(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md": {id: "001", title: "First task", status: "pending"},
+	})
+	wt := addLinkedWorktree(t, repo, "isolated-wt")
+
+	// The project opts out of merging. Commit it so the linked worktree keeps
+	// the same task files.
+	cfg := filepath.Join(repo, ".taskmd.yaml")
+	data, err := os.ReadFile(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg, append(data, []byte("\nworktree_scope: isolated\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	env := writeGlobalRegistry(t, [2]string{"proj", repo})
+	mustRun(t, wt, "set", "001", "--status", "in-progress")
+
+	neutral := t.TempDir()
+	res := runWithEnv(t, neutral, env, "list", "--all-projects", "--format", "json")
+	if res.ExitCode != 0 {
+		t.Fatalf("list --all-projects failed (%d): %s", res.ExitCode, res.Stderr)
+	}
+	if statuses := listStatuses(t, res); statuses["001"] != "pending" {
+		t.Errorf("isolated project must be served local-only, got status %q", statuses["001"])
+	}
+}

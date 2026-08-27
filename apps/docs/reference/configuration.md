@@ -180,8 +180,15 @@ worktree_scope: isolated
 - All worktrees of one repository resolve to a single registered project — no
   duplicate entries or double-counting in `--all-projects`.
 
+**Across projects.** `--all-projects` reads merge each repository's worktrees
+too, so a task claimed in a sibling worktree shows the same effective status
+whether you ask from inside that repo or from a cross-project view. Each
+project's scope comes from **its own** `.taskmd.yaml`, so one repository can set
+`worktree_scope: isolated` while the others keep merging.
+
 Override per invocation with the global `--worktree-scope` flag or the
-`TASKMD_WORKTREE_SCOPE` environment variable. See the
+`TASKMD_WORKTREE_SCOPE` environment variable — unlike the config key, an
+explicit override applies to every project in the run. See the
 [CLI guide](/guide/cli#git-worktrees) for the full behavior reference.
 
 ## Usage Examples

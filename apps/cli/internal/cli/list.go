@@ -175,28 +175,17 @@ func runListAllProjects() error {
 }
 
 // projectTaskOutput is the JSON/YAML representation for --all-projects output.
-type projectTaskOutput struct {
-	Project string `json:"project" yaml:"project"`
-	*model.Task
-}
-
+// ProjectTask serializes as the task's own fields plus "project" and, when
+// that project's worktree overlay is active, the provenance fields.
 func outputProjectJSON(ptasks []*ProjectTask) error {
-	out := make([]projectTaskOutput, len(ptasks))
-	for i, pt := range ptasks {
-		out[i] = projectTaskOutput{Project: pt.ProjectID, Task: pt.Task}
+	if len(ptasks) == 0 {
+		return WriteJSON(os.Stdout, []*ProjectTask{})
 	}
-	if len(out) == 0 {
-		return WriteJSON(os.Stdout, []projectTaskOutput{})
-	}
-	return WriteJSON(os.Stdout, out)
+	return WriteJSON(os.Stdout, ptasks)
 }
 
 func outputProjectYAML(ptasks []*ProjectTask) error {
-	out := make([]projectTaskOutput, len(ptasks))
-	for i, pt := range ptasks {
-		out[i] = projectTaskOutput{Project: pt.ProjectID, Task: pt.Task}
-	}
-	return WriteYAML(os.Stdout, out)
+	return WriteYAML(os.Stdout, ptasks)
 }
 
 func outputProjectTable(ptasks []*ProjectTask, columnsStr string) error {
@@ -210,6 +199,9 @@ func outputProjectTable(ptasks []*ProjectTask, columnsStr string) error {
 		columns[i] = strings.TrimSpace(col)
 	}
 	columns = injectProjectColumn(columns)
+	if annotated(ptasks) {
+		columns = injectWorktreeColumn(columns)
+	}
 
 	r := getRenderer()
 	tw := NewTableWriter()
@@ -220,13 +212,17 @@ func outputProjectTable(ptasks []*ProjectTask, columnsStr string) error {
 		plain := make([]string, len(columns))
 		colored := make([]string, len(columns))
 		for i, col := range columns {
-			if col == "project" {
+			switch col {
+			case "project":
 				plain[i] = pt.ProjectID
 				colored[i] = pt.ProjectID
-			} else if col == "id" {
+			case "id":
 				plain[i] = pt.QualifiedID()
 				colored[i] = formatTaskID(pt.QualifiedID(), r)
-			} else {
+			case "worktree":
+				plain[i] = projectWorktreeCell(pt)
+				colored[i] = plain[i]
+			default:
 				plain[i] = getColumnValue(pt.Task, col)
 				colored[i] = colorizeColumn(pt.Task, col, r)
 			}

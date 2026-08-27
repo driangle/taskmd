@@ -1686,7 +1686,10 @@ taskmd list --worktree-scope isolated   # this checkout's files only
 ```
 
 One project identity spans all worktrees: registering a linked worktree registers
-the repository once, and `--all-projects` counts each repository once.
+the repository once, and `--all-projects` counts each repository once. Cross-project
+reads merge each repository's worktrees as well, with every project's scope taken
+from its own `.taskmd.yaml`; a `--worktree-scope` flag or `TASKMD_WORKTREE_SCOPE`
+env applies to the whole run.
 
 The MCP server and web dashboard serve the same merged view — see the
 [MCP guide](/guide/mcp) and [web guide](/guide/web) for the provenance fields their
