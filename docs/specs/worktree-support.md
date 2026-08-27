@@ -1,6 +1,8 @@
 # Git Worktree Support
 
-**Status:** Implemented (2026-08-23; owner-aware `next` implemented and reverted — see §6)
+**Status:** Implemented (2026-08-23; owner-aware `next` implemented and reverted — see §6).
+One known gap remains, marked pending inline: sibling-only IDs are not resolvable by
+`get` (§3, task `01m10n2qw`).
 **Date:** 2026-08-22
 **Related ADRs:** [0004 — Local git metadata is core](../adr/0004-local-git-metadata-is-core.md),
 [0005 — Worktrees are facets of one project](../adr/0005-worktrees-are-facets-of-one-project.md)
@@ -118,6 +120,7 @@ type Worktree struct {
     Root     string // worktree top-level path
     Branch   string // e.g. "dnc/01kz.../parser" ("" when detached)
     IsLocal  bool   // true for the worktree the command runs in
+    TasksDir string // absolute tasks dir, from this worktree's own .taskmd.yaml
 }
 
 func ListWorktrees(id *Identity) ([]Worktree, error)
@@ -125,6 +128,7 @@ func ListWorktrees(id *Identity) ([]Worktree, error)
 
 Backed by `git worktree list --porcelain`. Entries are filtered:
 
+- **bare** worktrees are skipped — a bare repo has no checkout, so no task files
 - **prunable** worktrees (deleted directories) are skipped
 - worktrees whose root no longer exists on disk are skipped
 - worktrees with no `.taskmd.yaml` at their root are skipped — they have opted out
@@ -160,17 +164,24 @@ scan tasks build a **worktree overlay**:
    file mtime, newest wins. When the winning copy is remote, the task is annotated
    with provenance: the worktree root basename and branch.
 4. Tasks that exist **only** in a sibling worktree (created on another branch) are
-   appended to read views, annotated the same way. They are visible but not
-   addressable by mutations (see §5).
+   appended to the list-shaped and status-aggregating read views, annotated the
+   same way. They are visible but not addressable by mutations (see the `set`
+   row in §4).
+
+   > **Pending:** `get` is the exception — it resolves an ID against the local
+   > task list only, so a sibling-only ID reports "not found" rather than
+   > rendering the sibling copy. Tracked by task `01m10n2qw`.
 
 The overlay result is carried on a wrapper, generalizing the existing
 `ProjectTask` pattern from `all_projects.go`:
 
 ```go
-// OverlayTask decorates a task with cross-worktree provenance.
-type OverlayTask struct {
+// Task decorates a task with cross-worktree provenance. It lives in
+// internal/worktree and is aliased as OverlayTask in internal/cli
+// (`type OverlayTask = worktree.Task`), which is how the CLI code names it.
+type Task struct {
     *model.Task                 // base copy (local when one exists)
-    EffectiveStatus string      // max status across copies
+    EffectiveStatus model.Status // max status across copies
     EffectiveOwner  string      // owner on the winning copy
     Worktree        string      // "" when the winning copy is local
     Branch          string      // branch of the winning copy
@@ -193,8 +204,8 @@ warning when the overlay is active.
 |---------|------------------------------|
 | `next` | Recommends against **effective** status: a task `in-progress`/`in-review`/`completed` in any sibling is not actionable. Local `in-progress` tasks keep today's resume semantics. `--explain` names the excluding worktree — as a section in table output, and as a structured `excluded` array (id, reason, worktree, branch, status) alongside `recommendations` in json/yaml. |
 | `list` | Extra `WORKTREE` column (only rendered when the overlay is active and at least one task is annotated). `--status` filters on effective status. Sibling-only tasks included, marked. |
-| `board`, `stats`, `graph`, `report`, `metrics`, `tracks`, `phases` | Operate on effective status. |
-| `get` | Shows the local copy, plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ. |
+| `board`, `stats`, `graph`, `report`, `tracks`, `phases` | Operate on effective status. |
+| `get` | Shows the local copy, plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ. Sibling-only IDs are not yet resolvable — see the pending note in §3. |
 | `set`, `add`, `rm`, `archive` | **Unchanged: local files only.** `set` on an ID that resolves only to a sibling copy fails with: `task 042 exists only in worktree ../agent-b (branch dnc/042/parser); run taskmd there`. This is the guard task `01kzdpvr1` asked for. |
 | `validate` | Warns on divergent terminal states across worktrees. Duplicate IDs *within* one worktree remain an error, as today; the same ID across worktrees is the expected case, never a duplicate. |
 | `mcp` / web | Serve the merged view for reads; mutations keep local-only semantics. See §9. |
@@ -208,8 +219,12 @@ worktree_scope: unified   # unified | isolated (default: unified)
 
 - `unified` (default) — reads merge task state across all worktrees. The overlay
   still only forms when the directory is inside a git repo with more than one
-  worktree; single-worktree repos and non-repos see zero behavior change, zero
-  extra git invocations beyond the one identity probe.
+  worktree; single-worktree repos and non-repos see zero behavior change and no
+  extra directory scans. They are not free of git, though: discovery runs
+  `rev-parse` and then `git worktree list` unconditionally inside a repo, because
+  "how many worktrees are there" is exactly what the second call answers. So a
+  single-worktree repo pays two git invocations per command — an accepted cost.
+  A non-repo pays only the failed `rev-parse` probe.
 - `isolated` — each worktree reads only its own task files; today's behavior.
   For users whose worktrees keep intentionally independent task states.
 
@@ -314,7 +329,9 @@ to today's.
 ## Performance
 
 Overlay cost is one `git rev-parse` + one `git worktree list` + one extra directory
-scan per sibling worktree. Task dirs are small (hundreds of files); the scans are
+scan per sibling worktree. The two git calls are paid by every command run inside a
+repo with `worktree_scope: unified`, siblings or not (see §5); only the scans scale
+with sibling count. Task dirs are small (hundreds of files); the scans are
 the same cost as `--all-projects` with N projects, which is already accepted. No
 caching in v1; if it ever matters, cache sibling scans keyed by dir mtime.
 
