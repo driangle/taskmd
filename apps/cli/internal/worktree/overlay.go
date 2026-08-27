@@ -47,6 +47,19 @@ type Task struct {
 	Branch          string       `json:"branch,omitempty" yaml:"branch,omitempty"`
 	LocalOnly       bool         `json:"-" yaml:"-"`
 	RemoteOnly      bool         `json:"remote_only,omitempty" yaml:"remote_only,omitempty"`
+	// origin is the sibling worktree the winning copy was scanned from; nil
+	// when the winning copy is the local one.
+	origin *gitmeta.Worktree
+}
+
+// Origin returns the sibling worktree the winning copy of this task came
+// from, and false when that copy is local. Detail views use it to resolve
+// paths — a worklog, say — inside the checkout that actually holds the file.
+func (t *Task) Origin() (gitmeta.Worktree, bool) {
+	if t.origin == nil {
+		return gitmeta.Worktree{}, false
+	}
+	return *t.origin, true
 }
 
 // Overlay is the merged cross-worktree task view: local tasks in scan order,
@@ -304,6 +317,7 @@ func mergeCopies(localTask *model.Task, all []taskCopy) *Task {
 	if winner.wt != nil {
 		ot.Worktree = filepath.Base(winner.wt.Root)
 		ot.Branch = winner.wt.Branch
+		ot.origin = winner.wt
 	}
 	return ot
 }

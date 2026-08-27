@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -306,6 +307,169 @@ func TestGetCommand_WorktreeOverlay_NoSectionWhenCopiesAgree(t *testing.T) {
 	}
 	if strings.Contains(res.Stdout, "Worktrees:") {
 		t.Errorf("Worktrees section rendered although all copies agree:\n%s", res.Stdout)
+	}
+}
+
+// siblingOnlyTask builds the fixture for the sibling-only get tests: local 001
+// only, with 002 existing solely in worktree agent-b on branch dnc/002.
+func siblingOnlyTask(t *testing.T) (*taskRepo, []gitmeta.Worktree) {
+	t.Helper()
+	repo := newTaskRepo(t, map[string]string{
+		"001-alpha.md": overlayTaskMD("001", "Alpha", "pending"),
+	})
+	siblings := []gitmeta.Worktree{newSiblingWorktree(t, "agent-b", "dnc/002", map[string]string{
+		"002-beta.md": overlayTaskMD("002", "Beta", "in-progress", `owner: "alice"`),
+	})}
+	return repo, siblings
+}
+
+func TestGetCommand_SiblingOnlyID_ResolvesWithProvenance(t *testing.T) {
+	repo, siblings := siblingOnlyTask(t)
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "get", "002")
+	if res.Err != nil {
+		t.Fatalf("get on a sibling-only ID failed: %v", res.Err)
+	}
+	for _, want := range []string{
+		"Beta",
+		"in-progress",
+		"agent-b (branch dnc/002)",
+		"remote-only",
+	} {
+		if !strings.Contains(res.Stdout, want) {
+			t.Errorf("get output missing %q:\n%s", want, res.Stdout)
+		}
+	}
+}
+
+func TestGetCommand_SiblingOnlyID_JSONProvenance(t *testing.T) {
+	repo, siblings := siblingOnlyTask(t)
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "get", "002", "--format", "json")
+	if res.Err != nil {
+		t.Fatalf("get on a sibling-only ID failed: %v", res.Err)
+	}
+
+	var out struct {
+		ID         string `json:"id"`
+		Title      string `json:"title"`
+		Status     string `json:"status"`
+		RemoteOnly bool   `json:"remote_only"`
+		Worktree   string `json:"worktree"`
+		Branch     string `json:"branch"`
+	}
+	mustUnmarshal(t, res.Stdout, &out)
+
+	if out.ID != "002" || out.Title != "Beta" || out.Status != "in-progress" {
+		t.Errorf("payload = %+v, want the sibling copy's content", out)
+	}
+	if !out.RemoteOnly || out.Worktree != "agent-b" || out.Branch != "dnc/002" {
+		t.Errorf("provenance = %+v, want remote_only in agent-b/dnc/002", out)
+	}
+}
+
+func TestGetCommand_SiblingOnlyID_YAMLProvenance(t *testing.T) {
+	repo, siblings := siblingOnlyTask(t)
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "get", "002", "--format", "yaml")
+	if res.Err != nil {
+		t.Fatalf("get on a sibling-only ID failed: %v", res.Err)
+	}
+	for _, want := range []string{"remote_only: true", "worktree: agent-b", "branch: dnc/002"} {
+		if !strings.Contains(res.Stdout, want) {
+			t.Errorf("yaml output missing %q:\n%s", want, res.Stdout)
+		}
+	}
+}
+
+// A local task must not grow the remote-only provenance block just because the
+// overlay is active — the fields are omitted from json entirely.
+func TestGetCommand_LocalIDUnchangedByOverlay(t *testing.T) {
+	repo, siblings := siblingOnlyTask(t)
+
+	text := repo.RunWith(stubSiblings(siblings, nil), "get", "001")
+	if text.Err != nil {
+		t.Fatalf("get failed: %v", text.Err)
+	}
+	if strings.Contains(text.Stdout, "remote-only") || strings.Contains(text.Stdout, "Worktree:") {
+		t.Errorf("local task rendered remote provenance:\n%s", text.Stdout)
+	}
+
+	jsonRes := repo.RunWith(stubSiblings(siblings, nil), "get", "001", "--format", "json")
+	if jsonRes.Err != nil {
+		t.Fatalf("get --format json failed: %v", jsonRes.Err)
+	}
+	var raw map[string]any
+	mustUnmarshal(t, jsonRes.Stdout, &raw)
+	for _, key := range []string{"remote_only", "worktree", "branch"} {
+		if _, present := raw[key]; present {
+			t.Errorf("local task payload carries %q: %v", key, raw[key])
+		}
+	}
+}
+
+// A query matching both a local and a sibling-only task must raise the same
+// ambiguity error a purely local collision raises, rather than silently
+// preferring one worktree.
+func TestGetCommand_AmbiguousQueryAcrossWorktrees(t *testing.T) {
+	// Same filename in both worktrees, and a query that matches neither an ID,
+	// a title, nor a full file path — so resolution lands on the filename rule
+	// with one candidate per worktree.
+	repo := newTaskRepo(t, map[string]string{
+		"shared.md": overlayTaskMD("001", "First", "pending"),
+	})
+	siblings := []gitmeta.Worktree{newSiblingWorktree(t, "agent-b", "dnc/002", map[string]string{
+		"shared.md": overlayTaskMD("002", "Second", "pending"),
+	})}
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "get", "shared")
+	if res.Err == nil {
+		t.Fatalf("get on an ambiguous filename succeeded:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Err.Error(), "ambiguous filename") {
+		t.Errorf("error = %v, want an ambiguous filename error", res.Err)
+	}
+	for _, want := range []string{"001", "002"} {
+		if !strings.Contains(res.Err.Error(), want) {
+			t.Errorf("error %v does not name candidate %s", res.Err, want)
+		}
+	}
+}
+
+// With the overlay off, a sibling-only ID is simply not found — get gains no
+// cross-worktree reach that worktree_scope: isolated did not ask for.
+func TestGetCommand_SiblingOnlyID_IsolatedScopeNotFound(t *testing.T) {
+	repo, siblings := siblingOnlyTask(t)
+
+	configure := stubSiblings(siblings, map[string]any{"worktree_scope": worktreeScopeIsolated})
+	res := repo.RunWith(configure, "get", "002", "--exact")
+	if res.Err == nil {
+		t.Fatalf("get resolved a sibling-only ID under isolated scope:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Err.Error(), "task not found") {
+		t.Errorf("error = %v, want task not found", res.Err)
+	}
+}
+
+// The worklog of a sibling-only task lives in the worktree that owns it; get
+// must resolve it there rather than against the local tasks dir.
+func TestGetCommand_SiblingOnlyID_WorklogFromOwningWorktree(t *testing.T) {
+	repo, siblings := siblingOnlyTask(t)
+	wlDir := filepath.Join(siblings[0].TasksDir, ".worklogs")
+	if err := os.MkdirAll(wlDir, 0o755); err != nil {
+		t.Fatalf("mkdir sibling worklogs: %v", err)
+	}
+	entry := "# Worklog\n\n## 2026-08-27T10:00:00Z\n\nClaimed in agent-b.\n"
+	if err := os.WriteFile(filepath.Join(wlDir, "002.md"), []byte(entry), 0o644); err != nil {
+		t.Fatalf("write sibling worklog: %v", err)
+	}
+
+	res := repo.RunWith(stubSiblings(siblings, nil), "get", "002")
+	if res.Err != nil {
+		t.Fatalf("get failed: %v", res.Err)
+	}
+	if !strings.Contains(res.Stdout, "Worklog: 1 entries") {
+		t.Errorf("get output missing the sibling worklog:\n%s", res.Stdout)
 	}
 }
 

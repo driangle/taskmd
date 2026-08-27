@@ -1,11 +1,12 @@
 ---
 title: "Make sibling-only task IDs addressable by get"
 id: "01m10n2qw"
-status: pending
+status: completed
 priority: medium
 type: feature
 tags: ["worktrees"]
 created: "2026-08-27"
+completed_at: 2026-08-27
 ---
 
 # Make sibling-only task IDs addressable by get
@@ -25,18 +26,18 @@ reads only.
 
 ## Tasks
 
-- [ ] Extend `get`'s ID resolution to fall back to the overlay's remote-only
+- [x] Extend `get`'s ID resolution to fall back to the overlay's remote-only
       tasks when no local copy matches
-- [ ] Render remote-only provenance in the table output (worktree root
+- [x] Render remote-only provenance in the table output (worktree root
       basename + branch, consistent with the `Worktrees:` section and the
       `list` column) and include `worktree` / `branch` / `remote_only` in
       JSON/YAML output
-- [ ] Keep exact-match/prefix-match semantics identical to local resolution;
+- [x] Keep exact-match/prefix-match semantics identical to local resolution;
       an ambiguous prefix across local + sibling copies should error the same
       way as an ambiguous local prefix
-- [ ] Unit tests: get on a sibling-only ID (table, JSON, YAML), get on a local
+- [x] Unit tests: get on a sibling-only ID (table, JSON, YAML), get on a local
       ID unchanged, ambiguous prefix spanning worktrees
-- [ ] Verify the web/MCP task-detail paths — the web handler already serves
+- [x] Verify the web/MCP task-detail paths — the web handler already serves
       overlay rows; confirm sibling-only detail works there or note the gap
 
 ## Acceptance Criteria

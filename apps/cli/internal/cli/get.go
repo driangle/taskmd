@@ -80,12 +80,16 @@ func runGet(cmd *cobra.Command, args []string) error {
 	}
 	makeFilePathsRelative(tasks, scanDir)
 
-	task, err := resolveTask(query, tasks, getExact, getThreshold)
+	// Sibling-only tasks are part of the merged read view, so they are
+	// addressable here too — see get_overlay.go.
+	candidates := resolvableTasks(tasks, overlay)
+
+	task, err := resolveTask(query, candidates, getExact, getThreshold)
 	if err != nil {
 		return err
 	}
 
-	depInfo := buildDependencyInfo(task, tasks)
+	depInfo := buildDependencyInfo(task, candidates)
 
 	var ctxFiles []taskcontext.FileEntry
 	if getShowContext {
@@ -101,14 +105,41 @@ func runGet(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	wlInfo := loadWorklogInfo(task, scanDir)
+	remote := remoteProvenance(overlay, task.ID)
 
-	var wtCopies []worktreeCopyEntry
+	view := getView{
+		Task:         task,
+		Deps:         depInfo,
+		ContextFiles: ctxFiles,
+		Worklog:      loadWorklogInfo(task, taskBaseDir(scanDir, remote)),
+		Remote:       remote,
+	}
 	if overlay != nil {
-		wtCopies = overlay.Copies(task.ID)
+		view.Copies = overlay.Copies(task.ID)
 	}
 
-	return outputGet(task, depInfo, ctxFiles, wlInfo, wtCopies, getFormat)
+	return outputGet(view, getFormat)
+}
+
+// getView is everything the detail formatters render for one task.
+type getView struct {
+	Task         *model.Task
+	Deps         dependencyInfo
+	ContextFiles []taskcontext.FileEntry
+	Worklog      *worklogInfo
+	Copies       []worktreeCopyEntry
+	// Remote is set only when the task exists solely in a sibling worktree.
+	Remote *getProvenance
+}
+
+// taskBaseDir returns the directory the resolved task's file path is relative
+// to: the scan dir for a local task, and the owning worktree's tasks dir for a
+// sibling-only one (its path was relativized against that dir by the overlay).
+func taskBaseDir(scanDir string, remote *getProvenance) string {
+	if remote != nil {
+		return remote.TasksDir
+	}
+	return scanDir
 }
 
 // worklogInfo holds optional worklog metadata for display.
@@ -117,10 +148,13 @@ type worklogInfo struct {
 	LastUpdated string `json:"last_updated,omitempty" yaml:"last_updated,omitempty"`
 }
 
-func loadWorklogInfo(task *model.Task, scanDir string) *worklogInfo {
-	// Resolve the worklog path relative to the scan directory
+func loadWorklogInfo(task *model.Task, baseDir string) *worklogInfo {
+	if baseDir == "" {
+		return nil
+	}
+	// Resolve the worklog path relative to the base directory
 	// since task.FilePath may be relative after makeFilePathsRelative
-	taskAbsPath := filepath.Join(scanDir, task.FilePath)
+	taskAbsPath := filepath.Join(baseDir, task.FilePath)
 	wlPath := worklog.WorklogPath(taskAbsPath, task.ID)
 	if !worklog.Exists(wlPath) {
 		return nil
@@ -361,20 +395,21 @@ func buildDependencyInfo(task *model.Task, allTasks []*model.Task) dependencyInf
 }
 
 // outputGet routes to the appropriate formatter.
-func outputGet(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, format string) error {
+func outputGet(v getView, format string) error {
 	switch format {
 	case "text":
-		return outputGetText(task, deps, ctxFiles, wl, wtCopies, os.Stdout)
+		return outputGetText(v, os.Stdout)
 	case "json":
-		return outputGetJSON(task, deps, ctxFiles, wl, wtCopies, os.Stdout)
+		return WriteJSON(os.Stdout, buildGetOutput(v))
 	case "yaml":
-		return outputGetYAML(task, deps, ctxFiles, wl, wtCopies, os.Stdout)
+		return WriteYAML(os.Stdout, buildGetOutput(v))
 	default:
 		return fmt.Errorf("unsupported format: %s (supported: text, json, yaml)", format)
 	}
 }
 
-func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, w io.Writer) error {
+func outputGetText(v getView, w io.Writer) error {
+	task, deps := v.Task, v.Deps
 	r := getRenderer()
 
 	fmt.Fprintf(w, "%s %s\n", formatLabel("Task:", r), formatTaskID(task.ID, r))
@@ -393,13 +428,27 @@ func outputGetText(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext
 		fmt.Fprintf(w, "%s %s\n", formatLabel("Created:", r), task.Created.Format("2006-01-02"))
 	}
 	fmt.Fprintf(w, "%s %s\n", formatLabel("File:", r), formatDim(task.FilePath, r))
-	printWorklogInfo(w, wl, r)
-	printWorktreeCopies(w, wtCopies, r)
+	printRemoteProvenance(w, v.Remote, r)
+	printWorklogInfo(w, v.Worklog, r)
+	printWorktreeCopies(w, v.Copies, r)
 	printDescription(w, task.Body, r, getRawMarkdown)
 	printDependencies(w, deps, r)
 	printChildren(w, deps.Children, r)
-	printGetContextFiles(w, ctxFiles, r)
+	printGetContextFiles(w, v.ContextFiles, r)
 	return nil
+}
+
+// printRemoteProvenance names the worktree a task lives in when this checkout
+// has no copy of it, so the reader can tell where the content came from — and
+// that a mutation must be run over there.
+func printRemoteProvenance(w io.Writer, p *getProvenance, r *lipgloss.Renderer) {
+	if p == nil {
+		return
+	}
+	fmt.Fprintf(w, "%s %s %s\n",
+		formatLabel("Worktree:", r),
+		fmt.Sprintf("%s (branch %s)", p.Worktree, p.branchLabel()),
+		formatWarning("(remote-only: no copy in this worktree)", r))
 }
 
 // printWorktreeCopies renders the Worktrees section: one line per copy of the
@@ -542,6 +591,11 @@ type getOutput struct {
 	ContextFiles []taskcontext.FileEntry `json:"context_files,omitempty" yaml:"context_files,omitempty"`
 	Worklog      *worklogInfo            `json:"worklog,omitempty" yaml:"worklog,omitempty"`
 	Worktrees    []worktreeCopyEntry     `json:"worktrees,omitempty" yaml:"worktrees,omitempty"`
+	// The provenance block below is present only for a task that exists
+	// solely in a sibling worktree, so local tasks keep their shape.
+	RemoteOnly bool   `json:"remote_only,omitempty" yaml:"remote_only,omitempty"`
+	Worktree   string `json:"worktree,omitempty" yaml:"worktree,omitempty"`
+	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
 }
 
 type getDepsJSON struct {
@@ -549,7 +603,8 @@ type getDepsJSON struct {
 	Blocks    []depEntry `json:"blocks" yaml:"blocks"`
 }
 
-func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry) getOutput {
+func buildGetOutput(v getView) getOutput {
+	task, deps := v.Task, v.Deps
 	created := ""
 	if !task.Created.IsZero() {
 		created = task.Created.Format("2006-01-02")
@@ -573,21 +628,18 @@ func buildGetOutput(task *model.Task, deps dependencyInfo, ctxFiles []taskcontex
 			Blocks:    deps.Blocks,
 		},
 		Children:  deps.Children,
-		Worklog:   wl,
-		Worktrees: wtCopies,
+		Worklog:   v.Worklog,
+		Worktrees: v.Copies,
 	}
-	if len(ctxFiles) > 0 {
-		out.ContextFiles = ctxFiles
+	if len(v.ContextFiles) > 0 {
+		out.ContextFiles = v.ContextFiles
+	}
+	if v.Remote != nil {
+		out.RemoteOnly = true
+		out.Worktree = v.Remote.Worktree
+		out.Branch = v.Remote.Branch
 	}
 	return out
-}
-
-func outputGetJSON(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, w io.Writer) error {
-	return WriteJSON(w, buildGetOutput(task, deps, ctxFiles, wl, wtCopies))
-}
-
-func outputGetYAML(task *model.Task, deps dependencyInfo, ctxFiles []taskcontext.FileEntry, wl *worklogInfo, wtCopies []worktreeCopyEntry, w io.Writer) error {
-	return WriteYAML(w, buildGetOutput(task, deps, ctxFiles, wl, wtCopies))
 }
 
 // printGetContextFiles appends context file information to the text output.
