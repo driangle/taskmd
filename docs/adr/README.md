@@ -23,3 +23,7 @@ sequentially and keep them short.
   worktrees share one project identity (the git common dir); cross-worktree
   coordination is a read-side overlay over sibling task files; mutations stay
   strictly local to the current worktree.
+- [0006 — `sdk/go` is the pure task-model layer](0006-sdk-is-the-pure-task-model-layer.md):
+  which module implements a feature, not whether taskmd should have it; the SDK is
+  pure, silent, and invocation-agnostic, and anything that renders output, reads
+  flags/config, or reaches outside the task files lives in `apps/cli`.

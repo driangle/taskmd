@@ -23,6 +23,16 @@ In short:
     on-ramp for turning comments into tasks, not a growth area. New languages/markers/
     analytics must clear the optional-feature bar.
 
+Once a feature is in scope, a second question decides where it lives: `sdk/go` or
+`apps/cli`? See [`docs/adr/0006-sdk-is-the-pure-task-model-layer.md`](docs/adr/0006-sdk-is-the-pure-task-model-layer.md).
+In short, it goes in `apps/cli` if it **produces output** (formats, prints, colorizes),
+**knows how it was invoked** (flags, config, cobra, MCP, HTTP), or **reaches outside the
+task files** (git, network, registry, watching). Everything else — parsing, validating,
+scanning, graphs, filtering, search, recommendation, task-file writing — is `sdk/go`.
+This is a layering axis, not a scope axis: git metadata is core (ADR 0004) and still
+lives in `apps/cli/internal/gitmeta`. Placement matters because `sdk/go` is a separate
+module with its own semver line and immutable version tags.
+
 Record non-obvious scope or architecture decisions as a new ADR under `docs/adr/`.
 
 ## Prerequisites
