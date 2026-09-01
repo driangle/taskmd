@@ -1,8 +1,6 @@
 # Git Worktree Support
 
 **Status:** Implemented (2026-08-23; owner-aware `next` implemented and reverted — see §6).
-One known gap remains, marked pending inline: sibling-only IDs are not resolvable by
-`get` (§3, task `01m10n2qw`).
 **Date:** 2026-08-22
 **Related ADRs:** [0004 — Local git metadata is core](../adr/0004-local-git-metadata-is-core.md),
 [0005 — Worktrees are facets of one project](../adr/0005-worktrees-are-facets-of-one-project.md)
@@ -165,12 +163,8 @@ scan tasks build a **worktree overlay**:
    with provenance: the worktree root basename and branch.
 4. Tasks that exist **only** in a sibling worktree (created on another branch) are
    appended to the list-shaped and status-aggregating read views, annotated the
-   same way. They are visible but not addressable by mutations (see the `set`
-   row in §4).
-
-   > **Pending:** `get` is the exception — it resolves an ID against the local
-   > task list only, so a sibling-only ID reports "not found" rather than
-   > rendering the sibling copy. Tracked by task `01m10n2qw`.
+   same way. They are visible and addressable by `get`, but not by mutations
+   (see the `set` row in §4).
 
 The overlay result is carried on a wrapper, generalizing the existing
 `ProjectTask` pattern from `all_projects.go`:
@@ -205,7 +199,7 @@ warning when the overlay is active.
 | `next` | Recommends against **effective** status: a task `in-progress`/`in-review`/`completed` in any sibling is not actionable. Local `in-progress` tasks keep today's resume semantics. `--explain` names the excluding worktree — as a section in table output, and as a structured `excluded` array (id, reason, worktree, branch, status) alongside `recommendations` in json/yaml. |
 | `list` | Extra `WORKTREE` column (only rendered when the overlay is active and at least one task is annotated). `--status` filters on effective status. Sibling-only tasks included, marked. |
 | `board`, `stats`, `graph`, `report`, `tracks`, `phases` | Operate on effective status. |
-| `get` | Shows the local copy, plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ. Sibling-only IDs are not yet resolvable — see the pending note in §3. |
+| `get` | Shows the local copy, plus a `Worktrees:` section listing each copy's status/owner/branch when copies differ. A sibling-only ID resolves to that worktree's copy, annotated with its provenance. |
 | `set`, `add`, `rm`, `archive` | **Unchanged: local files only.** `set` on an ID that resolves only to a sibling copy fails with: `task 042 exists only in worktree ../agent-b (branch dnc/042/parser); run taskmd there`. This is the guard task `01kzdpvr1` asked for. |
 | `validate` | Warns on divergent terminal states across worktrees. Duplicate IDs *within* one worktree remain an error, as today; the same ID across worktrees is the expected case, never a duplicate. |
 | `mcp` / web | Serve the merged view for reads; mutations keep local-only semantics. See §9. |
