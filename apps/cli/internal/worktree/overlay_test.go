@@ -314,3 +314,65 @@ func TestBuilder_SiblingGuard_ScansSiblings(t *testing.T) {
 		t.Errorf("guard on unknown id should pass, got %v", guardErr)
 	}
 }
+
+// TestBuilder_ScanSiblings_PreservesWorktreeOrder pins the invariant that makes
+// concurrent sibling scanning safe: scans run in parallel and finish in
+// arbitrary order, but results must still come back in worktree order. Each
+// sibling carries a distinct task count so a reordered result is detectable.
+func TestBuilder_ScanSiblings_PreservesWorktreeOrder(t *testing.T) {
+	const siblingCount = 12
+	siblings := make([]gitmeta.Worktree, 0, siblingCount)
+	for i := range siblingCount {
+		files := map[string]string{}
+		for j := 0; j <= i; j++ {
+			id := fmt.Sprintf("wt%02d-task%02d", i, j)
+			files[id+".md"] = taskMD(id, "Task", "pending")
+		}
+		siblings = append(siblings, newSiblingWorktree(t, fmt.Sprintf("agent-%02d", i), "", files))
+	}
+
+	b := Builder{Enabled: true}
+	for range 5 { // repeat: a scheduling-order bug would be intermittent
+		scanned := b.scanSiblings(siblings)
+		if len(scanned) != siblingCount {
+			t.Fatalf("scanned %d siblings, want %d", len(scanned), siblingCount)
+		}
+		for i, s := range scanned {
+			if s.WT.Root != siblings[i].Root {
+				t.Fatalf("position %d = %s, want %s", i, s.WT.Root, siblings[i].Root)
+			}
+			if len(s.Tasks) != i+1 {
+				t.Errorf("sibling %d has %d tasks, want %d", i, len(s.Tasks), i+1)
+			}
+		}
+	}
+}
+
+// TestBuilder_ScanSiblings_MissingTasksDirIsEmptyNotDropped pins how a sibling
+// with no tasks dir behaves. A missing root is not a scan failure: WalkDir
+// surfaces it through the walk callback, which the scanner records as a scan
+// error and still returns success, so the sibling stays in the list carrying
+// zero tasks. It contributes nothing to the merge either way; what matters
+// here is that it does not shift its neighbours' positions.
+func TestBuilder_ScanSiblings_MissingTasksDirIsEmptyNotDropped(t *testing.T) {
+	good := newSiblingWorktree(t, "agent-good", "", map[string]string{
+		"001-a.md": taskMD("001", "A", "pending"),
+	})
+	missing := gitmeta.Worktree{Root: "/nonexistent-root", TasksDir: "/nonexistent-root/tasks"}
+	after := newSiblingWorktree(t, "agent-after", "", map[string]string{
+		"002-b.md": taskMD("002", "B", "pending"),
+	})
+
+	scanned := Builder{Enabled: true}.scanSiblings([]gitmeta.Worktree{good, missing, after})
+	if len(scanned) != 3 {
+		t.Fatalf("scanned %d siblings, want 3", len(scanned))
+	}
+	for i, want := range []string{good.Root, missing.Root, after.Root} {
+		if scanned[i].WT.Root != want {
+			t.Errorf("position %d = %s, want %s", i, scanned[i].WT.Root, want)
+		}
+	}
+	if len(scanned[1].Tasks) != 0 {
+		t.Errorf("missing tasks dir yielded %d tasks, want 0", len(scanned[1].Tasks))
+	}
+}

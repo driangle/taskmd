@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
 	"github.com/driangle/taskmd/sdk/go/model"
@@ -99,22 +100,55 @@ func (b Builder) Siblings(scanDir string) ([]gitmeta.Worktree, error) {
 	return siblings, nil
 }
 
-// scanSiblings scans each sibling's tasks dir, skipping siblings that fail to
-// scan. Sibling duplicate-ID warnings are that worktree's own concern and are
+// scanSiblings scans each sibling's tasks dir concurrently, skipping siblings
+// that fail to scan. Sibling scans are independent and I/O-bound, so a repo
+// with many worktrees scans in roughly the time of its slowest sibling rather
+// than the sum of all of them. Results are written by index and compacted
+// afterwards, so the merged order is worktree order regardless of completion
+// order. Sibling duplicate-ID warnings are that worktree's own concern and are
 // not reported here.
+//
+// Verbose scans run serially: the scanner logs progress straight to stderr, so
+// concurrent scans would interleave those lines nondeterministically. Verbose
+// is a debugging aid where readable output beats speed.
 func (b Builder) scanSiblings(siblings []gitmeta.Worktree) []SiblingTasks {
-	var scanned []SiblingTasks
-	for _, wt := range siblings {
-		result, err := scanner.NewScanner(wt.TasksDir, b.Verbose, b.IgnoreDirs).Scan()
-		if err != nil {
-			if b.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: skipping worktree %s: %v\n", wt.Root, err)
-			}
-			continue
+	results := make([]*SiblingTasks, len(siblings))
+	if b.Verbose {
+		for i, wt := range siblings {
+			results[i] = b.scanSibling(wt)
 		}
-		scanned = append(scanned, SiblingTasks{WT: wt, Tasks: result.Tasks})
+	} else {
+		var wg sync.WaitGroup
+		for i, wt := range siblings {
+			wg.Add(1)
+			go func(i int, wt gitmeta.Worktree) {
+				defer wg.Done()
+				results[i] = b.scanSibling(wt)
+			}(i, wt)
+		}
+		wg.Wait()
+	}
+
+	scanned := make([]SiblingTasks, 0, len(siblings))
+	for _, r := range results {
+		if r != nil {
+			scanned = append(scanned, *r)
+		}
 	}
 	return scanned
+}
+
+// scanSibling scans one sibling worktree, returning nil when it cannot be
+// scanned so the overlay simply omits it.
+func (b Builder) scanSibling(wt gitmeta.Worktree) *SiblingTasks {
+	result, err := scanner.NewScanner(wt.TasksDir, b.Verbose, b.IgnoreDirs).Scan()
+	if err != nil {
+		if b.Verbose {
+			fmt.Fprintf(os.Stderr, "Warning: skipping worktree %s: %v\n", wt.Root, err)
+		}
+		return nil
+	}
+	return &SiblingTasks{WT: wt, Tasks: result.Tasks}
 }
 
 // AttributeNestedSiblingCopies drops local-scan copies whose file path lies
