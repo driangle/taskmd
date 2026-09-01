@@ -2,6 +2,7 @@ package worktree
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -374,5 +375,163 @@ func TestBuilder_ScanSiblings_MissingTasksDirIsEmptyNotDropped(t *testing.T) {
 	}
 	if len(scanned[1].Tasks) != 0 {
 		t.Errorf("missing tasks dir yielded %d tasks, want 0", len(scanned[1].Tasks))
+	}
+}
+
+// captureStderr redirects os.Stderr for the duration of fn and returns what was
+// written. The scanner logs verbose progress straight to os.Stderr, so this is
+// the only way to observe the ordering guarantee the serial path exists to
+// provide. It swaps a package-level global, so callers must not run in
+// parallel with other stderr writers.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	orig := os.Stderr
+	os.Stderr = w
+
+	// Drain concurrently: the scanner can emit more than a pipe buffer holds,
+	// and a blocked write would deadlock the scan.
+	done := make(chan string, 1)
+	go func() {
+		var buf strings.Builder
+		_, _ = io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+
+	fn()
+
+	os.Stderr = orig
+	if closeErr := w.Close(); closeErr != nil {
+		t.Fatalf("close stderr pipe: %v", closeErr)
+	}
+	out := <-done
+	if closeErr := r.Close(); closeErr != nil {
+		t.Fatalf("close read pipe: %v", closeErr)
+	}
+	return out
+}
+
+// orderedSiblings builds n siblings, each holding one uniquely-named task.
+func orderedSiblings(t *testing.T, n int) []gitmeta.Worktree {
+	t.Helper()
+	siblings := make([]gitmeta.Worktree, 0, n)
+	for i := range n {
+		id := fmt.Sprintf("wt%02d", i)
+		siblings = append(siblings, newSiblingWorktree(t, "agent-"+id, "branch-"+id,
+			map[string]string{id + ".md": taskMD(id, "Task "+id, "pending")}))
+	}
+	return siblings
+}
+
+// TestBuilder_ScanSiblings_VerboseLogsInWorktreeOrder covers the serial branch
+// of scanSiblings. Verbose scanning is deliberately not concurrent so its
+// stderr progress lines stay readable, so each sibling's "Scanning directory"
+// line must appear in worktree order and be stable run to run.
+func TestBuilder_ScanSiblings_VerboseLogsInWorktreeOrder(t *testing.T) {
+	siblings := orderedSiblings(t, 8)
+	b := Builder{Enabled: true, Verbose: true}
+
+	first := captureStderr(t, func() { b.scanSiblings(siblings) })
+	second := captureStderr(t, func() { b.scanSiblings(siblings) })
+
+	if first != second {
+		t.Error("verbose output differs between runs; serial scanning should be deterministic")
+	}
+
+	prev := -1
+	for i, wt := range siblings {
+		at := strings.Index(first, "Scanning directory: "+wt.TasksDir+"\n")
+		if at < 0 {
+			t.Fatalf("no scan line for sibling %d (%s)", i, wt.TasksDir)
+		}
+		if at < prev {
+			t.Errorf("sibling %d logged out of worktree order", i)
+		}
+		prev = at
+	}
+}
+
+// TestBuilder_ScanSiblings_VerboseAndConcurrentAgree guards the refactor that
+// split scanSiblings into two paths: the serial verbose path and the concurrent
+// quiet path must return the same worktrees, in the same order, with the same
+// tasks. Only the logging differs.
+func TestBuilder_ScanSiblings_VerboseAndConcurrentAgree(t *testing.T) {
+	siblings := orderedSiblings(t, 10)
+
+	var verbose []SiblingTasks
+	captureStderr(t, func() {
+		verbose = Builder{Enabled: true, Verbose: true}.scanSiblings(siblings)
+	})
+	concurrent := Builder{Enabled: true}.scanSiblings(siblings)
+
+	if len(verbose) != len(concurrent) {
+		t.Fatalf("verbose scanned %d siblings, concurrent %d", len(verbose), len(concurrent))
+	}
+	for i := range verbose {
+		if verbose[i].WT.Root != concurrent[i].WT.Root {
+			t.Errorf("position %d: verbose %s, concurrent %s",
+				i, verbose[i].WT.Root, concurrent[i].WT.Root)
+		}
+		if len(verbose[i].Tasks) != len(concurrent[i].Tasks) {
+			t.Fatalf("position %d: verbose has %d tasks, concurrent %d",
+				i, len(verbose[i].Tasks), len(concurrent[i].Tasks))
+		}
+		for j := range verbose[i].Tasks {
+			if verbose[i].Tasks[j].ID != concurrent[i].Tasks[j].ID {
+				t.Errorf("position %d task %d: verbose %s, concurrent %s",
+					i, j, verbose[i].Tasks[j].ID, concurrent[i].Tasks[j].ID)
+			}
+		}
+	}
+}
+
+// TestBuilder_Overlay_DeterministicAcrossRuns checks that concurrency does not
+// leak into the merged view: with many siblings contributing both shared and
+// sibling-only tasks, the overlay's task order and provenance must be identical
+// on every run.
+func TestBuilder_Overlay_DeterministicAcrossRuns(t *testing.T) {
+	const siblingCount = 12
+	siblings := make([]gitmeta.Worktree, 0, siblingCount)
+	for i := range siblingCount {
+		id := fmt.Sprintf("wt%02d", i)
+		siblings = append(siblings, newSiblingWorktree(t, "agent-"+id, "branch-"+id, map[string]string{
+			// A shared task every sibling advances, plus one only it has.
+			"shared.md": taskMD("shared", "Shared", "in-progress"),
+			id + ".md":  taskMD(id, "Only "+id, "pending"),
+		}))
+	}
+	local := scanDirTasks(t, writeTaskDir(t, map[string]string{
+		"shared.md": taskMD("shared", "Shared", "pending"),
+		"local.md":  taskMD("local", "Local only", "pending"),
+	}))
+
+	b := Builder{Enabled: true}
+	fingerprint := func() string {
+		overlay := b.Overlay(siblings, local)
+		if overlay == nil {
+			t.Fatal("overlay should be active with siblings present")
+		}
+		var sb strings.Builder
+		for _, ot := range overlay.Tasks {
+			fmt.Fprintf(&sb, "%s|%s|%s|%t\n",
+				ot.Task.ID, ot.EffectiveStatus, ot.Worktree, ot.RemoteOnly)
+		}
+		return sb.String()
+	}
+
+	want := fingerprint()
+	if !strings.Contains(want, "local|pending||false") {
+		t.Errorf("local-only task missing from overlay:\n%s", want)
+	}
+	if !strings.Contains(want, "wt00|pending|agent-wt00|true") {
+		t.Errorf("sibling-only task missing or mis-attributed:\n%s", want)
+	}
+	for range 20 { // a data race here would show up intermittently
+		if got := fingerprint(); got != want {
+			t.Fatalf("overlay not deterministic:\nfirst:\n%s\nlater:\n%s", want, got)
+		}
 	}
 }
