@@ -1,6 +1,6 @@
 {
   "name": "taskmd-lite",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "CLI-free taskmd plugin. Manage tasks stored as markdown files using only Claude's native tools — no CLI binary required.",
   "author": {
     "name": "driangle"
