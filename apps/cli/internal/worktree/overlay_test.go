@@ -100,6 +100,7 @@ func TestMerge_RemoteWinnerProvenance(t *testing.T) {
 	ot := overlay.Get("001")
 	if ot == nil {
 		t.Fatal("task 001 missing from overlay")
+		return
 	}
 	if ot.EffectiveStatus != model.StatusInProgress {
 		t.Errorf("EffectiveStatus = %s, want in-progress", ot.EffectiveStatus)

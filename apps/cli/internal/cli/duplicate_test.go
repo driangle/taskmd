@@ -264,6 +264,7 @@ func TestResolveTask_UniqueID(t *testing.T) {
 	}
 	if task == nil {
 		t.Fatal("expected task, got nil")
+		return
 	}
 	if task.ID != "001" {
 		t.Errorf("expected ID 001, got %s", task.ID)
