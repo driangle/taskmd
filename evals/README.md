@@ -222,8 +222,28 @@ there are worth carrying over to other suites:
   97% against `no-skill`'s 81%, so a headline number alone would have mis-ranked it in both
   directions.
 
-Store each suite's committed baseline as `<suite>/REPORT.md`; raw run output under
-`<suite>/results/` is gitignored and regenerable.
+### One run, one commit
+
+A skill eval measures the skill files *as of some commit*. A pass rate without the revision that
+produced it cannot be compared against a later one, which makes "did the fix work?" unanswerable
+— and editing a skill and re-running is the entire point of the harness. So use the wrapper
+rather than calling `skival run` directly:
+
+```bash
+evals/run-eval.sh list-tasks --samples 1     # smoke run
+evals/run-eval.sh list-tasks                 # full run
+```
+
+It validates the suite, warns if the tree is dirty (a dirty run is recorded against a commit it
+did not measure), and writes `snapshot.json` into the run directory with the commit, tool
+versions and wall clock.
+
+Layout per suite:
+
+- `REPORT.md` — cross-run index: one row per run, with its commit, and the current headline.
+- `reports/<date>-<commit>.md` — the durable per-run write-up. Never overwrite one; a superseded
+  run is still the only evidence for what the skill did at that revision.
+- `results/` — raw skival output. Gitignored and regenerable.
 
 ### Reading a failure
 
