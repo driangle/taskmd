@@ -33,8 +33,11 @@ cd "$REPO_ROOT/evals/$SUITE_DIR"
 
 COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 SHORT="$(git -C "$REPO_ROOT" rev-parse --short HEAD)"
+# Repo-wide, deliberately: the skills under test live outside the suite directory,
+# so a check scoped to the suite would call a run "clean" while measuring edited
+# skill files. results/ is gitignored and so never shows up here.
 DIRTY=false
-if ! git -C "$REPO_ROOT" diff --quiet HEAD -- . ':!*/results/'; then
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
   DIRTY=true
   cat >&2 <<WARN
 
