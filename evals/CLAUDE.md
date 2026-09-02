@@ -30,6 +30,30 @@ still prints confident rankings and confidence intervals. One run lost 35 of 160
 and left 3 of 20 cells empty while looking entirely normal. The wrapper now catches this —
 if it warns, re-run, do not publish.
 
+## Writing a new eval
+
+Mechanics are in [README.md](README.md) — "How a suite is put together", "Verifier types",
+"Adding a check". These are the judgment calls it does not make for you:
+
+- **Pick the verifier by what the skill does.** Writes files → `check` (grades the
+  filesystem). Reports something → `check_output` (grades the agent's final text on stdin).
+  A read-only skill also gets a `no-mutation` check, since its real failure mode is an agent
+  that "helpfully" edits while answering.
+- **Assert two-sided.** `output_contains` is presence-only, so an agent that ignores the
+  filter and dumps everything passes a "pending only" eval. Expected values present *and*
+  competing ones absent.
+- **Write the prompt as a user would ask it**, and grade IDs and field names — never
+  phrasing or table layout. Grading the plugin skill's format measures formatting
+  compliance and unfairly fails `no-skill`.
+- **Prompt vocabulary is a variable, not a detail.** Project words ("the mvp phase") ground
+  the agent; generic assistant words ("still pending") get resolved against its own memory.
+  Same variant, same workspace, 8/8 versus 2/8. Vary it deliberately, and if a prompt is
+  ambiguous the eval measures interpretation rather than the skill.
+- **New suite → fork [`fixtures/`](fixtures)**, do not point `dir` at the shared copy.
+- **Prove every check can fail before paying for a run.** A check that cannot fail measures
+  nothing. Prefer a Go test over a manual pass (see `list-tasks/workspace/.verify/`) — it
+  costs no tokens and pins the case for the next person.
+
 ## Test graders outside this repo
 
 `taskmd list` inside `*/workspace/` returns taskmd's own 230+ tasks — project resolution
