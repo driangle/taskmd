@@ -20,13 +20,21 @@ files — or whether it only restates what `taskmd validate` already does.
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This is a **read-only**
+  skill, so `evals/list-tasks/` is the reference to copy — correctness is graded from the
+  agent's reported output via `check_output` (two-sided, matching IDs rather than phrasing),
+  with a `no-mutation` check alongside it. Note this suite needs its **own** fixture with
+  seeded defects rather than a fork of `evals/fixtures/`, which is valid on purpose.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built, the four variants, and the hermeticity note:
   `allowed_tools` is passed through as `--allowedTools` and **does not gate built-ins**, so
   `disallowed_tools` must be pinned too (`Skill`, `TaskCreate`, …) or every variant silently
   runs the installed plugin skill
-- `evals/add-task/suite.yaml` is the reference implementation — `defaults`, `ranking`, `evals`,
-  and the `&variants` anchor
+- `evals/list-tasks/suite.yaml` is the reference implementation — `defaults`, `ranking`,
+  `evals`, the `&variants` anchor, and the `check_output` / `tool_not_used` steps this suite
+  will also want. `evals/add-task/suite.yaml` is a second example of the same skeleton
 - `benchmark/` is deprecated (see the banner in `benchmark/README.md`) — do not add evals there
 
 ## Tasks

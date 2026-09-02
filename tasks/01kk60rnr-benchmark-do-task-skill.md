@@ -20,6 +20,11 @@ and latency per sample.
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This skill **writes**
+  task files, so `evals/add-task/` is the reference to copy — correctness is graded from the
+  filesystem with a `check` step.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built (fixture workspace, `isolate: true`, the four
   variants, the Go verifier convention) and for the hermeticity note before adding variants:
@@ -35,8 +40,11 @@ and latency per sample.
 - [ ] Build a skival suite for do-task (`evals/do-task/suite.yaml`)
   - Raise `timeout` well above `add-task`'s `240` — do-task does real work and runs longer than
     any other skill
-- [ ] Set up the fixture workspaces, reusing or extending `evals/add-task/workspace/` and
-      `evals/add-task/workspace-bare/`
+- [ ] Set up the fixture workspaces by forking `evals/fixtures/workspace/` and
+      `evals/fixtures/workspace-bare/`, then adding the task pinned to a mechanically
+      checkable code change that this suite needs. Do **not** extend
+      `evals/add-task/workspace/`: it is frozen at five tasks because that suite's graders
+      hardcode `001`–`005`
   - `workspace/` — full `taskmd init` project (`.taskmd.yaml`, `tasks/CLAUDE.md`,
     `tasks/TASKMD_SPEC.md`), tasks grouped across `tasks/cli/`, `tasks/web/` and the root
   - `workspace-bare/` — no config, no docs, `taskmd` shadowed off PATH via `.shadow/taskmd`

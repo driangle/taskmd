@@ -21,14 +21,22 @@ and latency per sample.
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This is a **read-only**
+  skill, so `evals/list-tasks/` is the reference to copy — correctness is graded from the
+  agent's reported output via `check_output` (two-sided, matching IDs rather than phrasing),
+  with a `no-mutation` check alongside it.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built, the four variants, per-sample isolation
   (`isolate: true`), and the hermeticity note before adding variants — `allowed_tools` is
   passed through as `--allowedTools` and **does not gate built-ins**, so `disallowed_tools`
   must be pinned too (`Skill`, `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`,
   `ToolSearch`), or every variant silently runs the installed plugin skill
-- `evals/add-task/suite.yaml` is the reference suite (`defaults`, `ranking`, the `&variants`
-  anchor); `evals/add-task/workspace/.verify/` is the reference grader style
+- `evals/list-tasks/suite.yaml` is the reference suite (`defaults`, `ranking`, the `&variants`
+  anchor, plus the `check_output` / `no-mutation` / `tool_not_used` steps a read-only skill
+  needs); `evals/list-tasks/workspace/.verify/` is the reference grader style, including its
+  `output_test.go`. `evals/add-task/` is the equivalent for a skill that writes files
 - Read both skill files under test — `claude-code-plugin/skills/next-task/SKILL.md` (drives
   `taskmd next`) and `claude-code-plugin-lite/skills/next-task/SKILL.md` (globs task files
   and ranks by priority → effort → created date, no CLI)

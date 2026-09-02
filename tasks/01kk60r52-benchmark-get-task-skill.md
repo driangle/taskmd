@@ -21,12 +21,21 @@ whether `taskmd init`'s own docs already carry the behavior.
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This is a **read-only**
+  skill, so `evals/list-tasks/` is the reference to copy — correctness is graded from the
+  agent's reported output via `check_output` (two-sided, matching IDs rather than phrasing),
+  with a `no-mutation` check alongside it.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built, and the hermeticity note before adding
   variants (`allowed_tools` does not gate built-ins, so `disallowed_tools` must be pinned too —
   otherwise every variant silently loads the installed plugin skill and the suite measures
   nothing)
-- `evals/add-task/suite.yaml` is the reference implementation to copy the shape from
+- `evals/list-tasks/suite.yaml` is the reference implementation to copy the shape from — it
+  is the newer of the two and adds what a read-only suite needs (`check_output`,
+  `tool_not_used`, `no-mutation`). `evals/add-task/suite.yaml` shows the same `defaults` /
+  `ranking` / `&variants` skeleton if you want a second example
 - `benchmark/` is deprecated — do not add to it
 
 ## Tasks

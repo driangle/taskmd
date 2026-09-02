@@ -21,10 +21,19 @@ verification results — not just whether it runs the checks.
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This skill **reports**
+  rather than writing task files, so `evals/list-tasks/` is the reference to copy —
+  correctness is graded from the agent's reported output via `check_output`, with a
+  `no-mutation` check alongside it. Note this suite needs its **own** fixture carrying
+  `verify:` blocks that pass and fail, rather than a fork of `evals/fixtures/`.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built (fixture workspace, `isolate: true`, the four
-  variants, the Go grader convention) and `evals/add-task/suite.yaml` for the real structure —
-  `defaults`, `ranking`, `evals`, and the `&variants` anchor reused by every eval
+  variants, the Go grader convention) and `evals/list-tasks/suite.yaml` for the real
+  structure — `defaults`, `ranking`, `evals`, the `&variants` anchor reused by every eval, and
+  the `check_output` / `tool_not_used` steps a reporting skill needs. `evals/add-task/` is the
+  equivalent for a skill that writes files
 - Hermeticity: `allowed_tools` is passed through as `--allowedTools` and **does not gate
   built-ins** — an agent can still reach `Skill` (loading the plugin skill installed in your own
   `~/.claude`) or `TaskCreate`. `disallowed_tools` must be pinned alongside `allowed_tools` or

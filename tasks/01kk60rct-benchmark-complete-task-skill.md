@@ -21,6 +21,11 @@ remaining subtasks were handled, and that nothing else in the task was disturbed
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This skill **writes**
+  task files, so `evals/add-task/` is the reference to copy — correctness is graded from the
+  filesystem with a `check` step.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built, and the hermeticity note before adding
   variants (`allowed_tools` does not gate built-ins, so `disallowed_tools` must be pinned

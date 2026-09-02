@@ -20,13 +20,21 @@ alongside cost and latency so we can tell whether the skill file earns its conte
 
 ## Prerequisites
 
+- **Follow the `/new-eval` skill** (`.claude/skills/new-eval/SKILL.md`) — it encodes the whole
+  procedure: fixture fork, verifier choice, grader style, proving every check can fail, the
+  smoke run before any paid run, and the report/suggestions artifacts. This is a **read-only**
+  skill, so `evals/list-tasks/` is the reference to copy — correctness is graded from the
+  agent's reported output via `check_output` (two-sided, matching IDs rather than phrasing),
+  with a `no-mutation` check alongside it.
 - Harness: [skival](https://github.com/driangle/skival); suites live in `evals/`
 - See `evals/README.md` for how a suite is built, and the hermeticity note before adding
   variants (`allowed_tools` does not gate built-ins, so `disallowed_tools` must pin
   `Skill`, `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`, `ToolSearch` too — otherwise
   every variant silently loads the installed taskmd plugin skill)
-- `evals/add-task/` is the reference suite — copy its `suite.yaml` shape, its `&variants`
-  anchor, and its `.verify/` Go module layout
+- `evals/list-tasks/` is the reference suite — copy its `suite.yaml` shape, its `&variants`
+  anchor, and its `.verify/` Go module layout (including `output_test.go`, which exercises
+  every grader in both directions at zero token cost). `evals/add-task/` is the equivalent
+  for a skill that writes files
 - `benchmark/` is deprecated (see the banner in `benchmark/README.md`); do not add to it
 - The two skills under test differ in mechanism, which is the point of the comparison:
   `claude-code-plugin/skills/get-task-status/SKILL.md` shells out to `taskmd status
@@ -37,8 +45,10 @@ alongside cost and latency so we can tell whether the skill file earns its conte
 
 - [ ] Build a skival suite for get-task-status (`evals/get-task-status/suite.yaml`),
       mirroring add-task's `defaults`, `ranking`, `isolate: true`, and `&variants` anchor
-- [ ] Set up the fixture workspaces, starting from copies of `evals/add-task/workspace/`
-      and `evals/add-task/workspace-bare/`
+- [ ] Set up the fixture workspaces by forking `evals/fixtures/workspace/` and
+      `evals/fixtures/workspace-bare/` — the shared base, six tasks carrying `phase`, `owner`
+      and a dependency edge. Do **not** copy `evals/add-task/workspace/`: it is frozen at five
+      tasks because that suite's graders hardcode `001`–`005`
   - `workspace/` — full `taskmd init` project (`.taskmd.yaml`, `.taskmd/`, `tasks/CLAUDE.md`,
     `tasks/TASKMD_SPEC.md`) with tasks grouped across `cli/`, `web/` and the root
   - `workspace-bare/` — no config, no docs, `taskmd` shadowed off PATH via `.shadow/taskmd`
