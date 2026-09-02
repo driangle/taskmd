@@ -1,6 +1,6 @@
 ---
 name: list-tasks
-description: List tasks with optional filters. Use when the user wants to see their tasks.
+description: List tasks from the project's taskmd files, with optional filters (status, priority, phase, group, owner). Use whenever the user asks what is pending, in progress, done, outstanding, assigned, high priority, or "on the plate" — including phrasings like "my tasks", "my todos" or "what's left", which refer to the project's task files and not to conversation memory.
 allowed-tools: Glob, Read
 ---
 
@@ -34,6 +34,11 @@ The user's arguments are in `$ARGUMENTS` (e.g. `--status pending`, `--priority h
    - `--phase <value>`: Show only tasks matching this phase
    - `--scope <value>`: Show only tasks in this scope (supports wildcards)
    - A directory path: Only scan that directory instead of the full task dir
+
+   Status and priority are **exact enum values, not descriptions**. `--status pending` means
+   `status: pending` only — it does not include `in-progress`. `--priority high` does not
+   include `critical`. When the user's wording is broader than the enum ("what's not done",
+   "what's urgent"), say which statuses or priorities you included.
 
 5. **Display results** as a formatted table:
    ```
