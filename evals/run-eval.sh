@@ -92,8 +92,11 @@ echo "snapshot: ${RUN_DIR}snapshot.json (commit $SHORT)"
 # One did: 35 of 160 samples errored, leaving 3 of 20 cells with no data at all,
 # while the summary reported confident pass rates for the rest. Never report a
 # run this warns about; re-run it.
-INCOMPLETE="$(grep -l '"pass": *null' "${RUN_DIR}"evals/*/*/run-*.json 2>/dev/null | wc -l | tr -d ' ')"
-TOTAL="$(ls "${RUN_DIR}"evals/*/*/run-*.json 2>/dev/null | wc -l | tr -d ' ')"
+# `|| true` on both: under `set -euo pipefail`, grep exiting 1 for "no matches" —
+# the healthy case — would otherwise abort the script right here, silently, on
+# exactly the runs that are fine.
+INCOMPLETE="$(grep -l '"pass": *null' "${RUN_DIR}"evals/*/*/run-*.json 2>/dev/null | wc -l | tr -d ' ' || true)"
+TOTAL="$(ls "${RUN_DIR}"evals/*/*/run-*.json 2>/dev/null | wc -l | tr -d ' ' || true)"
 if [[ "${INCOMPLETE:-0}" -gt 0 ]]; then
   cat >&2 <<WARN
 
@@ -106,6 +109,10 @@ WARN
 fi
 
 echo "samples:  $TOTAL/$TOTAL completed"
+[[ $STATUS -ne 0 ]] && echo "(skival exited $STATUS — expected whenever any sample fails its checks)"
 echo
 echo "Commit the write-up as evals/$SUITE_DIR/reports/$(date -u +%Y-%m-%d)-$SHORT.md"
-exit "$STATUS"
+
+# Exit 0 for a complete run even when samples failed: failing samples are the
+# measurement, not a harness error. Only an incomplete run (above) is a failure.
+exit 0

@@ -1,8 +1,20 @@
 # list-tasks — improvement suggestions
 
-Grounded in the failures observed in [REPORT.md](REPORT.md) (160 samples, 2026-09-02). Each
+Grounded in the failures observed in [run 1](reports/2026-09-02-565f740.md) (160 samples). Each
 item names the failure it fixes and how many samples it would have flipped. Nothing here is
 speculative polish — if a change is not tied to an observed failure, it is not listed.
+
+**Status after applying items 1–4 in `7dc4f3f` and re-running
+([run 2](reports/2026-09-02-95e136c.md)):**
+
+| Item | Applied | Verified by run 2 |
+|---|---|---|
+| 1 — preserve requested output format | yes | **Confirmed.** 0/8 → 8/8 on the JSON eval; `plugin-skill` 77.5% → 100%, zero failures |
+| 2 — drop the `core-cli` literal | yes | **Confirmed.** No sample copied a literal example; `list-scope-filter` 7/8 → 8/8 |
+| 3 — widen `description:` | yes | **Not verifiable here** — skills are injected as a system prompt, so `description:` never decides loading |
+| 4 — status/priority are enums | yes | **No measurable effect.** `lite-skill` was already 8/8 on the status eval; it dipped elsewhere, and an A/B showed the dip was *not* caused by this edit |
+| 5 — lite skill shelling out | no, by recommendation | — |
+| 6 — suite gaps | no | Deliberately deferred: adding evals changes the denominator and breaks comparability with run 1 |
 
 ---
 
@@ -152,6 +164,13 @@ trade is visible rather than accidental.
   injected as a system prompt rather than selected by `description:`.
 - **A sort/limit eval.** `--sort` and `--limit` are documented in the plugin skill and untested
   here; "what are my top 3 priorities" is a common phrasing with a checkable answer.
+- **Rephrase `list-scope-filter`, or accept two answers.** Run 2 surfaced samples that read
+  "what's on the plate for the CLI?" as *outstanding* CLI work and so omitted the completed task
+  `005` — a defensible answer graded wrong. The eval currently measures prompt interpretation as
+  much as group filtering. Either name the group explicitly or make the expected set tolerant.
+- **Baselines need more samples than skill variants.** `no-skill` moved 17.5 points between two
+  identical runs, driven by the bimodal "check my own memory" behavior. Any future comparison
+  resting on the baseline should run it twice or raise `samples` for it.
 - **Cross-check item 1 against the other read skills.** If "present the output" loses `--format`
   in `list-tasks`, `get-task` and `next-task` are likely identical — a cheap single-eval probe
   each would confirm before rewriting them.

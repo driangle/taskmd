@@ -19,23 +19,28 @@ Then commit the write-up as `reports/<date>-<commit>.md` and add a row below. Ra
 | Run | Commit | Date | `no-skill` | `plugin-skill` | `lite-skill` | `bare-project` | Cost |
 |-----|--------|------|-----------|----------------|--------------|----------------|------|
 | [1 — baseline](reports/2026-09-02-565f740.md) | `565f740` | 2026-09-02 | 80% | 77.5% | 100% | 65% | $22.11 |
+| [2 — after the fixes](reports/2026-09-02-95e136c.md) | `95e136c` | 2026-09-02 | 62.5% | **100%** | 95% | 57.5% | $21.41 |
 
 All runs: `claude-sonnet-5`, 8 samples per variant per eval, 160 samples, taskmd 0.5.0.
 
+One further run was **discarded, not reported**: 35 of its 160 samples errored with zero
+duration, leaving 3 of 20 cells empty while skival still printed a full rankings table.
+`../run-eval.sh` now fails on any run containing an errored sample.
+
 ## Current headline
 
-From run 1, the baseline of the skills as shipped:
-
-- **The `lite-skill` is the strongest at 100%**, but buys it with effort — it re-implements the
-  CLI in the agent loop (241 `Read` + 57 `Glob` calls across 40 samples) and costs the same as
-  having no skill at all.
-- **The retired `benchmark/` harness's "0% delta" verdict was wrong.** 14 of 31 failures never
-  looked at the project: each ran one command, `cat ~/.claude/projects/<slug>/memory/MEMORY.md`,
-  and asked the user where their tasks live. It is phrasing-dependent — the same `no-skill`
-  variant scores 8/8 on "show me all my tasks" and 2/8 on "which of my tasks are still
-  pending?". Either skill eliminates it.
-- **`plugin-skill` scores 0/8 on "as JSON"** — it fetches correct JSON and re-renders it as a
-  markdown table. Excluding that one eval it is 97% against `no-skill`'s 81%, so the 77.5%
-  headline mis-ranks it in both directions.
+- **The format fix works.** `plugin-skill` went 0/8 → **8/8** on the JSON eval and has zero
+  failures across all 40 samples in run 2. It is now #1 on correctness *and* cost *and* latency
+  at once: 100%, $0.11, 10.9s. In run 1 it needed an "excluding the JSON eval" caveat to look
+  good; it needs none now.
+- **The retired `benchmark/` harness's "0% delta" verdict was wrong.** The dominant failure in
+  both runs is the agent resolving "my tasks" to its own memory — running one command,
+  `cat ~/.claude/projects/<slug>/memory/MEMORY.md`, and asking the user where their tasks live
+  (14 occurrences in run 1, 17 in run 2). Both skills eliminate it. Finding `taskmd` on `PATH`
+  was never the hard part.
+- **Read cross-run deltas with care.** `no-skill` and `bare-project` contain no skill file, so
+  their inputs were identical across both runs — and they still moved −17.5 and −7.5 points. The
+  reported 95% intervals are within-run and do not model that drift. A cross-run difference under
+  ~20 points is unresolved without a mechanism; side-by-side variants within one run are fine.
 
 Recommendations and their status live in [SUGGESTIONS.md](SUGGESTIONS.md).
