@@ -1,0 +1,153 @@
+version: 1
+title: "list-tasks skill"
+description: >
+  Does the taskmd list-tasks skill make an agent better at answering "show me my
+  tasks" than a vanilla Claude Code session in the same project? Five realistic
+  requests, graded deterministically against what the agent reported.
+
+defaults:
+  runner: claude-code
+  model: "claude-sonnet-5"
+  # add-task uses 5. This suite uses 8 because its variants cluster much more
+  # tightly — a read-only task is easy enough that most variants sit near the
+  # ceiling, and separating them needs narrower confidence intervals.
+  samples: 8
+  timeout: 240
+  parallel: 3
+  runner_config:
+    # Identical toolset for every variant, so the skill file is the only
+    # difference between them. The union of what both skills declare: the plugin
+    # skill drives the CLI (Bash), the lite skill reads files itself (Glob, Read).
+    #
+    # Write and Edit are deliberately *not* granted — this is a read-only skill.
+    # They are also deliberately not added to disallowed_tools: `allowed_tools`
+    # does not gate built-ins, so the agent can still reach them, and the
+    # `no-mutation` check below is what proves it did not. Removing the ability
+    # to misbehave would make that check vacuous.
+    allowed_tools: ["Read", "Bash", "Glob", "Grep"]
+    # Critical: without this, the agent invokes the taskmd plugin skill installed
+    # in the developer's own ~/.claude, so *every* variant — including no-skill —
+    # silently runs the real skill and the suite measures nothing. skival injects
+    # its own `skill:` files as an appended system prompt, so this does not
+    # disable the variants under test.
+    disallowed_tools:
+      ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+
+ranking:
+  weights:
+    correctness: 0.70
+    cost: 0.20
+    duration: 0.10
+
+# Every eval runs the same four steps. `check_output` carries the correctness
+# grade: `list-tasks` mutates nothing, so there is no created file to inspect and
+# the answer has to be judged from what the agent reported. skival pipes the
+# agent's final text to the grader on stdin.
+#
+# The steps are ordered cheapest-and-most-diagnostic first, and the pipeline
+# short-circuits on the first failure. `tool_not_used` runs before the grade so a
+# leaked sample is reported as a leak rather than scored as a pass, and
+# `no-mutation` runs before it so a sample that damaged the fixture says so even
+# when its answer was also wrong.
+#
+# Every `run` starts with the absolute `/bin/sh -c`, which looks redundant but is
+# load-bearing: skival resolves a *relative* first token against the suite
+# directory, so the bare `cd .verify && …` that the add-task suite uses turns
+# into `<suite-dir>/cd` here and dies with exit 127. An absolute first token is
+# passed through untouched. See "Writing a verifier command" in ../README.md.
+evals:
+  - id: list-all
+    name: "Every task, including completed and nested ones"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      show me all my tasks
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . list-all'"
+    variants: &variants
+      - name: no-skill
+      - name: plugin-skill
+        skill: ../../claude-code-plugin/skills/list-tasks/SKILL.md
+      - name: lite-skill
+        skill: ../../claude-code-plugin-lite/skills/list-tasks/SKILL.md
+      # No skill AND no taskmd: `workspace-bare` drops .taskmd.yaml, .taskmd/,
+      # tasks/CLAUDE.md and TASKMD_SPEC.md, and the PATH below puts a stub
+      # `taskmd` first so the agent has only markdown files to work with.
+      # Verifiers run outside this env and still use the real CLI.
+      - name: bare-project
+        dir: ./workspace-bare
+        env:
+          PATH: ".shadow:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+  - id: list-status-filter
+    name: "Status filter excludes in-progress and completed"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      which of my tasks are still pending?
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . list-status-filter'"
+    variants: *variants
+
+  # "scope" here is the task *group* — the tasks/cli/ directory. taskmd's own
+  # `--scope` flag matches source paths and is not configured in this fixture;
+  # `taskmd list tasks/cli` and `--filter group=cli` are the queries that work.
+  - id: list-scope-filter
+    name: "Tasks in the cli group only"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      what's on the plate for the CLI?
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . list-scope-filter'"
+    variants: *variants
+
+  - id: list-json-format
+    name: "High priority tasks as parseable JSON"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      list my high priority tasks as JSON
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . list-json-format'"
+    variants: *variants
+
+  - id: list-phase-filter
+    name: "Phase filter resolves to the mvp tasks"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      what's in the mvp phase?
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . list-phase-filter'"
+    variants: *variants

@@ -1,12 +1,13 @@
 ---
 id: "01kk60r2g"
 title: "Benchmark list-tasks skill"
-status: pending
+status: completed
 priority: medium
 dependencies: []
 tags: ["benchmark", "skill-eval"]
 created: 2026-03-08
 phase: skill-benchmarks
+completed_at: 2026-09-02
 ---
 
 # Benchmark list-tasks skill
@@ -32,9 +33,9 @@ it costs to load.
 
 ## Tasks
 
-- [ ] Build a skival suite for list-tasks (`evals/list-tasks/suite.yaml`) and get it through
+- [x] Build a skival suite for list-tasks (`evals/list-tasks/suite.yaml`) and get it through
       `skival validate suite.yaml`
-- [ ] Set up the fixture workspaces under `evals/list-tasks/`
+- [x] Set up the fixture workspaces under `evals/list-tasks/`
   - `workspace/` — full `taskmd init` project. The `add-task` fixture already covers everything
     this skill needs to read: six tasks (`001`–`006`) with mixed statuses (`in-progress`,
     `pending`, `completed`), priorities (`critical`/`high`/`medium`/`low`), types, tags, phases
@@ -46,33 +47,39 @@ it costs to load.
     (two configured phases), `owner` on four, and a dependency edge — so `--phase` and owner
     filters are now gradable. It has six tasks, not five; graders must not hardcode a count of
     five. `evals/fixtures/README.md` records the verified ground truth.
-- [ ] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`
-      (`main.go` + `checks.go` + `assert.go`, run as `cd .verify && GOWORK=off go run . <name>`)
-- [ ] Resolve the read-only grading question first — see **Grading notes** below; the prompt
-      wording of every eval depends on which answer is chosen
-- [ ] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
-- [ ] Grade correctness and record duration, token usage and cost per sample
-- [ ] Audit the run's conversation logs for tool leakage before trusting the numbers
-- [ ] Write the results report (`evals/list-tasks/REPORT.md`)
-- [ ] Write improvement suggestions (`evals/list-tasks/SUGGESTIONS.md`)
+- [x] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`
+      (`main.go` + `checks.go` + `output.go` + `jsonoutput.go` + `taskmd.go`, run as
+      `/bin/sh -c 'cd .verify && GOWORK=off go run . <name>'` — the absolute `/bin/sh` is
+      required, see the note in `suite.yaml`). Plus `output_test.go`, which exercises every
+      grader in both directions at zero token cost.
+- [x] Resolve the read-only grading question first — **route 1** (`check_output` + exact-set Go
+      grader), confirmed viable by reading skival's `internal/verifier/check_output.go`, plus
+      route 3 (`no-mutation`) and a `tool_not_used` backstop on every eval
+- [x] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
+- [x] Grade correctness and record duration, token usage and cost per sample
+- [x] Audit the run's conversation logs for tool leakage before trusting the numbers — clean
+      across all 160 samples, by both `tool_not_used` and a manual census
+- [x] Write the results report (`evals/list-tasks/REPORT.md`)
+- [x] Write improvement suggestions (`evals/list-tasks/SUGGESTIONS.md`)
 
 ### Proposed evals
 
 One behavior per eval — the `add-task` suite deliberately split `add-bug-template` from
 `add-group-routing` because a single eval asserting two things lets one failure mask the other.
 
-- [ ] `list-all` — "show me all my tasks". Asserts the full set `001`–`006` is reported,
+- [x] `list-all` — "show me all my tasks". Asserts the full set `001`–`006` is reported,
       including the `completed` task `005` and the ones nested under `tasks/cli/` and
       `tasks/web/`. This is the eval that catches an agent that only globs the root directory.
-- [ ] `list-status-filter` — "which of my tasks are still pending?". Asserts exactly
+- [x] `list-status-filter` — "which of my tasks are still pending?". Asserts exactly
       `002`, `003`, `004`, `006` — `001` is `in-progress` and `005` is `completed`, so both must
       be excluded. Requires a negative assertion (see Grading notes).
-- [ ] `list-scope-filter` — "what's on the plate for the CLI?". Asserts exactly `001` and `005`,
-      the two tasks under `tasks/cli/`.
-- [ ] `list-json-format` — "list my high priority tasks as JSON". Asserts a parseable JSON array
+- [x] `list-scope-filter` — "what's on the plate for the CLI?". Asserts exactly `001` and `005`,
+      the two tasks under `tasks/cli/`. (Group filtering, not taskmd's `--scope` flag — the
+      fixture configures no `scopes:`, so `--scope cli` returns nothing.)
+- [x] `list-json-format` — "list my high priority tasks as JSON". Asserts a parseable JSON array
       containing exactly `001`, `005` and `006`, each with at least `id` and `title`. Grades
       output *shape* as well as content, which the table-format evals cannot.
-- [ ] `list-phase-filter` — "what's in the mvp phase?". Asserts exactly `001`, `002`, `003`, `005`
+- [x] `list-phase-filter` — "what's in the mvp phase?". Asserts exactly `001`, `002`, `003`, `005`
       — newly gradable now that the fixture carries phases.
 
 ## Grading notes

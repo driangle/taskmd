@@ -42,11 +42,29 @@ Every field is load-bearing:
 
 Re-verify after any fixture change — these are the values graders assert on.
 
+**Verify from a copy outside this repo**, or the numbers are wrong. Run `taskmd list` in
+`fixtures/workspace/` while it sits in the taskmd checkout and it returns taskmd's own 120+
+tasks: project resolution walks up to the repo root, and an explicit `-d tasks` does not stop
+it. `taskmd validate` *is* scoped correctly and reports 6, so the two commands disagree and
+only one is lying. Actual eval runs are immune (`isolate: true` copies to a temp dir).
+
+```bash
+cp -R evals/fixtures/workspace /tmp/gt && cd /tmp/gt
 ```
-taskmd next                 → ranked: 002, 001, 006, 004   (003 absent: blocked)
-taskmd next --limit 1       → 002
+
+```
+taskmd list                  → 001, 002, 003, 004, 005, 006
+taskmd next                  → ranked: 002, 001, 006, 004   (003 absent: blocked)
+taskmd next --limit 1        → 002
 taskmd list --status pending → 002, 003, 004, 006
+taskmd list --priority high  → 001, 005, 006
+taskmd list --phase mvp      → 001, 002, 003, 005
+taskmd list tasks/cli        → 001, 005          (same as --filter group=cli)
 ```
+
+`--scope` is **not** usable against this fixture: `.taskmd.yaml` configures no `scopes:`, and
+taskmd's scopes map to *source* paths rather than task groups, so `--scope cli` returns
+nothing. Group filtering is the query that works.
 
 **`next` returns a ranked list, not a single answer, and #1 is not the highest-priority task.**
 `002` ranks first for being on the critical path (it unblocks `003`), ahead of the two `high`
@@ -54,6 +72,12 @@ tasks. This matters for grading: "which task is #1" is *not* a crisp assertion, 
 that answers `001` or `006` is reasoning defensibly even though the CLI disagrees. Grade the
 robust fact instead — **`003` must never be recommended** — and treat first-place agreement as a
 soft signal reported in prose, not a pass/fail check.
+
+## Suites built on this fixture
+
+- **`list-tasks/`** — forked both workspaces verbatim; no fixture changes were needed. Its
+  evals lean on the phase, group, status and priority spreads above, and its graders assume
+  **six** tasks. Anything added here breaks them.
 
 ## What is deliberately not here
 
