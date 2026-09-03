@@ -4,6 +4,15 @@ See [../CLAUDE.md](../CLAUDE.md) for the rules that apply to every suite, and
 [../list-tasks/CLAUDE.md](../list-tasks/CLAUDE.md) for the read-only grading model this
 suite inherits (`check_output` on stdin, plus `no-mutation`, plus `tool_not_used`).
 
+## `no-mutation` here is decorative, not an assertion
+
+It passed 160/160 in run 1 because `Write` and `Edit` are absent from `allowed_tools`, and
+skival compiles that list into the CLI's `--tools` flag — an exclusive built-in whitelist — so
+they were denied at registration. The check cannot fail as configured. Adding `Write`/`Edit` to
+`allowed_tools` would make it real, at the cost of starting a new baseline. See
+[../README.md#hermeticity](../README.md) and
+[reports/2026-09-03-3081927.md](reports/2026-09-03-3081927.md).
+
 ## One task is the answer, not a set
 
 `list-tasks` grades an exact ID set. `get-task` grades a **focus**: `assertFocused` in

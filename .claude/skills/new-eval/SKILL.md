@@ -97,9 +97,13 @@ confirm FAIL.
 Copy the structure from `evals/list-tasks/suite.yaml`:
 
 - `defaults`: runner, model, `samples`, `timeout`, `parallel`, and `runner_config` pinning
-  **`allowed_tools` and `disallowed_tools`** — `allowed_tools` does not gate built-ins, so
-  without the deny list every variant silently invokes your own installed plugin skill and
-  the suite measures nothing.
+  **`allowed_tools`** — skival compiles it into the CLI's `--tools` flag, an exclusive
+  whitelist over built-ins, so every tool you do not list (`Write`, `Skill`, `TaskCreate`)
+  is denied at registration. Get this list right and the suite is hermetic; get it wrong and
+  every variant silently invokes your own installed plugin skill and the suite measures
+  nothing. `disallowed_tools` is advisory only — keep it as documentation of intent, but it
+  is not what enforces. **If your suite has a `no-mutation` check, `Write` and `Edit` must be
+  in `allowed_tools`**, or the check cannot fail and proves nothing.
 - `ranking` weights, and the four variants via a `&variants` anchor: `no-skill`,
   `plugin-skill`, `lite-skill`, `bare-project` (which overrides `dir:` and shadows `taskmd`
   on `PATH`).

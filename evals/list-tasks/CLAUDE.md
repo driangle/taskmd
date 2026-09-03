@@ -11,7 +11,14 @@ expected IDs present, competing ones absent. A presence-only check would pass an
 dumps every task.
 
 Every eval also runs `no-mutation` (the fixture is untouched) and `tool_not_used`.
-`Write`/`Edit` are deliberately reachable so `no-mutation` can actually fail.
+
+> **`no-mutation` cannot currently fail.** This file used to say `Write`/`Edit` were
+> deliberately reachable so it could. They are not: skival compiles `allowed_tools` into the
+> CLI's `--tools` flag, an exclusive built-in whitelist, so omitting them denies them at
+> registration. The check passes on every sample because mutation is impossible, not because
+> the agent behaved. Add `Write` and `Edit` to `allowed_tools` to make it a real assertion —
+> deferred here so runs 1 and 2 stay comparable. See
+> [../README.md#hermeticity](../README.md).
 
 ## After touching a grader
 

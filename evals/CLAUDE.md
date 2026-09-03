@@ -64,7 +64,12 @@ before testing anything by hand. Real runs are immune (`isolate: true`).
 ## Conventions
 
 - One behavior per eval. Two assertions in one eval lets one failure mask the other.
-- Pin `allowed_tools` **and** `disallowed_tools` — `allowed_tools` does not gate built-ins.
+- **`allowed_tools` is what makes a suite hermetic.** skival compiles it into the CLI's
+  `--tools` flag, an exclusive whitelist over built-ins, so anything unlisted — `Write`,
+  `Skill`, `TaskCreate` — is denied at registration. `disallowed_tools` is advisory and
+  upstream plans to deprecate it. This README said the reverse until 2026-09-03; see
+  [README.md](README.md#hermeticity). Corollary: a `no-mutation` check is vacuous unless
+  `Write`/`Edit` are in `allowed_tools`.
 - `results/` is gitignored. The durable record is `<suite>/reports/<date>-<commit>.md`;
   `REPORT.md` is the cross-run index. Never overwrite a past run's report.
 - Editing [`fixtures/`](fixtures) means re-verifying the ground truth in its README — from

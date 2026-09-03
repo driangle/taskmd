@@ -24,6 +24,11 @@ skival run suite.yaml --samples 1                # cheap smoke run
 skival run suite.yaml --evals add-basic --variants plugin-skill --samples 1
 skival run suite.yaml --results-dir ./results    # save for `skival report` / `skival compare`
 skival run suite.yaml --max-cost 40              # abort if the run overruns its budget
+
+# What will this cost? Prints the resolved matrix and exits without executing.
+# With --results-dir it estimates from the medians of your previous runs, which is
+# more accurate than extrapolating a smoke run by hand.
+skival run suite.yaml --dry-run --results-dir ./results
 ```
 
 **Always `--samples 1` first.** A smoke run is ~5% of the cost of a full one and is where
@@ -74,17 +79,37 @@ attributable to the skill file. `bare-project` additionally strips taskmd itself
 
 ### Hermeticity
 
-`allowed_tools` is passed through as `--allowedTools` and **does not gate built-ins** — an agent
-can still reach the `Skill` tool (loading plugin skills installed in your own `~/.claude`) or
-`TaskCreate` (Claude Code's task tracker). Either one makes every variant run the same
-configuration, and neither is visible in skival's report. Every suite must pin
-`disallowed_tools` as well as `allowed_tools`.
+**`allowed_tools` is the enforcement mechanism.** skival compiles it into the claude CLI's
+`--tools` flag, an *exclusive whitelist over the built-in set*: every unlisted built-in —
+`Write`, `Edit`, `Skill`, `TaskCreate`, and anything added in a future release — is denied at
+tool registration, not merely discouraged. The posture is deny-by-default, so a variant that
+declares no `allowed_tools` at all gets `--tools ""` and can use no built-in tools. Verified
+against skival `internal/executor/runnercfg.go` and
+[`docs/specs/tool-deny-enforcement.md`](https://github.com/driangle/skival) on 2026-09-03.
 
-skival turns this from a manual audit into a hard assertion: `tool_not_used` fails any sample
-that touched a forbidden tool, and the report now carries a per-variant tool census. This
-**does** work on the installed build (verified 2026-09-01 against `skival` commit `d896bc2`;
-an earlier note here claimed `skival validate` rejects `tool_not_used`, which is no longer
-true). Add it to every eval — `list-tasks/suite.yaml` shows the shape:
+`disallowed_tools` is **advisory** — a best-effort narrowing flag that skival explicitly does
+not rely on for enforcement, and which has an open deprecation task upstream. Keeping it costs
+nothing and documents intent, but a suite is hermetic because of `allowed_tools`, not because
+of it.
+
+> **This section said the opposite until 2026-09-03**, and every suite here was written against
+> that claim: it stated that `allowed_tools` was passed through as `--allowedTools` only and did
+> not gate built-ins, so `disallowed_tools` had to carry hermeticity. That was true of an older
+> skival. It stopped being true at `8b42dcb` (*"enforce allowed_tools as an exclusive built-in
+> whitelist"*), which predates the `d896bc2` build these suites were run on. If you find a suite
+> comment still asserting the old behavior, it is stale — fix it.
+
+**One consequence to check when you write a read-only suite.** A `no-mutation` check is only
+meaningful if the agent *could* have mutated. Under the whitelist, an `allowed_tools` list
+without `Write`/`Edit` denies them outright, so `no-mutation` cannot fail and proves nothing.
+To keep it a real assertion, add `Write` and `Edit` to `allowed_tools` deliberately; to drop
+the pretence, leave them out and stop describing `no-mutation` as evidence. Both suites here
+currently do the latter while claiming the former — see
+[`get-task/reports/2026-09-03-3081927.md`](get-task/reports/2026-09-03-3081927.md).
+
+`tool_not_used` remains worth adding as a backstop — it catches anything the whitelist does not
+cover, notably MCP and custom tools, which `--tools` does not govern. The report also carries a
+per-variant tool census. Add it to every eval — `list-tasks/suite.yaml` shows the shape:
 
 ```yaml
 - type: tool_not_used
@@ -92,7 +117,8 @@ true). Add it to every eval — `list-tasks/suite.yaml` shows the shape:
 ```
 
 Still audit a run's conversations before trusting it — `tool_not_used` only catches the tools
-you thought to name. Anything outside the variant's `allowed_tools` is a leak:
+you thought to name, and the whitelist only covers built-ins. Anything outside the variant's
+`allowed_tools` is a leak:
 
 ```bash
 python3 -c "

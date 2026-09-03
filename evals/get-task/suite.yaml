@@ -21,17 +21,22 @@ defaults:
     # plugin skill runs `taskmd get` (Bash, Read), the lite skill finds and
     # reads the file itself (Glob, Read).
     #
-    # Write and Edit are deliberately *not* granted — this is a read-only skill.
-    # They are also deliberately not added to disallowed_tools: `allowed_tools`
-    # does not gate built-ins, so the agent can still reach them, and the
-    # `no-mutation` check below is what proves it did not. Removing the ability
-    # to misbehave would make that check vacuous.
+    # This list is the hermeticity mechanism: skival compiles it into the CLI's
+    # `--tools` flag, an exclusive whitelist over built-ins, so every tool not
+    # named here — including `Skill`, which would otherwise load the developer's
+    # own installed taskmd plugin into *every* variant — is denied at
+    # registration. skival injects the variants' own `skill:` files as an
+    # appended system prompt, so denying the tool does not disable them.
+    #
+    # Write and Edit are not granted, which for a read-only skill is right — but
+    # it also means the `no-mutation` check below **cannot fail** and is
+    # currently decorative. Granting them would make it a real assertion at the
+    # cost of letting a sample damage its own workdir copy. Left as-is here so
+    # run 1's numbers stay comparable; see reports/2026-09-03-3081927.md.
     allowed_tools: ["Read", "Bash", "Glob", "Grep"]
-    # Critical: without this, the agent invokes the taskmd plugin skill installed
-    # in the developer's own ~/.claude, so *every* variant — including no-skill —
-    # silently runs the real skill and the suite measures nothing. skival injects
-    # its own `skill:` files as an appended system prompt, so this does not
-    # disable the variants under test.
+    # Advisory only — skival does not rely on it for enforcement and upstream
+    # plans to deprecate it. Kept because it documents what must never appear,
+    # and `tool_not_used` below asserts the same names.
     disallowed_tools:
       ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
 
