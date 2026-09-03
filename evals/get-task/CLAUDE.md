@@ -27,6 +27,23 @@ exact-set assertion would fail correct answers to `get-by-id`.
   `dependencies.depends_on[0]` object — which carries the *dependency's* id — is not
   counted as a second task. Pinned by `TestTaskObjectsSkipsNestedDependency`.
 
+## `get-missing` has been the buggy grader every time
+
+All five grader bugs found so far — two by the Go tests, one by the smoke run, two by auditing
+the full run — were in the not-found path, and every one was a **false negative**: the agent
+was right and the grader's notion of "the title is attached to 042" was too loose, or its
+vocabulary for "does not exist" too narrow. If you touch `assertNotFound` or `mislabeledAs042`,
+assume the same and add cases in both directions.
+
+Two rules that are easy to undo there:
+
+- **The span around 042 breaks on another task ID, not just on punctuation.** If a real ID
+  sits between 042 and a title, the title belongs to that ID — *"no task 042 — the highest
+  task ID present is 006 (…006-export-reports-csv.md)"* is correct, not a mislabel.
+- **Address the captured digits, never the match bounds.** `missingIDPattern` consumes a
+  boundary character on each side; measuring from the match end steps over a sentence-ending
+  period and swallows the following sentence.
+
 ## After touching a grader
 
 ```bash

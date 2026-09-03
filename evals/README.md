@@ -207,6 +207,13 @@ findings.
 [`add-task/REPORT.md`](add-task/REPORT.md), 2026-08-15 (`claude-sonnet-5`, 5 samples, 80 total):
 `plugin-skill` 100%, `lite-skill` 95%, `no-skill` 75%, `bare-project` 45%.
 
+[`get-task/REPORT.md`](get-task/REPORT.md), 2026-09-03 (`claude-sonnet-5`, 8 samples, 160
+total): `plugin-skill` 100%, `lite-skill` 100%, `bare-project` 80%, `no-skill` 77.5%. It
+reproduces the `list-tasks` memory finding below in a second suite — 16 failures, all of them
+the agent answering from `~/.claude/.../memory/MEMORY.md` — and adds one caution of its own:
+**four of its five evals sit at the ceiling for all four variants**, so a single eval carries
+the entire result. Check the per-eval table before quoting a headline.
+
 [`list-tasks/REPORT.md`](list-tasks/REPORT.md), 2026-09-02 (`claude-sonnet-5`, 8 samples, 160
 total): `lite-skill` 100%, `no-skill` 80%, `plugin-skill` 77.5%, `bare-project` 65%. Two results
 there are worth carrying over to other suites:

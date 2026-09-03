@@ -52,10 +52,10 @@ whether `taskmd init`'s own docs already carry the behavior.
     `evals/fixtures/README.md` records the verified ground truth
 - [x] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`,
       following `evals/add-task/workspace/.verify/{checks.go,assert.go}`
-- [ ] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
-- [ ] Grade correctness and record duration, token usage and cost per sample
-- [ ] Write the results report (`evals/get-task/REPORT.md`)
-- [ ] Write improvement suggestions (`evals/get-task/SUGGESTIONS.md`)
+- [x] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
+- [x] Grade correctness and record duration, token usage and cost per sample
+- [x] Write the results report (`evals/get-task/REPORT.md`)
+- [x] Write improvement suggestions (`evals/get-task/SUGGESTIONS.md`)
 
 ### Proposed evals
 

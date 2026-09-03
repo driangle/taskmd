@@ -80,10 +80,27 @@ func wordPattern(v string) *regexp.Regexp {
 // notFoundCues are ways of saying a task does not exist. Matched near the
 // queried ID rather than anywhere in the answer, so "not found" text about
 // something else cannot satisfy the eval.
-var notFoundCues = regexp.MustCompile(`(?i)no (?:such )?task|not found|no exact match|does ?n[o']?t exist|no match|could ?n[o']?t find|can ?n[o']?t find|unable to find|there is no|isn'?t (?:a|any) task`)
+//
+// The list is broad because "this does not exist" has many idioms and the eval
+// grades the fact, not the phrasing. The 2026-09-03 run failed a correct
+// answer — "I don't see a task 042 in this project" — on a list that had
+// "no task" but not "don't see".
+var notFoundCues = regexp.MustCompile(`(?i)` + strings.Join([]string{
+	`no (?:such )?task`, `no match`, `no exact match`, `not found`,
+	`there ?(?:'s|s| is| are) no`,
+	`do(?:es)? ?n[o']?t (?:see|have|exist|appear|contain)`,
+	`is ?n[o']?t (?:a |any )?(?:task|there|present)`,
+	`could ?n[o']?t find`, `can ?n[o']?t find`, `unable to find`,
+	`nonexistent`, `non-existent`,
+}, "|"))
 
-// missingIDPattern matches the queried-but-absent ID as a standalone token.
-var missingIDPattern = regexp.MustCompile(`(?:^|[^0-9])042(?:[^0-9]|$)`)
+// missingIDPattern matches the queried-but-absent ID as a standalone token. The
+// digits are captured so callers can address the ID's own span: the
+// surrounding boundary characters are part of the match, and treating the match
+// end as the ID's end steps *over* a sentence-ending period — which is how the
+// 2026-09-03 run scored "There's no task 042. The closest match is 002: Add
+// full-text search" as a mislabel.
+var missingIDPattern = regexp.MustCompile(`(?:^|[^0-9])(042)(?:[^0-9]|$)`)
 
 // assertNotFound grades the get-missing eval.
 //
@@ -164,9 +181,11 @@ func mislabeledAs042(output string) []string {
 
 	var found []string
 	seen := map[string]bool{}
-	for _, loc := range missingIDPattern.FindAllStringIndex(lower, -1) {
-		span := truncateAtSentenceEnd(after(lower, loc[1], mislabelAfter)) +
-			"\n" + truncateAtSentenceStart(before(lower, loc[0], mislabelBefore))
+	for _, loc := range missingIDPattern.FindAllStringSubmatchIndex(lower, -1) {
+		start, end := loc[2], loc[3] // the captured digits, not the boundaries
+
+		span := clipForward(lower[end:min(end+mislabelAfter, len(lower))]) +
+			"\n" + clipBackward(lower[max(start-mislabelBefore, 0):start])
 
 		for id, tokens := range titleTokens {
 			if !seen[id] && containsToken(span, tokens) {
@@ -178,28 +197,22 @@ func mislabeledAs042(output string) []string {
 	return found
 }
 
-func after(s string, i, n int) string {
-	if i >= len(s) {
-		return ""
-	}
-	return s[i:min(i+n, len(s))]
-}
+// spanBoundary ends the text that counts as attached to the missing ID: a
+// sentence or clause break, or — just as decisive — *another task ID*. If a
+// real ID sits between 042 and a title, the title belongs to that ID. Without
+// this, "There's no task 042 — the highest task ID present is 006
+// (tasks/web/006-export-reports-csv.md)" reads as 006 mislabeled as 042.
+var spanBoundary = regexp.MustCompile(`[.!?\n;—–]|00[1-6]`)
 
-func before(s string, i, n int) string {
-	return s[max(i-n, 0):max(i, 0)]
-}
-
-var sentenceEnd = regexp.MustCompile(`[.!?\n]`)
-
-func truncateAtSentenceEnd(s string) string {
-	if loc := sentenceEnd.FindStringIndex(s); loc != nil {
+func clipForward(s string) string {
+	if loc := spanBoundary.FindStringIndex(s); loc != nil {
 		return s[:loc[0]]
 	}
 	return s
 }
 
-func truncateAtSentenceStart(s string) string {
-	if locs := sentenceEnd.FindAllStringIndex(s, -1); len(locs) > 0 {
+func clipBackward(s string) string {
+	if locs := spanBoundary.FindAllStringIndex(s, -1); len(locs) > 0 {
 		return s[locs[len(locs)-1][1]:]
 	}
 	return s

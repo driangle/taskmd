@@ -200,6 +200,39 @@ func TestMissing(t *testing.T) {
 			pass: true,
 		},
 		{
+			// Verbatim from the full run (no-skill sample 1, 2026-09-03,
+			// 3081927). "I don't see a task 042" is the statement the eval asks
+			// for; the cue list had "no task" but not "don't see".
+			name: "does not exist, phrased as don't see",
+			out:  "I don't see a task 042 in this project — the existing tasks are 001, 002, 003, 004, 005, and 006 (across `tasks/`, `tasks/cli/`, and `tasks/web/`). Did you mean one of those, or is task 042 tracked somewhere else (e.g., an external tracker)?",
+			pass: true,
+		},
+		{
+			// Verbatim from the full run (no-skill sample 3). 006's title is
+			// attached to *006*, which sits between it and 042 — but the span
+			// only broke on sentence punctuation, and an em dash is not that.
+			name: "highest existing ID named after the missing one",
+			out: `There's no task 042 — the highest task ID present is 006 (tasks/web/006-export-reports-csv.md). Full list of existing tasks:
+
+- 001 – cli/fix-login-sso-bug
+- 006 – web/export-reports-csv`,
+			pass: true,
+		},
+		{
+			// Verbatim from the full run (plugin-skill sample 4). The forward
+			// span started *after* the period closing "no task 042.", because
+			// the ID pattern consumed it, so the next sentence read as attached.
+			name: "near-match named in the following sentence",
+			out: `There's no task 042. The closest match is **002: Add full-text search**. Here are the available tasks:
+
+| ID | Title | Status | Priority |
+|----|-------|--------|----------|
+| 002 | Add full-text search | pending | medium |
+
+Which one did you mean?`,
+			pass: true,
+		},
+		{
 			// The failure the 67% fuzzy match makes reachable.
 			name: "near-match presented as the answer",
 			out: `Task 042: Add full-text search
