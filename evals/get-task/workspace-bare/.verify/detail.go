@@ -104,9 +104,8 @@ func assertNotFound(output string) error {
 	lines := strings.Split(output, "\n")
 
 	var (
-		stated     bool
-		mentioned  bool
-		mislabeled []string
+		stated    bool
+		mentioned bool
 	)
 
 	for i, line := range lines {
@@ -114,18 +113,14 @@ func assertNotFound(output string) error {
 			continue
 		}
 		mentioned = true
-
 		if notFoundCues.MatchString(window(lines, i)) {
 			stated = true
 		}
-		for id, tokens := range titleTokens {
-			if containsToken(strings.ToLower(line), tokens) {
-				mislabeled = append(mislabeled, id)
-			}
-		}
 	}
 
+	mislabeled := mislabeledAs042(output)
 	sort.Strings(mislabeled)
+
 	switch {
 	case !mentioned:
 		return fmt.Errorf("answer never mentions the task that was asked for (042)")
@@ -135,6 +130,79 @@ func assertNotFound(output string) error {
 		return fmt.Errorf("answer mentions 042 but never states that no such task exists")
 	}
 	return nil
+}
+
+// mislabelWindow is how much text either side of an occurrence of 042 counts as
+// "attached to" it. Sentence-scoped, not line-scoped: agents answer this eval in
+// a single paragraph, and a whole-line check called this correct answer a
+// mislabel —
+//
+//	There's no task 042. Available task IDs are 001–006. Closest match was
+//	task 002 ("Add full-text search"), but none exactly matches "042"
+//
+// — because the title happens to sit on the same (only) line. Naming a
+// near-match in a *later sentence*, having already said the task does not
+// exist, is the behavior the skills ask for.
+// The windows are asymmetric because mislabeling has a direction: it reads
+// "Task 042: Add full-text search", with the title *after* the ID. The backward
+// window only needs to cover the rarer "Add full-text search (042)" form, and
+// keeping it short matters — the answer above mentions 042 a second time, and a
+// 60-character look-back from that one reaches into the preceding clause and
+// finds 002's title there.
+const (
+	mislabelAfter  = 60
+	mislabelBefore = 25
+)
+
+// mislabeledAs042 returns the fixture tasks whose title is attached directly to
+// the missing ID — "Task 042: Add full-text search" — which is the failure the
+// CLI's 67% fuzzy match on 002 invites. The span around each 042 is cut at the
+// first sentence boundary, so a title mentioned in a neighbouring sentence does
+// not count.
+func mislabeledAs042(output string) []string {
+	lower := strings.ToLower(output)
+
+	var found []string
+	seen := map[string]bool{}
+	for _, loc := range missingIDPattern.FindAllStringIndex(lower, -1) {
+		span := truncateAtSentenceEnd(after(lower, loc[1], mislabelAfter)) +
+			"\n" + truncateAtSentenceStart(before(lower, loc[0], mislabelBefore))
+
+		for id, tokens := range titleTokens {
+			if !seen[id] && containsToken(span, tokens) {
+				seen[id] = true
+				found = append(found, id)
+			}
+		}
+	}
+	return found
+}
+
+func after(s string, i, n int) string {
+	if i >= len(s) {
+		return ""
+	}
+	return s[i:min(i+n, len(s))]
+}
+
+func before(s string, i, n int) string {
+	return s[max(i-n, 0):max(i, 0)]
+}
+
+var sentenceEnd = regexp.MustCompile(`[.!?\n]`)
+
+func truncateAtSentenceEnd(s string) string {
+	if loc := sentenceEnd.FindStringIndex(s); loc != nil {
+		return s[:loc[0]]
+	}
+	return s
+}
+
+func truncateAtSentenceStart(s string) string {
+	if locs := sentenceEnd.FindAllStringIndex(s, -1); len(locs) > 0 {
+		return s[locs[len(locs)-1][1]:]
+	}
+	return s
 }
 
 // dependencyCues mark text that ties an ID to a blocking relationship, as

@@ -190,6 +190,16 @@ func TestMissing(t *testing.T) {
 			pass: true,
 		},
 		{
+			// Verbatim from the smoke run (plugin-skill, 2026-09-03, c017794),
+			// where a line-scoped mislabel check called this correct answer a
+			// failure: it is one line, so 002's title shared a "line" with 042.
+			// The near-match is named in a later sentence, after the answer has
+			// already said the task does not exist.
+			name: "near-match named in a later sentence",
+			out:  `There's no task 042. Available task IDs are 001–006. Closest match was task 002 ("Add full-text search"), but none exactly matches "042" — could you confirm which task you meant?`,
+			pass: true,
+		},
+		{
 			// The failure the 67% fuzzy match makes reachable.
 			name: "near-match presented as the answer",
 			out: `Task 042: Add full-text search
