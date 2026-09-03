@@ -1,12 +1,13 @@
 ---
 id: "01kk60r52"
 title: "Benchmark get-task skill"
-status: in-progress
+status: completed
 priority: medium
 dependencies: []
 tags: ["benchmark", "skill-eval"]
 created: 2026-03-08
 phase: skill-benchmarks
+completed_at: 2026-09-03
 ---
 
 # Benchmark get-task skill
