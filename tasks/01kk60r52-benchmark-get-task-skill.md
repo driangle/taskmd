@@ -1,7 +1,7 @@
 ---
 id: "01kk60r52"
 title: "Benchmark get-task skill"
-status: pending
+status: in-progress
 priority: medium
 dependencies: []
 tags: ["benchmark", "skill-eval"]
@@ -40,9 +40,9 @@ whether `taskmd init`'s own docs already carry the behavior.
 
 ## Tasks
 
-- [ ] Build a skival suite for get-task (`evals/get-task/suite.yaml`), reusing add-task's
+- [x] Build a skival suite for get-task (`evals/get-task/suite.yaml`), reusing add-task's
       `defaults`, `ranking`, and `&variants` shape
-- [ ] Set up the fixture workspaces
+- [x] Set up the fixture workspaces
   - `workspace/` — full `taskmd init` project, same grouped fixture tasks as add-task
     (`001`/`005` in `cli/`, `003` in `web/`, `002`/`004` at the root)
   - `workspace-bare/` — no config, no docs, `taskmd` shadowed off PATH via `.shadow/taskmd`
@@ -50,7 +50,7 @@ whether `taskmd init`'s own docs already carry the behavior.
     `002`, giving the blocked-state eval a real target, and `001`/`005` are both auth tasks, so
     "the auth task" is a genuinely ambiguous keyword query without a contrived near-duplicate.
     `evals/fixtures/README.md` records the verified ground truth
-- [ ] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`,
+- [x] Write deterministic graders as a stdlib-only Go module under `workspace/.verify/`,
       following `evals/add-task/workspace/.verify/{checks.go,assert.go}`
 - [ ] Run all four variants: `no-skill`, `plugin-skill`, `lite-skill`, `bare-project`
 - [ ] Grade correctness and record duration, token usage and cost per sample
@@ -62,16 +62,16 @@ whether `taskmd init`'s own docs already carry the behavior.
 One behavior per eval — add-task deliberately split `add-bug-template` from
 `add-group-routing` because a single eval asserting two things lets one failure mask the other.
 
-- [ ] `get-by-id` — "show me the details of task 003"; the reported title, status, priority and
+- [x] `get-by-id` — "show me the details of task 003"; the reported title, status, priority and
       type must match the fixture file, with no fabricated fields
-- [ ] `get-by-keyword` — "what's the task about the SSO login bug?"; must resolve the keyword to
+- [x] `get-by-keyword` — "what's the task about the SSO login bug?"; must resolve the keyword to
       `001` rather than asking the user to supply an ID
-- [ ] `get-missing` — "show me task 042"; must state plainly that no such task exists (and offer
+- [x] `get-missing` — "show me task 042"; must state plainly that no such task exists (and offer
       the available tasks) rather than inventing one or reporting the nearest match as if it were
       the one asked for
-- [ ] `get-blocked-state` — "can I start task 006?"; must report the unmet dependency on `002`
+- [x] `get-blocked-state` — "can I start task 006?"; must report the unmet dependency on `002`
       and that the task is not startable (fixture task `003`, blocked by pending `002`)
-- [ ] `get-json-format` — "give me task 004 as JSON"; output must contain a parseable JSON object
+- [x] `get-json-format` — "give me task 004 as JSON"; output must contain a parseable JSON object
       carrying at least `id`, `title` and `status` with the fixture's values
 
 ## Grading notes

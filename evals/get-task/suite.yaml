@@ -1,0 +1,167 @@
+version: 1
+title: "get-task skill"
+description: >
+  Does the taskmd get-task skill make an agent better at answering "show me
+  task X" than a vanilla Claude Code session in the same project? Five realistic
+  lookups — by ID, by keyword, a miss, a blocked task, and a format request —
+  graded deterministically against what the agent reported.
+
+defaults:
+  runner: claude-code
+  model: "claude-sonnet-5"
+  # Matches list-tasks rather than add-task's 5. A single-task lookup is easy
+  # enough that most variants sit near the ceiling, and separating them needs
+  # narrower confidence intervals.
+  samples: 8
+  timeout: 240
+  parallel: 3
+  runner_config:
+    # Identical toolset for every variant, so the skill file is the only
+    # difference between them. The union of what the two skills declare: the
+    # plugin skill runs `taskmd get` (Bash, Read), the lite skill finds and
+    # reads the file itself (Glob, Read).
+    #
+    # Write and Edit are deliberately *not* granted — this is a read-only skill.
+    # They are also deliberately not added to disallowed_tools: `allowed_tools`
+    # does not gate built-ins, so the agent can still reach them, and the
+    # `no-mutation` check below is what proves it did not. Removing the ability
+    # to misbehave would make that check vacuous.
+    allowed_tools: ["Read", "Bash", "Glob", "Grep"]
+    # Critical: without this, the agent invokes the taskmd plugin skill installed
+    # in the developer's own ~/.claude, so *every* variant — including no-skill —
+    # silently runs the real skill and the suite measures nothing. skival injects
+    # its own `skill:` files as an appended system prompt, so this does not
+    # disable the variants under test.
+    disallowed_tools:
+      ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+
+ranking:
+  weights:
+    correctness: 0.70
+    cost: 0.20
+    duration: 0.10
+
+# Every eval runs the same four steps. `check_output` carries the correctness
+# grade: `get-task` mutates nothing, so there is no created file to inspect and
+# the answer has to be judged from what the agent reported. skival pipes the
+# agent's final text to the grader on stdin.
+#
+# The steps are ordered cheapest-and-most-diagnostic first, and the pipeline
+# short-circuits on the first failure. `tool_not_used` runs before the grade so a
+# leaked sample is reported as a leak rather than scored as a pass, and
+# `no-mutation` runs before it so a sample that damaged the fixture says so even
+# when its answer was also wrong.
+#
+# Every `run` starts with the absolute `/bin/sh -c`, which looks redundant but is
+# load-bearing: skival resolves a *relative* first token against the suite
+# directory, so a bare `cd .verify && …` turns into `<suite-dir>/cd` and dies
+# with exit 127. An absolute first token is passed through untouched. See
+# "Writing a verifier command" in ../README.md.
+evals:
+  - id: get-by-id
+    name: "Task 003 by ID, with its real field values"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      show me the details of task 003
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . get-by-id'"
+    variants: &variants
+      - name: no-skill
+      - name: plugin-skill
+        skill: ../../claude-code-plugin/skills/get-task/SKILL.md
+      - name: lite-skill
+        skill: ../../claude-code-plugin-lite/skills/get-task/SKILL.md
+      # No skill AND no taskmd: `workspace-bare` drops .taskmd.yaml, .taskmd/,
+      # tasks/CLAUDE.md and TASKMD_SPEC.md, and the PATH below puts a stub
+      # `taskmd` first so the agent has only markdown files to work with.
+      # Verifiers run outside this env and still use the real CLI.
+      - name: bare-project
+        dir: ./workspace-bare
+        env:
+          PATH: ".shadow:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+  # 001 and 005 are both auth tasks, so "the auth task" would be genuinely
+  # ambiguous. This prompt is not — only 001 is an SSO bug — so offering 005 as
+  # a candidate is a failure to disambiguate, and the grader forbids it.
+  #
+  # `taskmd get "sso"` does not resolve this for free: the CLI fuzzy-matches,
+  # then opens an interactive selection prompt and exits 1 with no tty.
+  - id: get-by-keyword
+    name: "Keyword resolved to 001 without asking for an ID"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      what's the task about the SSO login bug?
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . get-by-keyword'"
+    variants: *variants
+
+  # `taskmd get 042` fuzzy-matches 002 at 67% and offers it. Reporting that
+  # near-match as though it were the task asked for is the failure being graded,
+  # and it is one the CLI actively invites.
+  - id: get-missing
+    name: "A task that does not exist is reported as missing"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      show me task 042
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . get-missing'"
+    variants: *variants
+
+  # 003 depends on 002, which is pending. `taskmd get 003` prints
+  # "Depends on: 002" but never the word "blocked", so repeating the CLI is not
+  # enough — the grader needs a startability verdict as well as the dependency.
+  - id: get-blocked-state
+    name: "Blocked task reported as not startable, with the reason"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      can I start task 003?
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . get-blocked-state'"
+    variants: *variants
+
+  # `taskmd get --format json` emits an object, not the array `list` emits. The
+  # grader accepts either, but grades the shape: list-tasks found plugin-skill
+  # fetching correct JSON and re-rendering it as a markdown table.
+  - id: get-json-format
+    name: "Task 004 as a parseable JSON object"
+    dir: ./workspace
+    isolate: true
+    prompt: |
+      give me task 004 as JSON
+    verify:
+      - type: agent_exits_ok
+      - type: tool_not_used
+        tools: ["Skill", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "ToolSearch"]
+      - type: check
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . no-mutation'"
+      - type: check_output
+        run: "/bin/sh -c 'cd .verify && GOWORK=off go run . get-json-format'"
+    variants: *variants

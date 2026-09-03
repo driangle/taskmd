@@ -78,6 +78,11 @@ soft signal reported in prose, not a pass/fail check.
 - **`list-tasks/`** — forked both workspaces verbatim; no fixture changes were needed. Its
   evals lean on the phase, group, status and priority spreads above, and its graders assume
   **six** tasks. Anything added here breaks them.
+- **`get-task/`** — forked both workspaces verbatim as well. It leans on the two properties
+  called out above that nothing else uses yet: the `003 → 002` dependency edge (its
+  blocked-state eval) and the `001`/`005` auth pair (its keyword eval). Note that its
+  graders match `005` on **`refactor`**, not `auth`: `001`'s body says "users *authenticate*
+  via SSO", and an `auth` substring would fire on it.
 
 ## What is deliberately not here
 

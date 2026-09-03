@@ -12,6 +12,7 @@ behavior — when a single eval asserts two things, a failure in one masks the o
 |-------|-------|--------|
 | [`add-task/`](add-task) | `add-task` | trial suite — [report](add-task/REPORT.md) |
 | [`list-tasks/`](list-tasks) | `list-tasks` | first read-only suite — [report](list-tasks/REPORT.md) |
+| [`get-task/`](get-task) | `get-task` | read-only, single-task lookup — [report](get-task/REPORT.md) |
 
 ## Running
 
