@@ -211,6 +211,9 @@ func TestWorktree_SingleWorktreeBehaviorUnchanged(t *testing.T) {
 		{"next", "--format", "json"},
 		{"list"},
 		{"list", "--format", "json"},
+		{"status"},
+		{"status", "--format", "json"},
+		{"status", "--statusline"},
 	} {
 		unified := mustRun(t, repo, args...)
 		isolated := mustRun(t, repo, append([]string{"--worktree-scope", "isolated"}, args...)...)
@@ -265,6 +268,64 @@ func TestWorktree_GetListsDivergingCopies(t *testing.T) {
 	}
 	if !strings.Contains(res.Stdout, "agent-b (branch agent-b): in-progress") {
 		t.Errorf("Worktrees section missing the sibling copy line:\n%s", res.Stdout)
+	}
+}
+
+// status is the surface shell statuslines and the get-task-status skill read,
+// so a task claimed in a sibling worktree must not read as "nothing in
+// progress" here — that is a false negative, the worst shape for this command.
+func TestWorktree_StatusShowsSiblingClaims(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md":  {id: "001", title: "First task", status: "pending"},
+		"002-second.md": {id: "002", title: "Second task", status: "pending"},
+	})
+	agentB := addLinkedWorktree(t, repo, "agent-b")
+	mustRun(t, agentB, "set", "001", "--status", "in-progress")
+
+	res := mustRun(t, repo, "status")
+	if !strings.Contains(res.Stdout, "First task") {
+		t.Fatalf("status missing 001, in-progress in agent-b:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Stdout, "Worktree: agent-b (branch agent-b)") {
+		t.Errorf("status should name the worktree holding the claim:\n%s", res.Stdout)
+	}
+	if !strings.Contains(res.Stdout, "this worktree: pending") {
+		t.Errorf("status should disclose the local copy's status:\n%s", res.Stdout)
+	}
+	if strings.Contains(res.Stdout, "Second task") {
+		t.Errorf("002 is pending everywhere and should not be listed:\n%s", res.Stdout)
+	}
+
+	// status agrees with the other read views on the same repo.
+	listRes := mustRun(t, repo, "list", "--status", "in-progress")
+	if !strings.Contains(listRes.Stdout, "001") {
+		t.Errorf("list disagrees with status about 001:\n%s", listRes.Stdout)
+	}
+}
+
+// --statusline answers "what am I working on in *this* checkout", so it stays
+// local even with the overlay active.
+func TestWorktree_StatuslineStaysLocal(t *testing.T) {
+	repo := initWorktreeRepo(t, map[string]taskSpec{
+		"001-first.md":  {id: "001", title: "First task", status: "pending"},
+		"002-second.md": {id: "002", title: "Second task", status: "pending"},
+	})
+	agentB := addLinkedWorktree(t, repo, "agent-b")
+	mustRun(t, agentB, "set", "001", "--status", "in-progress")
+
+	// Nothing claimed here yet: the statusline stays empty even though the
+	// merged status view reports 001.
+	res := mustRun(t, repo, "status", "--statusline")
+	if strings.TrimSpace(res.Stdout) != "" {
+		t.Errorf("statusline = %q, want empty: 001 is agent-b's work", res.Stdout)
+	}
+
+	// Claim 002 locally: now the statusline reports that, and only that.
+	mustRun(t, repo, "set", "002", "--status", "in-progress")
+	res = mustRun(t, repo, "status", "--statusline")
+	line := strings.TrimSpace(res.Stdout)
+	if line != "#002 Second task" {
+		t.Errorf("statusline = %q, want only the locally claimed 002", line)
 	}
 }
 

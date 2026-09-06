@@ -48,7 +48,13 @@ func newSiblingWorktree(t *testing.T, name, branch string, files map[string]stri
 		t.Fatalf("mkdir sibling tasks dir: %v", err)
 	}
 	for fname, content := range files {
-		if err := os.WriteFile(filepath.Join(tasksDir, fname), []byte(content), 0o644); err != nil {
+		path := filepath.Join(tasksDir, fname)
+		// Names may be nested (e.g. "cli/001.md") so siblings can carry the
+		// same group layout as the local repo.
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir for sibling task %s: %v", fname, err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("write sibling task %s: %v", fname, err)
 		}
 	}

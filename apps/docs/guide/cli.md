@@ -990,6 +990,12 @@ If the task has children (other tasks with a matching `parent` field), a recursi
 
 Matching uses the same logic as `get` (ID, title, file path, fuzzy).
 
+In a multi-worktree git repository, `status` selects on **effective** status — so a
+task claimed in a sibling worktree is listed here, annotated with the worktree and
+branch it came from, and a sibling-only ID resolves like it does under `get`.
+`--statusline` is the exception and stays local; see
+[Git Worktrees](#git-worktrees).
+
 ```bash
 # Show all in-progress tasks
 taskmd status
@@ -1032,9 +1038,28 @@ Children:
 File: cli/173-e2e-test-suite.md
 ```
 
+**Example output (task claimed in a sibling worktree):**
+
+```
+Task: 042
+Title: Parser rewrite
+Status: in-progress
+Worktree: agent-b (branch dnc/042/parser)
+File: cli/042-parser-rewrite.md
+
+Worktrees:
+  this worktree: pending
+  agent-b (branch dnc/042/parser): in-progress
+```
+
+In `json`/`yaml`, as in [`list`](#list-list-tasks), `status` stays the **local** copy's
+and the merged one is added as `effective_status`, alongside `worktree`, `branch`,
+`remote_only`, and `worktrees`. All of them are absent when the local copy is the most
+advanced one, and in single-worktree repositories the output is unchanged.
+
 **Statusline examples:**
 
-The `--statusline` flag outputs a compact format suitable for embedding in Claude Code's statusline. If multiple tasks are in progress, the first is shown with `(+N more)`.
+The `--statusline` flag outputs a compact format suitable for embedding in Claude Code's statusline. If multiple tasks are in progress, the first is shown with `(+N more)`. It reads the current checkout only — tasks claimed in sibling worktrees are deliberately excluded.
 
 Use `$(taskmd status --statusline)` anywhere you want to display the active task:
 
@@ -1670,11 +1695,16 @@ across all worktree copies, using the ladder:
 pending < blocked < in-progress < in-review < cancelled < completed
 ```
 
-Read views (`list`, `board`, `stats`, `get`, `graph`, `next`, …) operate on effective
-status. When the winning copy lives in a sibling worktree, the task is annotated with
-provenance — the worktree name and branch. `list` adds a `WORKTREE` column, and `get`
-shows a per-worktree breakdown when copies diverge. Tasks that exist only in a
-sibling worktree appear in read views, marked as remote-only.
+Read views (`list`, `board`, `stats`, `get`, `graph`, `next`, `status`, …) operate on
+effective status. When the winning copy lives in a sibling worktree, the task is
+annotated with provenance — the worktree name and branch. `list` adds a `WORKTREE`
+column, and `get` and `status` show a per-worktree breakdown when copies diverge.
+Tasks that exist only in a sibling worktree appear in read views, marked as
+remote-only.
+
+The one exception is `status --statusline`, which stays local on purpose: it answers
+"what am I working on in *this* checkout", so a task claimed in a sibling worktree is
+another agent's work and is left out (see [status](#status-show-in-progress-tasks-or-task-metadata)).
 
 **The claim convention.** Marking a task `in-progress` in your worktree *claims* it
 for the whole repository:
