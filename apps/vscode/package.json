@@ -2,7 +2,7 @@
   "name": "@taskmd/vscode",
   "displayName": "taskmd",
   "description": "Real-time frontmatter validation and autocompletion for taskmd files",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "taskmd",
   "private": true,
   "engines": {
