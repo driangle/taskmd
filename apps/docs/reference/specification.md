@@ -477,6 +477,43 @@ Group resolution priority:
 2. Parent directory name
 3. No group (root-level tasks)
 
+### Ignored Directories
+
+The `ignore` key in `.taskmd.yaml` excludes directories from scanning:
+
+```yaml
+# .taskmd.yaml
+dir: ./tasks
+ignore:
+  - drafts
+  - scratch
+```
+
+Entries are **bare directory names, not paths**. A name matches a directory of
+that name at *any depth* under `dir` — `drafts` excludes `tasks/drafts/`,
+`tasks/cli/drafts/`, and any other `drafts/` beneath the task directory alike.
+Path-shaped entries such as `tasks/drafts` or `cli/*` are not supported and
+match nothing.
+
+Two consequences follow from `dir` scoping the walk:
+
+- `ignore` **cannot exclude anything outside `dir`**. With `dir: ./tasks`, an
+  entry of `content` cannot keep the scanner out of a top-level `content/` — the
+  scanner never looks there. It excludes `tasks/content/` instead, which is
+  usually the opposite of what was intended.
+- Directories ignored this way are invisible to *every* read: `list`, `get`,
+  `next`, `board`, `stats`, `graph` and `validate` alike. `validate` reports the
+  remaining tasks as valid without mentioning what it skipped.
+
+Some directories are always skipped regardless of configuration: any directory
+whose name begins with `.`, the archive directory (`archive`), and common build
+and dependency directories (`node_modules`, `vendor`, `dist`, `build`, `out`,
+`target`, `.next`, `.nuxt`, `__pycache__`).
+
+Because a task written into a skipped directory would be unreachable,
+`taskmd add --group <dir>` refuses when the group resolves under one, naming the
+directory and the reason rather than creating a file no read command can find.
+
 ## Validation
 
 A valid taskmd file **must**:

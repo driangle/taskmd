@@ -374,3 +374,34 @@ func TestScanner_ScanArchive_EmptyArchive(t *testing.T) {
 		t.Errorf("Expected 0 archived tasks from empty archive, got %d", len(archived))
 	}
 }
+
+func TestScanner_SkippedSegment(t *testing.T) {
+	s := NewScanner("/tmp/tasks", false, []string{"content"})
+
+	tests := []struct {
+		name    string
+		relPath string
+		want    string
+	}{
+		{"scannable", "cli", ""},
+		{"nested scannable", "cli/backend", ""},
+		{"configured ignore", "content", "content"},
+		{"configured ignore nested", "a/content", "content"},
+		{"configured ignore as parent", "content/a", "content"},
+		{"default skip dir", "node_modules", "node_modules"},
+		{"hidden dir", ".drafts", ".drafts"},
+		{"hidden nested", "a/.drafts/b", ".drafts"},
+		{"empty path", "", ""},
+		{"dot path", ".", ""},
+		{"parent traversal is not a hidden dir", "../cli", ""},
+		{"substring is not a match", "contents", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := s.SkippedSegment(tt.relPath); got != tt.want {
+				t.Errorf("SkippedSegment(%q) = %q, want %q", tt.relPath, got, tt.want)
+			}
+		})
+	}
+}

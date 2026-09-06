@@ -108,6 +108,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	flags := GetGlobalFlags()
 	scanDir := ResolveScanDir(nil)
 
+	if err := checkGroupIsScannable(scanDir, addGroup, flags); err != nil {
+		return err
+	}
+
 	id, err := resolveNextID(scanDir, flags)
 	if err != nil {
 		return err

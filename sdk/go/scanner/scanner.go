@@ -150,6 +150,26 @@ func (s *Scanner) shouldSkipDirectory(name string) bool {
 	return s.ignoreDirs[name]
 }
 
+// SkippedSegment reports the first segment of relPath — a directory path
+// relative to the scanner's root — that the scanner would refuse to descend
+// into, or "" if the whole path is scannable. Writers use it to check a
+// destination directory against the same rules the walk applies, so a file
+// cannot be written somewhere the scan will never look.
+//
+// Segments are matched by name at any depth, matching the walk: "a/content"
+// is skipped when "content" is ignored, just as "content" is.
+func (s *Scanner) SkippedSegment(relPath string) string {
+	for _, segment := range strings.Split(filepath.ToSlash(filepath.Clean(relPath)), "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			continue
+		}
+		if s.shouldSkipDirectory(segment) {
+			return segment
+		}
+	}
+	return ""
+}
+
 // ScanArchive walks rootDir to find directories named "archive" and parses
 // task files within them. These tasks are returned for dependency resolution
 // but are not included in normal scan results.
