@@ -927,3 +927,92 @@ func TestValidateFeedSource(t *testing.T) {
 		t.Error("expected error for invalid source")
 	}
 }
+
+func TestFeedCommand_PlainText_ShowsCommitHash(t *testing.T) {
+	repo := newTaskRepo(t, nil)
+
+	oldGitLog := gitLogFunc
+	gitLogFunc = func(_ string, _ []string) (string, error) {
+		return sampleGitLogOutput, nil
+	}
+	defer func() { gitLogFunc = oldGitLog }()
+
+	oldGitShow := gitShowFunc
+	gitShowFunc = noopGitShow
+	defer func() { gitShowFunc = oldGitShow }()
+
+	output := feedStdout(t, repo, "--no-color")
+
+	// The abbreviated hash sits between the timestamp and the author.
+	if !strings.Contains(output, "2026-02-28 10:30 aaaaaaaa Alice:") {
+		t.Errorf("expected abbreviated hash between date and author, got:\n%s", output)
+	}
+	if !strings.Contains(output, "bbbbbbbb Bob:") {
+		t.Errorf("expected abbreviated hash for second entry, got:\n%s", output)
+	}
+	// Only the abbreviation, never the full 40-char hash.
+	if strings.Contains(output, strings.Repeat("a", feedHashLen+1)) {
+		t.Errorf("expected hash truncated to %d chars, got:\n%s", feedHashLen, output)
+	}
+}
+
+func TestFormatFeedHash(t *testing.T) {
+	r := getRenderer()
+
+	if got := formatFeedHash("", r); got != "" {
+		t.Errorf("expected empty string for empty hash, got %q", got)
+	}
+	if got := StripANSI(formatFeedHash(strings.Repeat("a", 40), r)); got != strings.Repeat("a", feedHashLen)+" " {
+		t.Errorf("expected truncated hash with trailing space, got %q", got)
+	}
+	// A hash shorter than the abbreviation length is passed through as-is.
+	if got := StripANSI(formatFeedHash("abc", r)); got != "abc " {
+		t.Errorf("expected short hash passed through, got %q", got)
+	}
+}
+
+func TestWriteFeedText_NoHashHasNoStraySeparator(t *testing.T) {
+	oldFormat := feedFormat
+	feedFormat = "text"
+	defer func() { feedFormat = oldFormat }()
+
+	entries := []feed.FeedEntry{{
+		Source:    "git",
+		Timestamp: time.Date(2026, 2, 28, 10, 30, 0, 0, time.UTC),
+		Author:    "Alice",
+		Message:   "chore: update task 042 status",
+	}}
+
+	var err error
+	stdout, _ := captureOutput(t, func() { err = writeFeedText(entries) })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(StripANSI(stdout), "2026-02-28 10:30 Alice: chore: update task 042 status") {
+		t.Errorf("expected single space between date and author when hash is empty, got:\n%s", stdout)
+	}
+}
+
+func TestWriteFeedText_WorklogEntryHasNoHashColumn(t *testing.T) {
+	oldFormat := feedFormat
+	feedFormat = "text"
+	defer func() { feedFormat = oldFormat }()
+
+	entries := []feed.FeedEntry{{
+		Source:    "worklog",
+		Timestamp: time.Date(2026, 2, 15, 10, 0, 0, 0, time.UTC),
+		TaskID:    "042",
+		Message:   "Started implementation.",
+	}}
+
+	var err error
+	stdout, _ := captureOutput(t, func() { err = writeFeedText(entries) })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(StripANSI(stdout), "2026-02-15 10:00 [Worklog] (042) Started implementation.") {
+		t.Errorf("expected worklog line unchanged, got:\n%s", stdout)
+	}
+}

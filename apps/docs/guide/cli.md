@@ -1363,6 +1363,17 @@ Show a chronological activity feed of recent changes to task files. Uses git log
 
 Pass a task id to scope the feed to a single task — a timeline of its status transitions, including the initial "created" event. Use `--field` to track a different frontmatter field (e.g. `priority`).
 
+Each git-sourced line carries the abbreviated commit hash between the timestamp and the author, so you can go straight from an event to the commit that caused it:
+
+```
+Recent task activity
+
+2026-03-12 17:29 76acc1a0 German Greiner: chore: rename milestone feature to phase (task 01kkhc0y5)
+  [Completed] tasks/01kkhc0y5-rename-milestone-feature-to-phase.md (01kkhc0y5)
+```
+
+Worklog-sourced entries have no commit and omit the column. `--format json` carries the full 40-character hash in the `hash` field.
+
 ```bash
 # Show recent task activity
 taskmd feed

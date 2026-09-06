@@ -17,6 +17,9 @@ import (
 // task-id positional (mirrors the `get` command default).
 const feedFuzzyThreshold = 0.6
 
+// feedHashLen is how many characters of the commit hash the text output shows.
+const feedHashLen = 8
+
 var (
 	feedFormat string
 	feedLimit  int
@@ -244,8 +247,9 @@ func writeFeedText(entries []feed.FeedEntry) error {
 		}
 
 		date := formatDim(entry.Timestamp.Format("2006-01-02 15:04"), r)
+		hash := formatFeedHash(entry.Hash, r)
 		author := formatLabel(entry.Author, r)
-		fmt.Printf("%s %s: %s\n", date, author, entry.Message)
+		fmt.Printf("%s %s%s: %s\n", date, hash, author, entry.Message)
 
 		for _, f := range entry.Files {
 			writeFileChangeText(f, r)
@@ -253,6 +257,20 @@ func writeFeedText(entries []feed.FeedEntry) error {
 	}
 
 	return nil
+}
+
+// formatFeedHash renders the abbreviated commit hash as a trailing-spaced
+// column, or an empty string when the entry carries no hash (worklog-sourced
+// entries, or a git entry whose hash could not be parsed) so the line does not
+// gain a stray separator.
+func formatFeedHash(hash string, r *lipgloss.Renderer) string {
+	if hash == "" {
+		return ""
+	}
+	if len(hash) > feedHashLen {
+		hash = hash[:feedHashLen]
+	}
+	return formatDim(hash, r) + " "
 }
 
 func writeWorklogEntryText(entry feed.FeedEntry, r *lipgloss.Renderer) {
