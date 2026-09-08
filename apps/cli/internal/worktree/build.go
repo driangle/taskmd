@@ -70,19 +70,19 @@ func (b Builder) Build(scanDir string, localTasks []*model.Task) (*Overlay, erro
 	if err != nil {
 		return nil, err
 	}
-	return b.Overlay(siblings, localTasks), nil
+	return b.Overlay(scanDir, siblings, localTasks), nil
 }
 
 // Overlay merges localTasks with scans of the given sibling worktrees, or
 // returns nil (overlay inactive) when there are none. Callers that already
 // discovered siblings (e.g. to derive watch dirs) use this to avoid a second
 // discovery.
-func (b Builder) Overlay(siblings []gitmeta.Worktree, localTasks []*model.Task) *Overlay {
+func (b Builder) Overlay(scanDir string, siblings []gitmeta.Worktree, localTasks []*model.Task) *Overlay {
 	if len(siblings) == 0 {
 		return nil
 	}
 	scanned := b.scanSiblings(siblings)
-	localTasks = AttributeNestedSiblingCopies(localTasks, siblings)
+	localTasks = AttributeNestedSiblingCopies(localTasks, scanDir, siblings)
 	return Merge(localTasks, scanned)
 }
 
@@ -156,21 +156,59 @@ func (b Builder) scanSibling(wt gitmeta.Worktree) *SiblingTasks {
 // root gets double-scanned, and those files belong to that worktree, not this
 // one (spec §8). The sibling's own scan already carries them, so dropping the
 // local-scan copies attributes them instead of flagging duplicates.
-func AttributeNestedSiblingCopies(local []*model.Task, siblings []gitmeta.Worktree) []*model.Task {
+//
+// Only siblings nested *inside* scanDir can double-scan, so only those are
+// considered. A sibling whose root is an ancestor of scanDir — the primary
+// checkout, when this worktree lives under it (`repo/.claude/worktrees/x`) —
+// contains every local task path without having scanned any of them; treating
+// that as nesting would drop the entire local task list.
+func AttributeNestedSiblingCopies(local []*model.Task, scanDir string, siblings []gitmeta.Worktree) []*model.Task {
+	nested := nestedSiblings(scanDir, siblings)
+	if len(nested) == 0 {
+		return local
+	}
 	attributed := make([]*model.Task, 0, len(local))
 	for _, task := range local {
-		if !insideAnyWorktreeRoot(task.FilePath, siblings) {
+		if !insideAnyWorktreeRoot(task.FilePath, nested) {
 			attributed = append(attributed, task)
 		}
 	}
 	return attributed
 }
 
+// nestedSiblings returns the siblings whose root lies inside scanDir, i.e. the
+// ones the local scan could have picked up.
+func nestedSiblings(scanDir string, siblings []gitmeta.Worktree) []gitmeta.Worktree {
+	root, err := filepath.Abs(scanDir)
+	if err != nil {
+		return nil
+	}
+	var nested []gitmeta.Worktree
+	for _, wt := range siblings {
+		wtRoot, err := filepath.Abs(wt.Root)
+		if err != nil {
+			continue
+		}
+		if isUnder(wtRoot, root) {
+			nested = append(nested, wt)
+		}
+	}
+	return nested
+}
+
+// isUnder reports whether path lies strictly inside dir.
+func isUnder(path, dir string) bool {
+	return strings.HasPrefix(filepath.Clean(path), filepath.Clean(dir)+string(filepath.Separator))
+}
+
 // insideAnyWorktreeRoot reports whether path lies under any sibling's root.
 func insideAnyWorktreeRoot(path string, siblings []gitmeta.Worktree) bool {
-	cleaned := filepath.Clean(path)
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
 	for _, wt := range siblings {
-		if strings.HasPrefix(cleaned, filepath.Clean(wt.Root)+string(filepath.Separator)) {
+		if isUnder(abs, wt.Root) {
 			return true
 		}
 	}

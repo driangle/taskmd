@@ -503,14 +503,15 @@ func TestBuilder_Overlay_DeterministicAcrossRuns(t *testing.T) {
 			id + ".md":  taskMD(id, "Only "+id, "pending"),
 		}))
 	}
-	local := scanDirTasks(t, writeTaskDir(t, map[string]string{
+	localDir := writeTaskDir(t, map[string]string{
 		"shared.md": taskMD("shared", "Shared", "pending"),
 		"local.md":  taskMD("local", "Local only", "pending"),
-	}))
+	})
+	local := scanDirTasks(t, localDir)
 
 	b := Builder{Enabled: true}
 	fingerprint := func() string {
-		overlay := b.Overlay(siblings, local)
+		overlay := b.Overlay(localDir, siblings, local)
 		if overlay == nil {
 			t.Fatal("overlay should be active with siblings present")
 		}
