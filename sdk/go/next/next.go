@@ -241,25 +241,36 @@ func filterActionable(
 	return applySpecialFilters(actionable, criticalPath, opts.QuickWins, opts.Critical, opts.Efforts), nil
 }
 
-// rootReachableSet returns the set of task IDs reachable from root: root's
-// transitive upstream dependency prerequisites, root's transitive subtask
-// subtree (via the parent/child hierarchy), and root itself. Dependencies use
-// the graph package's upstream traversal; subtasks recurse over childrenMap.
+// rootReachableSet returns the set of task IDs whose completion the root
+// transitively waits on, plus root itself. Two edge types participate: a task
+// waits on its depends_on prerequisites, and a parent task waits on its
+// subtasks (via the parent/child hierarchy). The traversal interleaves both to
+// a fixpoint, so a subtask of an upstream dependency — and that subtask's own
+// prerequisites — are reachable too.
 func rootReachableSet(root string, tasks []*model.Task, childrenMap map[string][]*model.Task) map[string]bool {
-	reachable := graph.NewGraph(tasks).GetUpstream(root)
-	reachable[root] = true
+	deps := make(map[string][]string, len(tasks))
+	for _, t := range tasks {
+		deps[t.ID] = t.Dependencies
+	}
 
-	var addSubtree func(id string)
-	addSubtree = func(id string) {
+	reachable := map[string]bool{root: true}
+	queue := []string{root}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, depID := range deps[id] {
+			if !reachable[depID] {
+				reachable[depID] = true
+				queue = append(queue, depID)
+			}
+		}
 		for _, child := range childrenMap[id] {
 			if !reachable[child.ID] {
 				reachable[child.ID] = true
-				addSubtree(child.ID)
+				queue = append(queue, child.ID)
 			}
 		}
 	}
-	addSubtree(root)
-
 	return reachable
 }
 

@@ -1106,6 +1106,53 @@ func TestRecommend_RootNestedSubtree(t *testing.T) {
 	}
 }
 
+func TestRecommend_RootReachesSubtasksOfUpstreamDependency(t *testing.T) {
+	// R depends on P; P has been decomposed into pending subtasks S1 and S2,
+	// and S1 has its own actionable dependency D. X is unrelated.
+	// R is blocked by P, P by its incomplete children, S1 by D — so the
+	// actionable work that transitively unblocks R is D and S2.
+	tasks := []*model.Task{
+		makeTask("R", model.StatusPending, model.PriorityHigh, []string{"P"}),
+		makeTask("P", model.StatusPending, model.PriorityHigh, nil),
+		makeTaskWithParentDeps("S1", model.StatusPending, model.PriorityMedium, "P", []string{"D"}),
+		makeTaskWithParent("S2", model.StatusPending, model.PriorityMedium, "P"),
+		makeTask("D", model.StatusPending, model.PriorityMedium, nil),
+		makeTask("X", model.StatusPending, model.PriorityHigh, nil),
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, Root: "R"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ids := map[string]bool{}
+	for _, rec := range recs {
+		ids[rec.ID] = true
+	}
+	if len(recs) != 2 || !ids["D"] || !ids["S2"] {
+		t.Fatalf("Expected D and S2 (work unblocking R through P's subtasks), got %v", recs)
+	}
+}
+
+func TestRecommend_RootDependencyCycleTerminates(t *testing.T) {
+	// A and B depend on each other (invalid but must not hang the traversal),
+	// and C is an actionable prerequisite of the cycle.
+	tasks := []*model.Task{
+		makeTask("R", model.StatusPending, model.PriorityHigh, []string{"A"}),
+		makeTask("A", model.StatusPending, model.PriorityMedium, []string{"B"}),
+		makeTask("B", model.StatusPending, model.PriorityMedium, []string{"A", "C"}),
+		makeTask("C", model.StatusPending, model.PriorityMedium, nil),
+	}
+
+	recs, err := Recommend(tasks, Options{Limit: 10, Root: "R"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(recs) != 1 || recs[0].ID != "C" {
+		t.Fatalf("Expected only C to be actionable, got %v", recs)
+	}
+}
+
 func TestRecommend_RootUnknownIDErrors(t *testing.T) {
 	tasks := []*model.Task{
 		makeTask("A", model.StatusPending, model.PriorityHigh, nil),
