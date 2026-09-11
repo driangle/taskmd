@@ -1550,3 +1550,113 @@ created: 2026-02-08
 		t.Errorf("Expected completed_at to be cleared when cancelling, got:\n%s", s)
 	}
 }
+
+// prettierFlowFile returns a task whose dependencies use the multi-line flow
+// sequence Prettier emits once the single-line form exceeds the print width.
+// This shape used to corrupt the frontmatter on write, after which taskmd
+// stopped seeing the task at all.
+func prettierFlowFile() map[string]string {
+	files := map[string]string{}
+	for _, id := range []string{"001", "002", "003"} {
+		files[id+"-stub.md"] = fmt.Sprintf(`---
+id: "%s"
+title: "Stub"
+status: pending
+created: 2026-02-08
+---
+
+# Stub
+`, id)
+	}
+	files["080-target.md"] = `---
+id: "080"
+title: "Target"
+status: pending
+priority: high
+dependencies:
+  [
+    "001",
+    "002",
+  ]
+touches:
+  ["cli"]
+created: 2026-02-08
+---
+
+# Target
+`
+	return files
+}
+
+// Regression: a set that writes a list field must leave a file taskmd can still
+// read back. Asserting on `get` afterwards is what makes this a test for the
+// real damage rather than a formatting nit -- the old writer exited 0 and the
+// task then silently disappeared from get, list and validate.
+func TestSet_MultilineFlowList_TaskStillReadable(t *testing.T) {
+	repo := newTaskRepo(t, prettierFlowFile())
+
+	setStdout(t, repo, "080", "--depends-on", "001,003")
+
+	content, _ := os.ReadFile(repo.Path("080-target.md"))
+	s := string(content)
+
+	if !strings.Contains(s, `dependencies: ["001", "003"]`) {
+		t.Errorf("Expected dependencies rewritten in place, got:\n%s", s)
+	}
+	// The orphaned flow node the old writer left behind.
+	if strings.Contains(s, `"002"`) {
+		t.Errorf("Expected the old flow sequence to be gone, got:\n%s", s)
+	}
+	if strings.Contains(s, "  - 001") {
+		t.Errorf("Expected flow shape preserved, not converted to a block list, got:\n%s", s)
+	}
+
+	// The task must still be visible to the read commands.
+	if out := repo.Run("get", "080").Stdout; !strings.Contains(out, "Target") {
+		t.Errorf("Expected `get 080` to still find the task, got: %s", out)
+	}
+	if out := repo.Run("list").Stdout; !strings.Contains(out, "080") {
+		t.Errorf("Expected `list` to still include the task, got: %s", out)
+	}
+	// 3 stubs + the target; the target dropping out would make this read 3.
+	if out := repo.Run("validate").Stdout; !strings.Contains(out, "4 task(s) are valid") {
+		t.Errorf("Expected `validate` to still count all 4 tasks, got: %s", out)
+	}
+}
+
+// The add/remove merge path must see values written as a multi-line flow
+// sequence, or it silently drops them while the summary claims otherwise.
+func TestSet_MultilineFlowList_AddKeepsExistingValues(t *testing.T) {
+	repo := newTaskRepo(t, prettierFlowFile())
+
+	output := setStdout(t, repo, "080", "--add-touches", "web")
+
+	if !strings.Contains(output, "touches: [cli] -> [cli, web]") {
+		t.Errorf("Expected summary to report both values, got: %s", output)
+	}
+
+	content, _ := os.ReadFile(repo.Path("080-target.md"))
+	s := string(content)
+	if !strings.Contains(s, `touches: ["cli", "web"]`) {
+		t.Errorf("Expected the written file to match the summary, got:\n%s", s)
+	}
+}
+
+// Clearing a multi-line flow list must remove the whole value. The old writer
+// deleted only the key, leaving an orphan that folded into the scalar above it
+// and silently corrupted that field -- while the file still parsed.
+func TestSet_ClearMultilineFlowList_LeavesNoOrphan(t *testing.T) {
+	repo := newTaskRepo(t, prettierFlowFile())
+
+	setStdout(t, repo, "080", "--remove-touches", "cli")
+
+	content, _ := os.ReadFile(repo.Path("080-target.md"))
+	s := string(content)
+	if strings.Contains(s, `["cli"]`) {
+		t.Errorf("Expected no orphaned flow node, got:\n%s", s)
+	}
+
+	if out := repo.Run("get", "080").Stdout; !strings.Contains(out, "Status: pending") {
+		t.Errorf("Expected status to survive intact, got: %s", out)
+	}
+}

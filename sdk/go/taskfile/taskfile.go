@@ -7,6 +7,7 @@ import (
 
 	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/model"
+	"gopkg.in/yaml.v3"
 )
 
 // UpdateRequest describes which fields to update. Nil pointer means "no change".
@@ -131,7 +132,29 @@ func UpdateTaskFile(filePath string, req UpdateRequest) error {
 		lines = replaceBody(lines, closeIdx, *req.Body)
 	}
 
-	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
+	out := strings.Join(lines, "\n")
+
+	// Backstop: never leave a task file taskmd cannot read back. A writer bug
+	// that corrupts frontmatter would otherwise make the task vanish silently
+	// from every view, with no error to explain it.
+	if err := verifyFrontmatter(out); err != nil {
+		return fmt.Errorf("refusing to write %s: update would produce unreadable frontmatter (%w) — this is a taskmd bug, please report it", filePath, err)
+	}
+
+	return os.WriteFile(filePath, []byte(out), 0644)
+}
+
+// verifyFrontmatter checks that the frontmatter of the about-to-be-written
+// content still parses as a YAML mapping.
+func verifyFrontmatter(content string) error {
+	lines := strings.Split(content, "\n")
+	openIdx, closeIdx := FindFrontmatterBounds(lines)
+	if openIdx < 0 || closeIdx < 0 {
+		return fmt.Errorf("frontmatter delimiters missing after update")
+	}
+
+	var fm map[string]any
+	return yaml.Unmarshal([]byte(strings.Join(lines[openIdx+1:closeIdx], "\n")), &fm)
 }
 
 type scalarUpdate struct {
@@ -245,46 +268,11 @@ func replaceBody(lines []string, closeIdx int, newBody string) []string {
 
 // parseCurrentTags reads the existing tags from frontmatter lines.
 func parseCurrentTags(lines []string, openIdx, closeIdx int) []string {
-	for i := openIdx + 1; i < closeIdx; i++ {
-		if !strings.HasPrefix(strings.TrimSpace(lines[i]), "tags:") {
-			continue
-		}
-		if strings.Contains(lines[i], "[") {
-			return parseInlineTags(strings.TrimSpace(lines[i]))
-		}
-		return parseMultilineTags(lines, i+1, closeIdx)
-	}
-	return nil
-}
-
-func parseInlineTags(line string) []string {
-	inner := line[strings.Index(line, "[")+1 : strings.LastIndex(line, "]")]
-	if strings.TrimSpace(inner) == "" {
+	f, found := findListField(lines, openIdx, closeIdx, "tags")
+	if !found {
 		return nil
 	}
-	parts := strings.Split(inner, ",")
-	var tags []string
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		p = strings.Trim(p, `"'`)
-		if p != "" {
-			tags = append(tags, p)
-		}
-	}
-	return tags
-}
-
-func parseMultilineTags(lines []string, start, closeIdx int) []string {
-	var tags []string
-	for j := start; j < closeIdx; j++ {
-		lt := strings.TrimSpace(lines[j])
-		if strings.HasPrefix(lt, "- ") {
-			tags = append(tags, strings.TrimPrefix(lt, "- "))
-		} else {
-			break
-		}
-	}
-	return tags
+	return f.values
 }
 
 // setTags replaces tags entirely with the given list.
@@ -319,49 +307,16 @@ func ComputeNewTags(current, addTags, removeTags []string) []string {
 }
 
 // applyTagUpdates modifies the lines slice to reflect the new tags.
+//
+// Unlike the other list fields, an empty result keeps the key as "tags: []"
+// rather than removing it.
 func applyTagUpdates(lines []string, openIdx, closeIdx int, _ []string, newTags []string) ([]string, int) {
-	tagsLineIdx := -1
-	for i := openIdx + 1; i < closeIdx; i++ {
-		if strings.HasPrefix(strings.TrimSpace(lines[i]), "tags:") {
-			tagsLineIdx = i
-			break
-		}
+	f, found := findListField(lines, openIdx, closeIdx, "tags")
+	if !found {
+		lines = insertLine(lines, closeIdx, FormatInlineTags(newTags))
+		return lines, closeIdx + 1
 	}
-
-	if tagsLineIdx < 0 {
-		tagLine := FormatInlineTags(newTags)
-		lines = insertLine(lines, closeIdx, tagLine)
-		closeIdx++
-		return lines, closeIdx
-	}
-
-	// Detect inline vs multiline format.
-	if strings.Contains(lines[tagsLineIdx], "[") {
-		lines[tagsLineIdx] = FormatInlineTags(newTags)
-		return lines, closeIdx
-	}
-
-	// Multiline format
-	removeStart := tagsLineIdx + 1
-	removeEnd := removeStart
-	for removeEnd < closeIdx && strings.HasPrefix(strings.TrimSpace(lines[removeEnd]), "- ") {
-		removeEnd++
-	}
-
-	var newTagLines []string
-	for _, t := range newTags {
-		newTagLines = append(newTagLines, "  - "+t)
-	}
-
-	before := lines[:removeStart]
-	after := lines[removeEnd:]
-	result := make([]string, 0, len(before)+len(newTagLines)+len(after))
-	result = append(result, before...)
-	result = append(result, newTagLines...)
-	result = append(result, after...)
-
-	closeIdx += len(newTagLines) - (removeEnd - removeStart)
-	return result, closeIdx
+	return replaceListField(lines, closeIdx, f, listFieldLines("tags", f.shape, newTags, keepEmptyKey))
 }
 
 // FormatInlineTags formats tags as inline YAML: tags: ["a", "b"]
@@ -378,80 +333,24 @@ func FormatInlineTags(tags []string) string {
 
 // parseCurrentListField reads an inline YAML list field (e.g. pr: ["a", "b"]) from frontmatter.
 func parseCurrentListField(lines []string, openIdx, closeIdx int, fieldName string) []string {
-	prefix := fieldName + ":"
-	for i := openIdx + 1; i < closeIdx; i++ {
-		if !strings.HasPrefix(strings.TrimSpace(lines[i]), prefix) {
-			continue
-		}
-		if strings.Contains(lines[i], "[") {
-			return parseInlineTags(strings.TrimSpace(lines[i]))
-		}
-		return parseMultilineTags(lines, i+1, closeIdx)
+	f, found := findListField(lines, openIdx, closeIdx, fieldName)
+	if !found {
+		return nil
 	}
-	return nil
+	return f.values
 }
 
 // applyListFieldUpdates modifies the lines slice to reflect the new list values for a named field.
 func applyListFieldUpdates(lines []string, openIdx, closeIdx int, fieldName string, newValues []string) ([]string, int) {
-	prefix := fieldName + ":"
-	lineIdx := -1
-	for i := openIdx + 1; i < closeIdx; i++ {
-		if strings.HasPrefix(strings.TrimSpace(lines[i]), prefix) {
-			lineIdx = i
-			break
-		}
-	}
-
-	if lineIdx < 0 {
+	f, found := findListField(lines, openIdx, closeIdx, fieldName)
+	if !found {
 		if len(newValues) == 0 {
 			return lines, closeIdx
 		}
-		newLine := FormatInlineList(fieldName, newValues)
-		lines = insertLine(lines, closeIdx, newLine)
-		closeIdx++
-		return lines, closeIdx
+		lines = insertLine(lines, closeIdx, FormatInlineList(fieldName, newValues))
+		return lines, closeIdx + 1
 	}
-
-	// Inline format
-	if strings.Contains(lines[lineIdx], "[") {
-		if len(newValues) == 0 {
-			// Remove the field line entirely
-			lines = append(lines[:lineIdx], lines[lineIdx+1:]...)
-			closeIdx--
-		} else {
-			lines[lineIdx] = FormatInlineList(fieldName, newValues)
-		}
-		return lines, closeIdx
-	}
-
-	// Multiline format
-	removeStart := lineIdx + 1
-	removeEnd := removeStart
-	for removeEnd < closeIdx && strings.HasPrefix(strings.TrimSpace(lines[removeEnd]), "- ") {
-		removeEnd++
-	}
-
-	if len(newValues) == 0 {
-		// Remove field key line and all item lines
-		lines = append(lines[:lineIdx], lines[removeEnd:]...)
-		closeIdx -= removeEnd - lineIdx
-		return lines, closeIdx
-	}
-
-	var newItemLines []string
-	for _, v := range newValues {
-		newItemLines = append(newItemLines, "  - "+v)
-	}
-
-	before := lines[:removeStart]
-	after := lines[removeEnd:]
-	result := make([]string, 0, len(before)+len(newItemLines)+len(after))
-	result = append(result, before...)
-	result = append(result, newItemLines...)
-	result = append(result, after...)
-
-	closeIdx += len(newItemLines) - (removeEnd - removeStart)
-	return result, closeIdx
+	return replaceListField(lines, closeIdx, f, listFieldLines(fieldName, f.shape, newValues, removeKey))
 }
 
 // FormatInlineList formats a named list field as inline YAML: field: ["a", "b"]
