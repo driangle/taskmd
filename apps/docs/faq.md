@@ -12,7 +12,7 @@ The easiest way is via Homebrew:
 brew tap driangle/tap && brew install taskmd
 ```
 
-Alternatively, download pre-built binaries from the [releases page](https://github.com/driangle/taskmd/releases), install with Go (`go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest`), or [build from source](/getting-started/installation).
+Alternatively, download pre-built binaries from the [releases page](https://github.com/driangle/taskmd/releases), install with Go (`go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest`), or [build from source](/getting-started/installation). Note that `go install` gives you the CLI only — the web dashboard is not included; use a pre-built binary, Homebrew, or Docker for that.
 
 ### What are the system requirements?
 

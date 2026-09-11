@@ -75,6 +75,13 @@ Requires Go 1.22 or later:
 go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
 ```
 
+::: warning CLI only
+`go install` builds the CLI without the web dashboard — the built frontend
+assets are not part of the Go module, so `taskmd web start` will report
+"No web UI embedded in this build". Use a [pre-built binary](#pre-built-binaries),
+[Homebrew](#homebrew-macos-and-linux), or [Docker](#docker) if you want the web dashboard.
+:::
+
 Make sure `$GOPATH/bin` is in your PATH:
 
 ```bash

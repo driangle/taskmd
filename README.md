@@ -48,6 +48,10 @@ sudo mv taskmd /usr/local/bin/  # macOS/Linux
 go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
 ```
 
+> **Note:** `go install` builds the CLI only — the web dashboard is not included
+> (the built frontend assets are not part of the Go module). Use a pre-built
+> binary, Homebrew, or Docker if you want `taskmd web start`.
+
 **Option 4: Build from Source**
 ```bash
 git clone https://github.com/driangle/taskmd.git

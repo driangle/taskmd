@@ -237,6 +237,8 @@ func (s *Server) buildIndexHTML(staticFS fs.FS) []byte {
 }
 
 func (s *Server) mountFallback(mux *http.ServeMux) {
+	fmt.Println("Warning: this build has no embedded web UI (installs via `go install` cannot include it).")
+	fmt.Println("Download a pre-built binary from https://github.com/driangle/taskmd/releases to get the web dashboard.")
 	mux.HandleFunc("/{path...}", func(w http.ResponseWriter, r *http.Request) {
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
 			http.NotFound(w, r)
@@ -244,10 +246,13 @@ func (s *Server) mountFallback(mux *http.ServeMux) {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, `<!DOCTYPE html>
-<html><body style="font-family:system-ui;max-width:480px;margin:80px auto;text-align:center">
+<html><body style="font-family:system-ui;max-width:520px;margin:80px auto;text-align:center">
 <h2>taskmd</h2>
 <p>No web UI embedded in this build.</p>
-<p>Rebuild with <code>make build-full</code> or use <code>--dev</code> mode with the Vite dev server.</p>
+<p>Builds installed with <code>go install</code> include the CLI only. To get the web dashboard,
+download a pre-built binary from the
+<a href="https://github.com/driangle/taskmd/releases">releases page</a>
+or build from source with <code>make build-full</code>.</p>
 </body></html>`)
 	})
 }
