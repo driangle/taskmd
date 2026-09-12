@@ -78,17 +78,6 @@ func runValidate(cmd *cobra.Command, args []string) error {
 
 	tasks := result.Tasks
 
-	// Report scan errors if any
-	if len(result.Errors) > 0 {
-		if !flags.Quiet {
-			fmt.Fprintf(os.Stderr, "Warning: encountered %d errors during scan:\n", len(result.Errors))
-			for _, scanErr := range result.Errors {
-				fmt.Fprintf(os.Stderr, "  %s: %v\n", scanErr.FilePath, scanErr.Error)
-			}
-			fmt.Fprintln(os.Stderr)
-		}
-	}
-
 	// With the overlay active, copies scanned from a sibling checkout nested
 	// in the scan root belong to that worktree — validating them here would
 	// flag cross-worktree copies as duplicate IDs (spec §8).
@@ -111,6 +100,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	validationResult := v.Validate(tasks)
 	validateConfig(v, validationResult, tasks)
 	addOverlayWarnings(validationResult, overlay)
+	addScanErrors(validationResult, result.Errors)
 
 	// Output results
 	switch validateFormat {
@@ -132,6 +122,16 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// addScanErrors merges scan errors (files the scanner could not read or
+// parse as tasks — e.g. task-like files with malformed YAML frontmatter)
+// into the validation result as errors, so validate fails instead of
+// silently reporting fewer tasks than exist on disk.
+func addScanErrors(result *validator.ValidationResult, scanErrors []scanner.ScanError) {
+	for _, scanErr := range scanErrors {
+		result.AddIssue(validator.LevelError, "", scanErr.FilePath, scanErr.Error.Error())
+	}
 }
 
 // addOverlayWarnings merges the overlay's cross-worktree consistency warnings

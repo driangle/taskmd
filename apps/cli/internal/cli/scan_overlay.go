@@ -17,7 +17,7 @@ func scanTasksWithOverlay(scanDir string, flags GlobalFlags) ([]*model.Task, *wo
 	if err != nil {
 		return nil, nil, fmt.Errorf("scan failed: %w", err)
 	}
-	reportScanErrors(result.Errors, flags.Verbose)
+	reportScanErrors(result.Errors, flags.Quiet)
 
 	overlay, err := buildWorktreeOverlay(scanDir, result.Tasks, flags)
 	if err != nil {

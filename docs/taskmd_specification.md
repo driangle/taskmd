@@ -526,6 +526,16 @@ A valid taskmd file **must**:
 6. Have no circular dependency chains
 7. Reference an existing task in `parent` (if set), with no self-reference or parent cycles
 
+Not every markdown file under the task directory has to be a task — files
+without frontmatter, or whose frontmatter lacks the required fields, are
+silently skipped. A file whose frontmatter is present but **not valid YAML**
+is treated as a broken task file — reported by `validate` as an error and
+warned about by other commands — when its raw frontmatter text contains at
+least one task-signature key (`id`, `status`, `priority`, or `dependencies`
+at the start of a line). Malformed frontmatter without any of those keys is
+assumed to be foreign markdown (a docs page, a blog post) and skipped
+silently. The check is textual because the frontmatter cannot be parsed.
+
 A valid taskmd file **should**:
 
 1. Follow the `NNN-task-name.md` naming pattern

@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -108,9 +109,16 @@ func (s *Scanner) Scan() (*ScanResult, error) {
 		// Try to parse as a task file
 		task, err := parser.ParseTaskFile(path)
 		if err != nil {
-			// Not all .md files are tasks, so we silently skip parse errors
-			// unless verbose mode is enabled
-			if s.verbose {
+			// A file whose frontmatter is present but malformed, and which
+			// carries task-signature keys, is a broken task file — report it
+			// instead of letting it silently vanish from every view.
+			// Everything else is assumed to be foreign markdown and skipped.
+			if isMalformedTaskFile(err) {
+				result.Errors = append(result.Errors, ScanError{
+					FilePath: path,
+					Error:    err,
+				})
+			} else if s.verbose {
 				fmt.Fprintf(os.Stderr, "Skipping %s: %v\n", path, err)
 			}
 			return nil
@@ -140,6 +148,14 @@ func (s *Scanner) Scan() (*ScanResult, error) {
 	}
 
 	return result, nil
+}
+
+// isMalformedTaskFile reports whether a parse error came from a file that was
+// clearly intended to be a task (frontmatter present, task-signature keys)
+// but has invalid frontmatter. See parser.HasTaskSignature for the contract.
+func isMalformedTaskFile(err error) bool {
+	var parseErr *parser.ParseError
+	return errors.As(err, &parseErr) && parseErr.MalformedTaskFrontmatter()
 }
 
 // shouldSkipDirectory determines if a directory should be skipped during scanning.

@@ -21,6 +21,19 @@ type ParseError struct {
 	FilePath string
 	Message  string
 	Err      error
+	// Frontmatter holds the raw frontmatter text when the error came from a
+	// frontmatter block that was present but could not be parsed. It is nil
+	// for other errors (missing file, no frontmatter, missing fields).
+	Frontmatter []byte
+}
+
+// MalformedTaskFrontmatter reports whether this error came from a file whose
+// frontmatter was present but invalid, and whose raw text carries
+// task-signature keys (see HasTaskSignature). Scanners use it to distinguish
+// a broken task file, which must be reported, from foreign markdown, which is
+// silently skipped.
+func (e *ParseError) MalformedTaskFrontmatter() bool {
+	return len(e.Frontmatter) > 0 && HasTaskSignature(e.Frontmatter)
 }
 
 func (e *ParseError) Error() string {
@@ -55,10 +68,14 @@ func ParseTaskContent(filePath string, content []byte) (*model.Task, error) {
 
 	frontmatter, body, err := extractFrontmatter(content)
 	if err != nil {
+		// The only extraction error is an unclosed frontmatter block, so the
+		// file did open a frontmatter delimiter; expose the raw content for
+		// task-signature sniffing.
 		return nil, &ParseError{
-			FilePath: filePath,
-			Message:  "failed to extract frontmatter",
-			Err:      err,
+			FilePath:    filePath,
+			Message:     "failed to extract frontmatter",
+			Err:         err,
+			Frontmatter: content,
 		}
 	}
 
@@ -70,9 +87,10 @@ func ParseTaskContent(filePath string, content []byte) (*model.Task, error) {
 	if len(frontmatter) > 0 {
 		if err := yaml.Unmarshal(frontmatter, task); err != nil {
 			return nil, &ParseError{
-				FilePath: filePath,
-				Message:  "failed to parse YAML frontmatter",
-				Err:      err,
+				FilePath:    filePath,
+				Message:     "failed to parse YAML frontmatter",
+				Err:         err,
+				Frontmatter: frontmatter,
 			}
 		}
 		// Backward compatibility: accept deprecated "created" field

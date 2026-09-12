@@ -1,9 +1,5 @@
 ---
-<<<<<<<< HEAD:tasks/cli/197-verbose-log-ignored-directories.md
 id: "197"
-========
-id: "198"
->>>>>>>> 61fbfc5 (chore: added task 195):tasks/cli/198-verbose-log-ignored-directories.md
 title: "Log debug message when directories are skipped via ignore config"
 status: pending
 priority: low

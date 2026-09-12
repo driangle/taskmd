@@ -15,16 +15,15 @@ func newTaskScanner(scanDir string, flags GlobalFlags) *scanner.Scanner {
 	return scanner.NewScanner(scanDir, flags.Verbose, flags.IgnoreDirs)
 }
 
-// scanTasks scans scanDir for tasks, reporting scan errors to stderr when
-// verbose is enabled and warning about duplicate IDs. It returns the
-// discovered tasks.
+// scanTasks scans scanDir for tasks, reporting scan errors to stderr and
+// warning about duplicate IDs. It returns the discovered tasks.
 func scanTasks(scanDir string, flags GlobalFlags) ([]*model.Task, error) {
 	result, err := newTaskScanner(scanDir, flags).Scan()
 	if err != nil {
 		return nil, fmt.Errorf("scan failed: %w", err)
 	}
 
-	reportScanErrors(result.Errors, flags.Verbose)
+	reportScanErrors(result.Errors, flags.Quiet)
 	warnDuplicateIDs(result.Tasks)
 
 	return result.Tasks, nil
@@ -40,7 +39,7 @@ func scanActiveAndArchived(scanDir string, flags GlobalFlags) (active, archived 
 		return nil, nil, fmt.Errorf("scan failed: %w", err)
 	}
 
-	reportScanErrors(result.Errors, flags.Verbose)
+	reportScanErrors(result.Errors, flags.Quiet)
 	warnDuplicateIDs(result.Tasks)
 
 	archived, err = taskScanner.ScanArchive()
@@ -70,9 +69,11 @@ func scanIDPool(scanDir string, flags GlobalFlags) ([]string, error) {
 	return ids, nil
 }
 
-// reportScanErrors prints scan errors to stderr when verbose is enabled.
-func reportScanErrors(errs []scanner.ScanError, verbose bool) {
-	if !verbose || len(errs) == 0 {
+// reportScanErrors prints scan errors to stderr. These are files the scanner
+// judged to be broken task files (e.g. malformed YAML frontmatter), so they
+// are surfaced even without --verbose; --quiet suppresses them.
+func reportScanErrors(errs []scanner.ScanError, quiet bool) {
+	if quiet || len(errs) == 0 {
 		return
 	}
 
