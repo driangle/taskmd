@@ -25,5 +25,13 @@ WORKDIR /tasks
 
 EXPOSE 8080
 
+# Bind the web server to every interface inside the container.
+# `taskmd web start` defaults to 127.0.0.1, which is correct on a host but
+# unreachable through Docker's published-port DNAT: the container's network
+# namespace is already the isolation boundary and `-p` is the operator's
+# explicit opt-in. Set as ENV rather than baked into CMD so that documented
+# CMD overrides (e.g. `web start --port 3000`) keep working unchanged.
+ENV TASKMD_WEB_HOST=0.0.0.0
+
 ENTRYPOINT ["tini", "--"]
 CMD ["taskmd", "web", "start"]

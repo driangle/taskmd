@@ -1,11 +1,12 @@
 ---
 title: "Fix Docker image broken by loopback web bind default"
 id: "01m2xmkd6"
-status: pending
+status: completed
 priority: high
 type: bug
 tags: ["docker", "web", "ci"]
 created: "2026-09-19"
+completed: "2026-09-19"
 ---
 
 # Fix Docker image broken by loopback web bind default
@@ -52,35 +53,35 @@ host. The image must opt back in; the fix does not belong in the docs.
 
 ## Tasks
 
-- [ ] Add an explicit wildcard bind to `Dockerfile` (line ~76) and
+- [x] Add an explicit wildcard bind to `Dockerfile` (line ~76) and
       `Dockerfile.release` (line ~29) — either `CMD ["taskmd", "web", "start",
       "--host", "0.0.0.0"]` or `ENV TASKMD_WEB_HOST=0.0.0.0`. Prefer the `ENV`
       form if `CMD` overrides in the docs should keep working without the flag.
-- [ ] Fix the CI assertion in `.github/workflows/ci.yml` (~line 262): the
+- [x] Fix the CI assertion in `.github/workflows/ci.yml` (~line 262): the
       "Test Docker image" step runs under Actions' default `bash -e {0}` with
       no `pipefail`, so `curl -sf ... | head -c 500` always exits 0. Add
       `shell: bash` to the step so the pipeline status is honored.
-- [ ] Confirm the smoke test actually fails against an unfixed image before
+- [x] Confirm the smoke test actually fails against an unfixed image before
       landing the Dockerfile change (guard against re-introducing false
       confidence).
-- [ ] Document `TASKMD_WEB_HOST` in the Environment Variables section of
+- [x] Document `TASKMD_WEB_HOST` in the Environment Variables section of
       `apps/docs/reference/configuration.md`; it is the natural fix for Docker
       Compose users and is currently undocumented (as is `TASKMD_WEB_PORT`,
       which `installation.md` already uses).
-- [ ] Re-check the Docker Compose example in `apps/docs/guide/web.md` (~line
+- [x] Re-check the Docker Compose example in `apps/docs/guide/web.md` (~line
       498) once the image is fixed.
 
 ## Acceptance Criteria
 
-- [ ] `docker run -d -p 8080:8080 -v ./tasks:/tasks:ro <image>` serves
+- [x] `docker run -d -p 8080:8080 -v ./tasks:/tasks:ro <image>` serves
       `GET /api/tasks` on the host with no extra flags.
-- [ ] Both `Dockerfile` and `Dockerfile.release` produce a reachable server.
-- [ ] The CI Docker smoke test fails (non-zero exit) when the server is
+- [x] Both `Dockerfile` and `Dockerfile.release` produce a reachable server.
+- [x] The CI Docker smoke test fails (non-zero exit) when the server is
       unreachable, demonstrated against a deliberately loopback-bound image.
-- [ ] Every `docker run` example in `README.md`,
+- [x] Every `docker run` example in `README.md`,
       `apps/docs/getting-started/installation.md` and `apps/docs/guide/web.md`
       works as written.
-- [ ] `TASKMD_WEB_HOST` appears in the configuration reference.
+- [x] `TASKMD_WEB_HOST` appears in the configuration reference.
 
 ## Notes
 

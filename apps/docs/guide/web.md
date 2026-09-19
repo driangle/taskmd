@@ -505,6 +505,13 @@ services:
       - ./tasks:/tasks
 ```
 
+::: tip Binding inside the container
+`taskmd web start` binds `127.0.0.1` by default, which would be unreachable
+through a published port. The image sets `TASKMD_WEB_HOST=0.0.0.0` for you, so
+no extra flag is needed. If you override the command with your own `--host`,
+keep it at `0.0.0.0`.
+:::
+
 ::: tip
 You can also use the Docker image to run any taskmd CLI command, not just the web server. For example: `docker run -v $(pwd)/tasks:/tasks ghcr.io/driangle/taskmd:latest taskmd list`
 :::

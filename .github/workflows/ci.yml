@@ -245,6 +245,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Test Docker image
+        # `shell: bash` runs the script with `-eo pipefail`. Without it, Actions'
+        # default `bash -e {0}` has no pipefail, so `curl -sf ... | head -c 500`
+        # takes its status from `head` and the assertion can never fail.
+        shell: bash
         run: |
           # Create a test task file
           mkdir -p test-tasks
@@ -273,7 +277,7 @@ jobs:
             sleep 1
           done
 
-          # Verify API endpoints
+          # Verify API endpoints (pipefail makes a failing curl fail the step)
           curl -sf http://localhost:8080/api/tasks | head -c 500
           echo
           curl -sf http://localhost:8080/api/config | head -c 500

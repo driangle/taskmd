@@ -278,12 +278,27 @@ web:
 
 ## Environment Variables
 
-taskmd supports environment variables with the `TASKMD_` prefix:
+taskmd supports environment variables with the `TASKMD_` prefix. Nested config
+keys map to an underscore, so `web.host` becomes `TASKMD_WEB_HOST`:
 
 ```bash
 export TASKMD_DIR=./tasks
 export TASKMD_VERBOSE=true
 ```
+
+| Variable | Config key | Description |
+|----------|-----------|-------------|
+| `TASKMD_DIR` | `dir` | Task directory to scan |
+| `TASKMD_VERBOSE` | `verbose` | Enable verbose output |
+| `TASKMD_WEB_HOST` | `web.host` | Address the web server binds to (default `127.0.0.1`; use `0.0.0.0` to accept connections from other hosts) |
+| `TASKMD_WEB_PORT` | `web.port` | Port the web server listens on (default `8080`) |
+
+::: tip Docker
+The published image already sets `TASKMD_WEB_HOST=0.0.0.0` so that
+`docker run -p 8080:8080 ...` works out of the box — inside a container the
+network namespace is the isolation boundary and `-p` is the explicit opt-in.
+Override it if you want to restrict the bind further.
+:::
 
 **Precedence** (highest to lowest):
 1. Command-line flags
