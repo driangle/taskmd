@@ -1863,7 +1863,9 @@ export TASKMD_DIR=./tasks
 export TASKMD_VERBOSE=true
 ```
 
-Environment variables have lower precedence than config files and CLI flags.
+Environment variables override both `.taskmd.yaml` files but are themselves
+overridden by CLI flags. Full order, highest to lowest: flags, environment
+variables, project `.taskmd.yaml`, global `~/.taskmd.yaml`, built-in defaults.
 
 ## Troubleshooting
 

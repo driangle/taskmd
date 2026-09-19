@@ -302,10 +302,14 @@ Override it if you want to restrict the bind further.
 
 **Precedence** (highest to lowest):
 1. Command-line flags
-2. Project-level `.taskmd.yaml`
-3. Global `~/.taskmd.yaml`
-4. Environment variables
+2. Environment variables (`TASKMD_*`)
+3. Project-level `.taskmd.yaml`
+4. Global `~/.taskmd.yaml`
 5. Built-in defaults
+
+An environment variable overrides both config files. This is what makes
+`docker run -e TASKMD_WEB_PORT=3000` work against an image whose mounted
+project already carries a `.taskmd.yaml`.
 
 ## Sync Configuration {#sync-configuration}
 
