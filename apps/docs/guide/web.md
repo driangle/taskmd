@@ -18,9 +18,43 @@ taskmd web start --port 3000 --open
 
 # Specific tasks directory
 taskmd web start --task-dir ./my-tasks --open
+
+# Reachable from other machines (see Network Access below)
+taskmd web start --host 0.0.0.0 --readonly
 ```
 
-The server starts on `http://localhost:8080` by default.
+The server starts on `http://127.0.0.1:8080` by default, reachable only from
+the machine running it.
+
+### Network Access
+
+By default the dashboard binds `127.0.0.1`, so nothing outside the machine can
+reach it. Use `--host` to widen that:
+
+```bash
+# All interfaces
+taskmd web start --host 0.0.0.0
+
+# One interface on a multi-homed host
+taskmd web start --host 10.0.0.1 --port 8380
+```
+
+It can also live in `.taskmd.yaml`:
+
+```yaml
+web:
+  host: 0.0.0.0
+  readonly: true
+```
+
+::: warning No authentication
+The JSON API is unauthenticated, and unless `--readonly` is passed it serves
+`PUT /api/tasks/{id}`, which rewrites task files on disk. Anyone who can reach
+the address can read and edit your tasks. When binding beyond loopback, pair it
+with `--readonly` and restrict access at the host level (firewall, VPN, or an
+authenticating reverse proxy). The startup banner warns whenever the bind is
+not loopback.
+:::
 
 ### Live Reload
 

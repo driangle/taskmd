@@ -121,6 +121,17 @@ Yes. It watches for file changes and updates automatically via Server-Sent Event
 
 Default is 8080. Change it with `--port`: `taskmd web start --port 3000`.
 
+### Why can't I reach the dashboard from another machine?
+
+By design: `taskmd web start` binds `127.0.0.1`, so it only accepts connections
+from the machine running it. Bind every interface with `taskmd web start --host
+0.0.0.0`, or set `web.host` in `.taskmd.yaml`.
+
+Do this deliberately. The API is unauthenticated and, unless you pass
+`--readonly`, `PUT /api/tasks/{id}` rewrites task files on disk — so a wider
+bind hands task read/write access to anything that can reach the address. Pair
+it with `--readonly` and a firewall or VPN on untrusted networks.
+
 ### Can I use the web UI in production?
 
 The web UI is designed for local development and personal use. It has **no authentication** and lacks the security features needed for internet-facing deployments. While it's suitable for small teams on trusted networks, treat it as a development tool rather than a production application.

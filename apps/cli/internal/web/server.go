@@ -24,7 +24,10 @@ type PhaseInfo struct {
 
 // Config holds server configuration.
 type Config struct {
-	Port     int
+	Port int
+	// Host is the bind address. The zero value means 127.0.0.1 — see
+	// defaultHost in bindaddr.go for why the default is loopback.
+	Host     string
 	ScanDir  string
 	Dev      bool
 	Verbose  bool
@@ -97,8 +100,9 @@ func (s *Server) Start(ctx context.Context) error {
 		handler = corsMiddleware(handler)
 	}
 
+	addr := listenAddr(s.config.Host, s.config.Port)
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.config.Port),
+		Addr:    addr,
 		Handler: handler,
 	}
 
@@ -118,9 +122,9 @@ func (s *Server) Start(ctx context.Context) error {
 		srv.Shutdown(shutdownCtx)
 	}()
 
-	listener, err := net.Listen("tcp", srv.Addr)
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on port %d: %w", s.config.Port, err)
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
 
 	s.printBanner()
@@ -151,7 +155,14 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) printBanner() {
-	fmt.Printf("taskmd web server running at http://localhost:%d\n", s.config.Port)
+	host := resolveHost(s.config.Host)
+	fmt.Printf("taskmd web server running at %s\n", BrowseURL(host, s.config.Port))
+	if isWildcardHost(host) {
+		fmt.Printf("Bound to %s: reachable on every network interface of this host\n", host)
+	}
+	if !isLoopbackHost(host) {
+		fmt.Println(exposureWarning(s.config.ReadOnly))
+	}
 	fmt.Printf("Watching %s for changes\n", s.config.ScanDir)
 	if s.config.ReadOnly {
 		fmt.Println("Read-only mode: editing is disabled")

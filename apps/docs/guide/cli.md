@@ -1459,6 +1459,9 @@ taskmd web start --open
 # Custom port
 taskmd web start --port 3000
 
+# Bind a specific address (default: 127.0.0.1, this machine only)
+taskmd web start --host 0.0.0.0 --readonly
+
 # Read-only mode (disables editing)
 taskmd web start --readonly
 
@@ -1471,9 +1474,16 @@ taskmd web start --task-dir ./my-tasks --open
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--port` | `8080` | Server port |
+| `--host` | `127.0.0.1` | Bind address; `0.0.0.0` binds every interface |
 | `--open` | `false` | Open browser on start |
 | `--dev` | `false` | Enable dev mode (CORS for Vite dev server) |
 | `--readonly` | `false` | Start in read-only mode (disables editing) |
+
+::: warning
+The dashboard binds `127.0.0.1` by default and is reachable only from this
+machine. Its API is unauthenticated and, without `--readonly`, can rewrite task
+files, so widen the bind with `--host` only on networks you trust.
+:::
 
 #### web export
 

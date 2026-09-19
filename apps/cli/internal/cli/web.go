@@ -19,6 +19,7 @@ import (
 
 var (
 	webPort     int
+	webHost     string
 	webDev      bool
 	webOpen     bool
 	webReadOnly bool
@@ -45,7 +46,13 @@ Examples:
   taskmd web start
   taskmd web start --task-dir ./tasks
   taskmd web start --port 3000
-  taskmd web start --dev --port 8080 --task-dir ./tasks`,
+  taskmd web start --host 0.0.0.0 --readonly
+  taskmd web start --dev --port 8080 --task-dir ./tasks
+
+By default the server binds 127.0.0.1 and is reachable only from this machine.
+The API is unauthenticated and, unless --readonly is passed, can rewrite task
+files on disk, so widening the bind with --host exposes that to whoever can
+reach the address.`,
 	Args: cobra.NoArgs,
 	RunE: runWebStart,
 }
@@ -55,12 +62,21 @@ func init() {
 	webCmd.AddCommand(webStartCmd)
 
 	webStartCmd.Flags().IntVar(&webPort, "port", 8080, "server port")
+	webStartCmd.Flags().StringVar(&webHost, "host", "127.0.0.1",
+		"bind address (127.0.0.1 = this machine only, 0.0.0.0 = all interfaces)")
 	webStartCmd.Flags().BoolVar(&webDev, "dev", false, "enable dev mode (CORS for Vite dev server)")
 	webStartCmd.Flags().BoolVar(&webOpen, "open", false, "open browser on start")
 	webStartCmd.Flags().BoolVar(&webReadOnly, "readonly", false, "start in read-only mode (disables editing)")
 
-	// Bind flags to viper for config file support
+	bindWebFlags()
+}
+
+// bindWebFlags binds `web start` flags to their config-file keys. It is a
+// named function so tests can restore the bindings after viper.Reset()
+// without restating them.
+func bindWebFlags() {
 	viper.BindPFlag("web.port", webStartCmd.Flags().Lookup("port"))
+	viper.BindPFlag("web.host", webStartCmd.Flags().Lookup("host"))
 	viper.BindPFlag("web.auto_open_browser", webStartCmd.Flags().Lookup("open"))
 	viper.BindPFlag("web.readonly", webStartCmd.Flags().Lookup("readonly"))
 }
@@ -78,6 +94,7 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 
 	// Read from viper to support config file values
 	port := viper.GetInt("web.port")
+	host := viper.GetString("web.host")
 	open := viper.GetBool("web.auto_open_browser")
 	flags := GetGlobalFlags()
 
@@ -88,6 +105,7 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 
 	srv := web.NewServer(web.Config{
 		Port:           port,
+		Host:           host,
 		ScanDir:        absDir,
 		Dev:            webDev,
 		Verbose:        flags.Verbose,
@@ -107,7 +125,7 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	if open {
-		go openBrowser(fmt.Sprintf("http://localhost:%d", port))
+		go openBrowser(web.BrowseURL(host, port))
 	}
 
 	return srv.Start(ctx)

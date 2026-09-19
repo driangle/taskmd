@@ -20,6 +20,13 @@ web:
   # This sets the default value for the --port flag in 'taskmd web start'
   port: 8080
 
+  # Bind address for the web dashboard server
+  # This sets the default value for the --host flag in 'taskmd web start'
+  # 127.0.0.1 (default) accepts connections only from this machine.
+  # 0.0.0.0 accepts them on every network interface -- note the API is
+  # unauthenticated and can rewrite task files unless readonly is true.
+  host: 127.0.0.1
+
   # Automatically open browser when starting the web server
   # This sets the default value for the --open flag in 'taskmd web start'
   auto_open_browser: false

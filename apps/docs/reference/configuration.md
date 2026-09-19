@@ -17,6 +17,10 @@ web:
   # Default port for the web dashboard
   port: 8080
 
+  # Bind address. 127.0.0.1 (the default) accepts connections only from this
+  # machine; 0.0.0.0 accepts them on every network interface.
+  host: 127.0.0.1
+
   # Automatically open browser when starting the web server
   auto_open_browser: false
 ```
@@ -43,6 +47,7 @@ Command-line flags always override config file values.
 | `worktree_scope` | string | `"unified"` | `unified` merges task state across git worktrees; `isolated` keeps each worktree to its own files ([details](#worktree-scope-configuration)) |
 | `todos.exclude` | string[] | `[]` | Glob patterns to exclude from TODO/FIXME scanning |
 | `web.port` | integer | `8080` | Web server port |
+| `web.host` | string | `127.0.0.1` | Web server bind address; `0.0.0.0` binds every interface ([details](#web-bind-address)) |
 | `web.auto_open_browser` | boolean | `false` | Auto-open browser on `web start` |
 | `web.readonly` | boolean | `false` | Start web server in read-only mode (disables editing) |
 | `id.strategy` | string | `"sequential"` | ID generation strategy ([details](#id-strategy-configuration)) |
@@ -190,6 +195,51 @@ Override per invocation with the global `--worktree-scope` flag or the
 `TASKMD_WORKTREE_SCOPE` environment variable — unlike the config key, an
 explicit override applies to every project in the run. See the
 [CLI guide](/guide/cli#git-worktrees) for the full behavior reference.
+
+## Web Bind Address {#web-bind-address}
+
+`web.host` controls which network interface the dashboard listens on. The
+default, `127.0.0.1`, accepts connections only from the machine running the
+server.
+
+```yaml
+web:
+  host: 127.0.0.1   # this machine only (default)
+  port: 8080
+```
+
+The dashboard's JSON API has **no authentication**, and unless read-only mode
+is on it serves `PUT /api/tasks/{id}`, which rewrites task markdown on disk.
+Widening the bind makes that reachable by anything that can route to the
+address, so treat `--host` as a deliberate choice rather than a convenience.
+
+To reach the dashboard from another machine, bind every interface:
+
+```bash
+taskmd web start --host 0.0.0.0
+```
+
+On a multi-homed host, bind the one interface you mean:
+
+```bash
+taskmd web start --host 10.0.0.1 --port 8380
+```
+
+Whenever the bind is not loopback, the startup banner prints a warning naming
+what is exposed. Pair a wider bind with `--readonly` when you only need to view
+tasks remotely:
+
+```yaml
+web:
+  host: 0.0.0.0
+  readonly: true
+```
+
+::: warning
+taskmd does not authenticate web requests. On an untrusted network, restrict
+access at the host level (firewall, VPN, or a reverse proxy that adds auth)
+rather than relying on the bind address alone.
+:::
 
 ## Usage Examples
 

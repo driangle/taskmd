@@ -145,6 +145,11 @@ The web interface provides:
 - **Graph View**: Interactive dependency visualization
 - **Statistics**: Project metrics and progress tracking
 
+The server binds `127.0.0.1` by default, so it is reachable only from your
+machine. To reach it from elsewhere, pass `--host 0.0.0.0` — but note the API
+is unauthenticated and can rewrite task files unless `--readonly` is set, so
+pair a wider bind with `--readonly`, a firewall, or a VPN.
+
 ## Documentation
 
 **[Read the full documentation →](https://driangle.github.io/taskmd/)**

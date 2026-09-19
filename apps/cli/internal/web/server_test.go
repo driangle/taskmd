@@ -1,8 +1,10 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -236,8 +238,11 @@ func TestPrintBanner_Default(t *testing.T) {
 		s.printBanner()
 	})
 
-	if !strings.Contains(output, "http://localhost:8080") {
-		t.Errorf("expected banner to show port 8080, got %q", output)
+	if !strings.Contains(output, "http://127.0.0.1:8080") {
+		t.Errorf("expected banner to show the loopback bind address, got %q", output)
+	}
+	if strings.Contains(output, "WARNING") {
+		t.Errorf("unexpected exposure warning for a loopback bind, got %q", output)
 	}
 	if !strings.Contains(output, fmt.Sprintf("Watching %s", dir)) {
 		t.Errorf("expected banner to show scan dir, got %q", output)
@@ -263,5 +268,106 @@ func TestPrintBanner_ReadOnlyAndDev(t *testing.T) {
 	}
 	if !strings.Contains(output, "Dev mode") {
 		t.Error("expected dev mode message in banner")
+	}
+}
+
+func TestPrintBanner_WildcardWarnsAndNamesBind(t *testing.T) {
+	dir := createTestTaskDir(t)
+	s := NewServer(Config{Port: 8080, Host: "0.0.0.0", ScanDir: dir})
+
+	output := captureStdout(t, func() {
+		s.printBanner()
+	})
+
+	// The bug in issue #23: the banner said "localhost" while bound to every
+	// interface, and nothing corrected the reader.
+	if !strings.Contains(output, "Bound to 0.0.0.0") {
+		t.Errorf("expected banner to name the wildcard bind, got %q", output)
+	}
+	if !strings.Contains(output, "WARNING") {
+		t.Errorf("expected an exposure warning for a wildcard bind, got %q", output)
+	}
+	if !strings.Contains(output, "PUT /api/tasks/{id}") {
+		t.Errorf("expected the warning to name the write endpoint, got %q", output)
+	}
+}
+
+func TestPrintBanner_SpecificHostShowsRealAddress(t *testing.T) {
+	dir := createTestTaskDir(t)
+	s := NewServer(Config{Port: 8380, Host: "10.0.0.1", ScanDir: dir})
+
+	output := captureStdout(t, func() {
+		s.printBanner()
+	})
+
+	if !strings.Contains(output, "http://10.0.0.1:8380") {
+		t.Errorf("expected banner to show the configured address, got %q", output)
+	}
+	if strings.Contains(output, "localhost") {
+		t.Errorf("banner should not claim localhost for a specific bind, got %q", output)
+	}
+	if strings.Contains(output, "Bound to") {
+		t.Errorf("a specific bind is not a wildcard, got %q", output)
+	}
+	if !strings.Contains(output, "WARNING") {
+		t.Errorf("expected an exposure warning for a non-loopback bind, got %q", output)
+	}
+}
+
+func TestPrintBanner_WildcardReadOnlyWarnsWithoutWriteClaim(t *testing.T) {
+	dir := createTestTaskDir(t)
+	s := NewServer(Config{Port: 8080, Host: "0.0.0.0", ScanDir: dir, ReadOnly: true})
+
+	output := captureStdout(t, func() {
+		s.printBanner()
+	})
+
+	if !strings.Contains(output, "WARNING") {
+		t.Errorf("expected an exposure warning even in read-only mode, got %q", output)
+	}
+	if strings.Contains(output, "PUT /api/tasks/{id}") {
+		t.Errorf("read-only mode should not warn about writes, got %q", output)
+	}
+}
+
+// Proof of the default against a real socket: the OS must report a loopback
+// bind, not a wildcard one.
+func TestDefaultBind_RealListenerIsLoopbackOnly(t *testing.T) {
+	// Port 0 lets the OS choose, so this cannot collide with a real server.
+	ln, err := net.Listen("tcp", listenAddr("", 0))
+	if err != nil {
+		t.Fatalf("failed to listen on the default address: %v", err)
+	}
+	defer ln.Close()
+
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("unexpected addr type %T", ln.Addr())
+	}
+	if addr.IP.IsUnspecified() {
+		t.Fatalf("default config bound a wildcard address %q", addr)
+	}
+	if !addr.IP.IsLoopback() {
+		t.Fatalf("default config bound non-loopback address %q", addr)
+	}
+}
+
+// A bind failure on a specific host is a different diagnosis from a port
+// clash, so the error has to name the whole address.
+func TestStart_ListenErrorNamesAddress(t *testing.T) {
+	dir := createTestTaskDir(t)
+	// 192.0.2.0/24 is TEST-NET-1 (RFC 5737): never assigned to a local
+	// interface, so binding it fails everywhere.
+	s := NewServer(Config{Port: 8080, Host: "192.0.2.1", ScanDir: dir})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err := s.Start(ctx)
+	if err == nil {
+		t.Fatal("expected a listen error for an unassignable address")
+	}
+	if !strings.Contains(err.Error(), "192.0.2.1:8080") {
+		t.Errorf("expected the error to name host and port, got %v", err)
 	}
 }

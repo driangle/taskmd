@@ -256,9 +256,13 @@ web:
 		t.Fatalf("failed to change directory: %v", err)
 	}
 
-	// Re-initialize cobra command
-	origRootCmd := rootCmd
-	t.Cleanup(func() { rootCmd = origRootCmd })
+	// Re-initialize cobra command. webCmd/webStartCmd are package globals
+	// carrying the real flag definitions, so they must be restored too or
+	// later tests see a `web start` with no flags.
+	origRootCmd, origWebCmd, origWebStartCmd := rootCmd, webCmd, webStartCmd
+	t.Cleanup(func() {
+		rootCmd, webCmd, webStartCmd = origRootCmd, origWebCmd, origWebStartCmd
+	})
 	rootCmd = &cobra.Command{Use: "taskmd"}
 	webCmd = &cobra.Command{Use: "web"}
 	webStartCmd = &cobra.Command{Use: "start"}
