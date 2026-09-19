@@ -63,53 +63,47 @@ If no arguments are provided, run a full audit and produce a report (no fixes).
 
 ### Phase 5: Cross-reference against documentation
 
-For each discovered item, check whether it is documented in both locations:
+For each discovered item, check whether it is documented in the VitePress docs
+site under `apps/docs/` — the single home for user-facing guides and reference.
 
 #### CLI Commands → Documentation
 
-For each command discovered in Phase 2:
+For each command discovered in Phase 2, check **`apps/docs/guide/cli.md`**:
 
-1. **`apps/docs/guide/cli.md`** (VitePress site):
-   - Is the command listed in the Quick Reference table?
-   - Does it have its own section with usage examples?
-   - Are all flags documented?
-   - Are examples accurate (flag names, defaults match reality)?
-
-2. **`docs/guides/cli-guide.md`** (standalone docs):
-   - Same checks as above.
+- Is the command listed in the Quick Reference table?
+- Does it have its own section with usage examples?
+- Are all flags documented?
+- Are examples accurate (flag names, defaults match reality)?
 
 #### Web Features → Documentation
 
-For each page/API endpoint discovered in Phase 3:
+For each page/API endpoint discovered in Phase 3, check **`apps/docs/guide/web.md`**:
 
-1. **`apps/docs/guide/web.md`** (VitePress site):
-   - Is the page/view listed?
-   - Are key features described?
-   - Are API endpoints documented?
-
-2. **`docs/guides/web-guide.md`** (standalone docs):
-   - Same checks.
+- Is the page/view listed?
+- Are key features described?
+- Are API endpoints documented?
 
 #### Configuration → Documentation
 
-For each config key discovered in Phase 4:
+For each config key discovered in Phase 4, check **`apps/docs/reference/configuration.md`**:
 
-1. **`apps/docs/reference/configuration.md`**:
-   - Is the option listed in the Supported Options table?
-   - Is there an example?
+- Is the option listed in the Supported Options table?
+- Is there an example?
 
 #### Specification → Documentation
 
-1. Compare `docs/taskmd_specification.md` (authoritative spec) with `apps/docs/reference/specification.md` (VitePress version).
-   - Check version numbers match.
-   - Check all frontmatter fields are listed in both.
-   - Check enum values (status, priority, effort) match.
+Compare `docs/taskmd_specification.md` (authoritative spec) with `apps/docs/reference/specification.md` (VitePress version):
+
+- Check version numbers match.
+- Check all frontmatter fields are listed in both.
+- Check enum values (status, priority, effort) match.
 
 #### VitePress Navigation
 
-1. Read `apps/docs/.vitepress/config.ts` and verify:
-   - All docs pages listed in the sidebar actually exist as files.
-   - No orphan pages exist that aren't linked from the sidebar.
+Read `apps/docs/.vitepress/config.ts` and verify:
+
+- All docs pages listed in the sidebar actually exist as files.
+- No orphan pages exist that aren't linked from the sidebar.
 
 ### Phase 6: Generate report
 

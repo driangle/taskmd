@@ -1,11 +1,12 @@
 ---
 title: "Prune stale references from the audit-docs skill"
 id: "01m2x95dh"
-status: pending
+status: completed
 priority: medium
 type: chore
 tags: ["skills", "docs"]
 created: "2026-09-19"
+completed_at: 2026-09-19
 ---
 
 # Prune stale references from the audit-docs skill
@@ -33,31 +34,35 @@ The skill is duplicated, byte-identical, in two places:
 - `.claude/skills/audit-docs/SKILL.md`
 - `.agents/skills/audit-docs/SKILL.md`
 
-Both must be edited together, or they drift. Worth deciding whether one should
-be generated from the other (or symlinked) rather than hand-maintained — but
-that decision is broader than this skill and may belong in its own task.
+**Resolved while working this task:** they are not two copies.
+`.claude/skills/audit-docs` is a git-tracked **symlink** to
+`../../.agents/skills/audit-docs`, so both paths are the same file and cannot
+drift. `diff` reports no differences for that reason. The open question about
+generating or symlinking one from the other is therefore already answered, and
+no follow-up task was filed.
 
 ## Tasks
 
-- [ ] Remove the `docs/guides/cli-guide.md` sub-step from Phase 5 ("CLI
+- [x] Remove the `docs/guides/cli-guide.md` sub-step from Phase 5 ("CLI
       Commands -> Documentation") in both copies.
-- [ ] Remove the `docs/guides/web-guide.md` sub-step from Phase 5 ("Web
+- [x] Remove the `docs/guides/web-guide.md` sub-step from Phase 5 ("Web
       Features -> Documentation") in both copies.
-- [ ] Reword the surrounding text that assumes two documentation trees, so the
+- [x] Reword the surrounding text that assumes two documentation trees, so the
       remaining checks read as the single source they now are
       (`apps/docs/**`).
-- [ ] Re-read Phase 7 (`--fix`), which references the same removed files when
-      describing what to update.
-- [ ] Audit the rest of SKILL.md for other paths that no longer resolve —
+- [x] Re-read Phase 7 (`--fix`), which references the same removed files when
+      describing what to update. — Verified: Phase 7 named only `apps/docs/...`
+      paths and needed no change.
+- [x] Audit the rest of SKILL.md for other paths that no longer resolve —
       verify each referenced path exists before leaving it in.
-- [ ] Confirm the two copies remain byte-identical after the edit
+- [x] Confirm the two copies remain byte-identical after the edit
       (`diff .claude/skills/audit-docs/SKILL.md .agents/skills/audit-docs/SKILL.md`).
 
 ## Acceptance Criteria
 
-- [ ] No path referenced in either copy of SKILL.md fails to resolve in the
+- [x] No path referenced in either copy of SKILL.md fails to resolve in the
       repository.
-- [ ] `docs/guides/` appears nowhere in either copy.
-- [ ] `diff` between the two copies reports no differences.
-- [ ] A `/audit-docs` run completes without reporting a missing-file gap for
+- [x] `docs/guides/` appears nowhere in either copy.
+- [x] `diff` between the two copies reports no differences.
+- [x] A `/audit-docs` run completes without reporting a missing-file gap for
       any path the skill itself named.
