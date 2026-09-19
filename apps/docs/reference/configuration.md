@@ -23,6 +23,9 @@ web:
 
   # Automatically open browser when starting the web server
   auto_open_browser: false
+
+  # Disable editing (no PUT /api/tasks/{id})
+  readonly: false
 ```
 
 ## Config File Locations

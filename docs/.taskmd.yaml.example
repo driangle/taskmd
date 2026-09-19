@@ -31,6 +31,12 @@ web:
   # This sets the default value for the --open flag in 'taskmd web start'
   auto_open_browser: false
 
+  # Serve the dashboard without editing
+  # This sets the default value for the --readonly flag in 'taskmd web start'
+  # Recommended whenever host is not 127.0.0.1: it disables
+  # PUT /api/tasks/{id}, so the API cannot rewrite task files.
+  readonly: false
+
 # Enable or disable task worklogs
 # When true (default), agents are encouraged to create and maintain worklog files
 # alongside tasks to record progress, decisions, and blockers.
