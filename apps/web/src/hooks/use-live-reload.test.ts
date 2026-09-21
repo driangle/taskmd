@@ -21,7 +21,14 @@ describe("useLiveReload", () => {
       addEventListener: vi.fn(),
       close: vi.fn(),
     };
-    vi.stubGlobal("EventSource", vi.fn(() => mockEventSource));
+    // Must be a function expression, not an arrow: vitest 4 only lets mocks be
+    // called with `new` when the implementation is constructible.
+    vi.stubGlobal(
+      "EventSource",
+      vi.fn(function () {
+        return mockEventSource;
+      }),
+    );
   });
 
   afterEach(() => {

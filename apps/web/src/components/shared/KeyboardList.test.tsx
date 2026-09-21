@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { KeyboardList } from "./KeyboardList";
 
@@ -9,7 +9,7 @@ function renderList({
   ariaLabel,
 }: {
   itemCount?: number;
-  onActivate?: ReturnType<typeof vi.fn>;
+  onActivate?: Mock<(index: number) => void>;
   role?: string;
   ariaLabel?: string;
 } = {}) {
