@@ -367,11 +367,13 @@ The dashboard includes several views:
 | View | What it shows |
 |------|--------------|
 | **Tasks** | Sortable, filterable task table with search |
-| **Board** | Kanban-style board grouped by status, priority, or effort |
+| **Board** | Kanban board grouped by status, priority, effort, type, group, tag, or phase, with drag-and-drop |
 | **Graph** | Interactive dependency graph with search and highlighting |
-| **Stats** | Project metrics -- completion rate, priority breakdown, critical path |
-| **Next** | AI-powered task recommendations with scores |
+| **Stats** | Project metrics -- status, priority, and effort breakdowns, critical path |
+| **Next** | Ranked recommendations with the reason for each, the same scoring as `taskmd next` |
 | **Tracks** | Parallel work streams based on scope overlap |
+| **Phases** | Progress per configured phase |
+| **Feed** | Recent task activity from git history |
 | **Validate** | Validation results with errors and warnings |
 
 The web interface updates in real time when you edit task files -- no page refresh needed.
@@ -380,7 +382,7 @@ You can also edit tasks directly in the browser by clicking a task and using the
 
 ## Step 11: Use taskmd with AI assistants
 
-taskmd is designed to work seamlessly with AI coding assistants. Here's how to set it up with popular tools.
+taskmd works with AI coding assistants in three ways: a Claude Code plugin, an MCP server for any client that supports it, and plain file access for everything else.
 
 ### Claude Code
 

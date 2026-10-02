@@ -4,7 +4,7 @@ layout: home
 hero:
   name: taskmd
   text: Task management for humans and AI
-  tagline: Markdown-based task management designed for both humans and AI coding assistants.
+  tagline: Tasks are markdown files in your repo. A CLI, a web dashboard, and an MCP server read and write them; so can any AI coding assistant.
   actions:
     - theme: brand
       text: Get Started
@@ -20,10 +20,10 @@ features:
     details: Use the CLI for automation and the web dashboard for visual management.
   - title: Dependency Tracking
     details: Visualize task dependencies with interactive graphs. Find critical paths and identify blockers automatically.
-  - title: Smart Filtering
-    details: Find tasks by status, priority, tags, effort, and dependencies. Get intelligent next-task recommendations.
+  - title: Filtering and Recommendations
+    details: Filter by status, priority, tags, effort, phase, and dependencies. The next command ranks what to do by priority, critical path, what it unblocks, effort, and phase order.
   - title: Validation & Linting
     details: Built-in validation ensures task files follow conventions. Catch errors before they cause problems.
-  - title: LLM-Friendly
-    details: Designed to integrate with AI coding assistants. Structured format makes it easy to automate task management.
+  - title: Works with AI Assistants
+    details: A Claude Code plugin, an MCP server for any client, or plain file access. The task file is the integration layer.
 ---

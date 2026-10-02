@@ -40,7 +40,7 @@ Those features are session-scoped and tool-specific. They help the AI organize i
 
 ### How does taskmd compare to Claude Code's task list?
 
-Claude Code has a built-in task list (`Ctrl+T`) that it creates during a session to track its own progress on multi-step work. It's useful — you can see what's pending, in progress, or complete while Claude works. But it's a session-level tool for the AI to organize itself, not a project-level tool for you to organize your backlog.
+Claude Code has a built-in task list that it creates during a session to track its own progress on multi-step work. It's useful — you can see what's pending, in progress, or complete while Claude works. But it's a session-level tool for the AI to organize itself, not a project-level tool for you to organize your backlog.
 
 The key differences: Claude Code's tasks are created by the AI during a session and live in Claude's internal state. They can persist across context compactions within a session, but they're not files in your repo — they don't travel with branches, show up in PRs, or carry structured metadata like priority and dependencies. A different AI tool can't read them. A teammate can't pick them up. They're an execution aid, not a planning system.
 
@@ -54,7 +54,7 @@ The YAML frontmatter provides structured, machine-parseable metadata that tools 
 
 ### Why have a spec at all? Why not just freeform markdown notes?
 
-Freeform notes work well for thinking, but they're hard to build tooling around. Without consistent structure, you can't sort tasks by priority, filter by status, visualize dependencies, or validate references. The spec is deliberately minimal — three required fields — so you get the benefits of structured data without the overhead of filling out forms. The freeform body is still available for everything else.
+Freeform notes work well for thinking, but they're hard to build tooling around. Without consistent structure, you can't sort tasks by priority, filter by status, visualize dependencies, or validate references. The spec is deliberately minimal — two required fields, `id` and `title` — so you get the benefits of structured data without the overhead of filling out forms. The freeform body is still available for everything else.
 
 ## The Philosophy
 

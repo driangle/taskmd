@@ -93,7 +93,7 @@ taskmd list --filter status=pending --filter priority=high
 taskmd next tasks/
 ```
 
-This provides intelligent suggestions based on priorities, dependencies, and status.
+It lists actionable tasks (pending, with every dependency completed), ranked by priority, critical path, how many tasks each unblocks, effort, and phase order. Add `--explain` to see the score.
 
 ### How do I visualize dependencies?
 

@@ -105,7 +105,7 @@ These are independent dimensions for planning:
 | `medium` | 2-8 hours |
 | `large` | More than 8 hours / multi-day |
 
-A task can be high priority but small effort (urgent bug fix), or low priority but large effort (nice-to-have feature). The `next` command uses both to make intelligent recommendations.
+Priority says how important a task is; effort says how big it is. They are independent: an urgent bug fix is high priority and small effort, a nice-to-have feature is low priority and large effort. `next` scores on both, so small high-priority work surfaces first.
 
 ## Tags
 
