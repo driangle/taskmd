@@ -34,7 +34,9 @@ taskmd --version
 ```
 
 ```
-taskmd version 0.15.0
+taskmd version 0.8.0
+  Git commit: 8ea09221b3130b022c864d4c726f4f9c7384826d
+  Built:      2026-09-19T20:19:27Z
 ```
 
 See [Installation](./installation) for other options including pre-built binaries and building from source.
@@ -52,8 +54,9 @@ The init command walks you through setup interactively. It creates:
 
 - A `tasks/` directory for your task files
 - A `.taskmd.yaml` configuration file
-- A `TASKMD_SPEC.md` specification document
-- Agent configuration files (if you use Claude Code, Codex, or Gemini)
+- `tasks/TASKMD_SPEC.md`, the task format specification
+- An agent configuration file in `tasks/` (if you use Claude Code, Codex, or Gemini)
+- Task templates in `.taskmd/templates/` for the `add --template` command
 
 You can also run it non-interactively:
 
@@ -66,8 +69,14 @@ After init, your project looks like this:
 ```
 my-project/
 ├── .taskmd.yaml
-├── TASKMD_SPEC.md
+├── .taskmd/
+│   └── templates/
+│       ├── bug.md
+│       ├── chore.md
+│       └── feature.md
 ├── tasks/
+│   ├── CLAUDE.md
+│   └── TASKMD_SPEC.md
 └── ... (your existing files)
 ```
 
@@ -80,10 +89,10 @@ taskmd add "Set up project repository" --priority high --effort small --tags set
 ```
 
 ```
-Created task: tasks/001-set-up-project-repository.md
+Created task 001: /path/to/my-project/tasks/001-set-up-project-repository.md
 ```
 
-This generates a markdown file with proper frontmatter and a slug-based filename. Open it in your editor to add details:
+This generates a markdown file with frontmatter, a slug-based filename, and a body skeleton to fill in:
 
 ```markdown
 ---
@@ -92,15 +101,27 @@ title: "Set up project repository"
 status: pending
 priority: high
 effort: small
-tags:
-  - setup
-created: 2026-02-20
+dependencies: []
+tags: ["setup"]
+created_at: 2026-10-02
 ---
 
 # Set up project repository
+
+## Objective
+
+<!-- Describe the goal of this task -->
+
+## Tasks
+
+- [ ] TODO
+
+## Acceptance Criteria
+
+- TODO
 ```
 
-Add an objective, subtasks, and acceptance criteria:
+Open it in your editor and replace the placeholders:
 
 ```markdown
 ---
@@ -109,9 +130,9 @@ title: "Set up project repository"
 status: pending
 priority: high
 effort: small
-tags:
-  - setup
-created: 2026-02-20
+dependencies: []
+tags: ["setup"]
+created_at: 2026-10-02
 ---
 
 # Set up project repository
@@ -144,7 +165,7 @@ taskmd add "Write project documentation" --priority medium --effort medium \
 ```
 
 ```
-Created task: tasks/002-write-project-documentation.md
+Created task 002: /path/to/my-project/tasks/002-write-project-documentation.md
 ```
 
 And a third task that depends on both:
@@ -155,7 +176,7 @@ taskmd add "Deploy to staging" --priority high --effort small \
 ```
 
 ```
-Created task: tasks/003-deploy-to-staging.md
+Created task 003: /path/to/my-project/tasks/003-deploy-to-staging.md
 ```
 
 ## Step 5: List and filter tasks
@@ -167,11 +188,14 @@ taskmd list
 ```
 
 ```
- ID   Title                          Status    Priority  Effort
- 001  Set up project repository      pending   high      small
- 002  Write project documentation    pending   medium    medium
- 003  Deploy to staging              pending   high      small
+id   title                        status   priority  file
+---  ---------------------------  -------  --------  ----------------------------------
+001  Set up project repository    pending  high      001-set-up-project-repository.md
+002  Write project documentation  pending  medium    002-write-project-documentation.md
+003  Deploy to staging            pending  high      003-deploy-to-staging.md
 ```
+
+Use `--columns` to show other fields, for example `taskmd list --columns id,title,effort,tags`.
 
 Filter by priority or status:
 
@@ -205,6 +229,7 @@ taskmd set 001 --done
 ```
 Updated task 001 (Set up project repository):
   status: in-progress -> completed
+  completed_at: (unset) -> 2026-10-02
 ```
 
 You can also update other fields:
@@ -229,10 +254,21 @@ taskmd graph --format ascii
 ```
 
 ```
-[001] Set up project repository (completed)
-  └──> [002] Write project documentation (pending)
-         └──> [003] Deploy to staging (pending)
-  └──> [003] Deploy to staging (pending)
+[002] Write project documentation
+    └── [003] Deploy to staging
+```
+
+Completed tasks are hidden by default, which is why task 001 does not appear. Pass `--all` to include every task:
+
+```bash
+taskmd graph --format ascii --all
+```
+
+```
+[001] Set up project repository ✓
+    ├── [002] Write project documentation
+    │   └── [003] Deploy to staging
+    └── [003] Deploy to staging (see above)
 ```
 
 Other graph formats are available for different use cases:
@@ -257,9 +293,14 @@ taskmd next
 ```
 
 ```
- Rank  ID   Title                          Priority  Effort  Score
- 1     002  Write project documentation    medium    medium  85
+Recommended tasks:
+
+#  ID   Title                        Priority  Effort  File                                Reason
+-  ---  ---------------------------  --------  ------  ----------------------------------  ---------------------------------
+1  002  Write project documentation  medium    medium  002-write-project-documentation.md  on critical path, unblocks 1 task
 ```
+
+Task 003 is not recommended because it still depends on 002. Add `--explain` to see the score behind each recommendation.
 
 taskmd recommends tasks based on:
 
@@ -290,8 +331,7 @@ taskmd validate
 ```
 
 ```
-✓ All tasks valid
-Found 3 task(s)
+✓ All 3 task(s) are valid
 ```
 
 Validation catches:
@@ -302,11 +342,13 @@ Validation catches:
 - Missing dependency references
 - Circular dependencies
 
-Use strict mode for additional warnings:
+Use strict mode for additional warnings about recommended fields:
 
 ```bash
 taskmd validate --strict
 ```
+
+With the flat `tasks/` layout from this tutorial, strict mode warns that each task has no group. Groups are subdirectories of `tasks/`; see [Best Practices](/guide/best-practices) for when to use them.
 
 ## Step 10: Launch the web dashboard
 
