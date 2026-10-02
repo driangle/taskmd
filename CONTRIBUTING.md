@@ -18,6 +18,42 @@ not duplicate it.
 - **Skills, plugins, and integrations** — see
   [Extending taskmd](#extending-taskmd-without-changing-core).
 
+## Repository layout
+
+taskmd is a monorepo. The pieces that ship, and where they live:
+
+| Path | What it is | Versioned as |
+|------|-----------|--------------|
+| `apps/cli/` | The `taskmd` CLI (Go, cobra), including the MCP server and the web server; embeds the built web app and the spec | `vX.Y.Z` repo tags |
+| `sdk/go/` | The pure task model as a Go module: parser, scanner, validator, graph, `next` scoring, tracks, search, task-file writing. No I/O policy, no output formatting ([ADR 0006](docs/adr/0006-sdk-is-the-pure-task-model-layer.md)) | `sdk/go/vX.Y.Z` tags, separate module |
+| `apps/web/` | The web dashboard (Vite, React, TypeScript); built assets are embedded into the CLI binary | with the CLI |
+| `apps/docs/` | The documentation site (VitePress), deployed to GitHub Pages | with the CLI |
+| `apps/vscode/` | VS Code extension: frontmatter validation and completion for task files | with the CLI |
+| `claude-code-plugin/` | Claude Code plugin: slash-command skills that drive the CLI | own `0.x` line |
+| `claude-code-plugin-mcp/` | Claude Code plugin: MCP server over the CLI | own `1.x` line |
+| `claude-code-plugin-lite/` | Claude Code plugin: the same skills using Claude's file tools, no binary | own `0.x` line |
+| `.claude-plugin/marketplace.json` | The marketplace that lists the three plugins | — |
+
+Supporting directories:
+
+| Path | What it is |
+|------|-----------|
+| `docs/` | Canonical sources: `taskmd_specification.md` (the task format), `taskmd_operations.md`, `.taskmd.yaml.example`, agent templates. `adr/` holds decisions, `specs/` implementation contracts for accepted features, `design/` non-binding notes |
+| `tasks/` | This project's own tasks (taskmd dogfoods itself); `.worklogs/` live alongside |
+| `tests/conformance/` | Fixtures and expected outputs for checking that other implementations of the spec agree with the CLI |
+| `evals/` | Skill benchmarks on skival. `benchmark/` is its deprecated predecessor and is kept only for reference |
+| `scripts/` | `release.sh`, the SDK-pin guards, and the MCPB bundle builder |
+| `.github/` | CI, docs deploy, and release workflows, plus the `taskmd-complete` action that marks a task complete when its PR merges |
+| `.githooks/` | The pre-commit hook (`git config core.hooksPath .githooks` enables it) |
+
+Two build entry points exist. The root `Makefile` runs the repo-wide checks
+(`make check` covers the CLI, the SDK, the web app, the VS Code extension, and
+the docs build; `make check-lite` is what the pre-commit hook runs) and the
+SDK-pin tooling. `apps/cli/Makefile` has the CLI-only targets (`build`,
+`install-dev`, `test`, `e2e`, `lint`, `sync-spec`). `go.work` ties `apps/cli`
+and `sdk/go` together during development; see "The sdk/go pin" in
+[`AGENTS.md`](./AGENTS.md) for why that matters at release time.
+
 ## Scope & non-goals
 
 taskmd is a **task format plus a CLI that reads and manages those task files.**
