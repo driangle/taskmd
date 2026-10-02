@@ -96,22 +96,47 @@ taskmd web start --task-dir tasks/ --open
 
 ### Web Interface
 
-Start the web server and open your browser:
-
 ```bash
-taskmd web start --open --port 8080
+taskmd web start --open
 ```
 
-The web interface provides:
-- **Task List**: Sortable, filterable table view
-- **Board View**: Kanban-style board with drag-and-drop
-- **Graph View**: Interactive dependency visualization
-- **Statistics**: Project metrics and progress tracking
+- **Tasks**: sortable, filterable table
+- **Board**: kanban grouped by status, priority, effort, type, group, tag, or phase, with drag-and-drop
+- **Graph**: interactive dependency graph
+- **Stats, Next, Tracks, Phases, Feed, Validate**: one page each
 
-The server binds `127.0.0.1` by default, so it is reachable only from your
-machine. To reach it from elsewhere, pass `--host 0.0.0.0` — but note the API
-is unauthenticated and can rewrite task files unless `--readonly` is set, so
-pair a wider bind with `--readonly`, a firewall, or a VPN.
+The server binds `127.0.0.1` and the API is unauthenticated; before exposing it with `--host 0.0.0.0`, read [Network Access](https://driangle.github.io/taskmd/guide/web#network-access) in the web guide.
+
+## Claude Code Plugin
+
+Use taskmd directly inside [Claude Code](https://claude.com/claude-code) with slash commands:
+
+```
+/taskmd:next-task              # Find next task to work on
+/taskmd:do-task 015            # Pick up and work on a task
+/taskmd:list-tasks --status pending  # List pending tasks
+/taskmd:add-task Fix login bug       # Create a new task
+/taskmd:complete-task 015      # Mark a task done
+/taskmd:validate-tasks         # Validate task files
+```
+
+Three plugins are available. **taskmd** provides slash command skills that drive the CLI. **taskmd-mcp** provides an MCP server so Claude can call task operations as tools, and can be installed alongside **taskmd**. **taskmd-lite** re-implements the skills with Claude's file tools for environments where the binary cannot be installed. See the [plugin guide](https://driangle.github.io/taskmd/guide/claude-code-plugin) for which to pick.
+
+```bash
+# Add the taskmd marketplace
+claude plugin marketplace add driangle/taskmd
+
+# Install slash command skills (/taskmd:do-task, /taskmd:next-task, etc.)
+claude plugin install taskmd@taskmd-marketplace --scope project
+
+# Optional: add the MCP server for direct tool access
+claude plugin install taskmd-mcp@taskmd-marketplace --scope project
+
+# Or, with no taskmd binary available:
+claude plugin install taskmd-lite@taskmd-marketplace --scope project
+```
+
+See [`claude-code-plugin/README.md`](claude-code-plugin/README.md) for full details.
 
 ## Documentation
 
@@ -176,7 +201,7 @@ taskmd loads **one** config file: the nearest `.taskmd.yaml` walking up from the
 
 See [docs/.taskmd.yaml.example](docs/.taskmd.yaml.example) for a complete example with all supported options.
 
-## Project Structure
+## Task Layout
 
 ```
 my-project/
@@ -190,57 +215,14 @@ my-project/
 
 ## Contributing
 
-Contributions are welcome! For development guidelines, see:
-
-- **[CLAUDE.md](CLAUDE.md)** - Development guidelines and testing requirements
-- **[Task Specification](docs/taskmd_specification.md)** - Task format conventions
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/driangle/taskmd.git
-cd taskmd
-
-# Build CLI (from apps/cli directory)
-cd apps/cli
-make build
-
-# Run tests
-make test
-
-# Run linter
-make lint
-
-# Build with embedded web UI
-make build-full
-```
-
-### Running Tests
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: what belongs in core, how to extend taskmd, and the PR process
+- **[AGENTS.md](AGENTS.md)**: local setup, build and test commands, lint rules, and versioning (`CLAUDE.md` is a symlink to it)
+- **[Task Specification](docs/taskmd_specification.md)**: task format conventions
 
 ```bash
 cd apps/cli
-go test ./...
-```
-
-All new CLI features must include comprehensive tests. See [CLAUDE.md](CLAUDE.md) for testing requirements.
-
-### Code Coverage
-
-Code coverage is tracked automatically via [Codecov](https://codecov.io/gh/driangle/taskmd). On every push and pull request, the CI generates coverage reports for both the CLI and web app and uploads them to Codecov. The coverage badge at the top of this README reflects the latest coverage on `main`.
-
-To generate coverage reports locally:
-
-```bash
-# CLI (Go)
-cd apps/cli
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out    # Open in browser
-
-# Web (TypeScript/React)
-cd apps/web
-pnpm test:coverage                  # Generates coverage/index.html
-open coverage/index.html            # Open in browser
+make build        # CLI only; make build-full embeds the web UI
+make check        # tests, lint, vet
 ```
 
 ## License
@@ -252,38 +234,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 - **Issues**: [GitHub Issues](https://github.com/driangle/taskmd/issues)
 - **Documentation**: [driangle.github.io/taskmd](https://driangle.github.io/taskmd/)
 - **Specification**: [taskmd_specification.md](docs/taskmd_specification.md)
-
-## Claude Code Plugin
-
-Use taskmd directly inside [Claude Code](https://claude.com/claude-code) with slash commands:
-
-```
-/taskmd:next-task              # Find next task to work on
-/taskmd:do-task 015            # Pick up and work on a task
-/taskmd:list-tasks --status pending  # List pending tasks
-/taskmd:add-task Fix login bug       # Create a new task
-/taskmd:complete-task 015      # Mark a task done
-/taskmd:validate-tasks         # Validate task files
-```
-
-Three plugins are available. **taskmd** provides slash command skills that drive the CLI. **taskmd-mcp** provides an MCP server so Claude can call task operations as tools, and can be installed alongside **taskmd**. **taskmd-lite** re-implements the skills with Claude's file tools for environments where the binary cannot be installed. See the [plugin guide](https://driangle.github.io/taskmd/guide/claude-code-plugin) for which to pick.
-
-```bash
-# Add the taskmd marketplace
-claude plugin marketplace add driangle/taskmd
-
-# Install slash command skills (/taskmd:do-task, /taskmd:next-task, etc.)
-claude plugin install taskmd@taskmd-marketplace --scope project
-
-# Optional: add the MCP server for direct tool access
-claude plugin install taskmd-mcp@taskmd-marketplace --scope project
-
-# Or, with no taskmd binary available:
-claude plugin install taskmd-lite@taskmd-marketplace --scope project
-```
-
-See [`claude-code-plugin/README.md`](claude-code-plugin/README.md) for full details.
-
----
-
-**Built with ❤️ for developers who love markdown**
