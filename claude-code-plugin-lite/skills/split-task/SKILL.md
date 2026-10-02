@@ -61,7 +61,7 @@ The user's query is in `$ARGUMENTS` (a task ID like `077`, optionally followed b
       tags: <inherit relevant tags>
       phase: <inherit from parent if set>
       parent: "<original task ID>"
-      created: <today's date YYYY-MM-DD>
+      created_at: <today's date YYYY-MM-DD>
       ---
       ```
 

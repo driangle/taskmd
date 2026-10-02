@@ -16,7 +16,7 @@ taskmd is a markdown-based task management tool designed for developers and AI c
 
 - A terminal (macOS, Linux, or WSL on Windows)
 - A text editor
-- Go 1.22+ (only if building from source)
+- Go 1.25+ (only if building from source)
 
 ## Step 1: Install taskmd
 

@@ -4,7 +4,7 @@ Guidelines and conventions for developing the taskmd project.
 
 ## Prerequisites
 
-- **Go** (1.22+): [go.dev/dl](https://go.dev/dl/)
+- **Go** (1.25+): [go.dev/dl](https://go.dev/dl/)
 - **pnpm**: `npm install -g pnpm` (for web frontend)
 - **golangci-lint**: `brew install golangci-lint` or [install docs](https://golangci-lint.run/welcome/install/)
 

@@ -16,7 +16,7 @@ Alternatively, download pre-built binaries from the [releases page](https://gith
 
 ### What are the system requirements?
 
-Pre-built binaries work on macOS, Linux, and Windows with no additional dependencies. Building from source requires Go 1.22+. The web interface works in any modern browser.
+Pre-built binaries work on macOS, Linux, and Windows with no additional dependencies. Building from source requires Go 1.25+. The web interface works in any modern browser.
 
 ### How do I verify my installation?
 

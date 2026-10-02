@@ -17,7 +17,7 @@ See the **[Tutorial](/getting-started/tutorial)** for a comprehensive, step-by-s
 
 - A terminal
 - A text editor
-- Go 1.22+ (only if building from source)
+- Go 1.25+ (only if building from source)
 
 ## Step 1: Install taskmd
 
@@ -51,7 +51,7 @@ priority: high
 effort: small
 tags:
   - setup
-created: 2026-02-09
+created_at: 2026-02-09
 ---
 
 # Set Up Project Repository
@@ -105,7 +105,7 @@ dependencies:
   - "001"
 tags:
   - documentation
-created: 2026-02-09
+created_at: 2026-02-09
 ---
 
 # Write Project Documentation
