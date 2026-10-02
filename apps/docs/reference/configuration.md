@@ -91,7 +91,7 @@ todos:
 ```
 
 ::: tip
-Only project-level settings are supported in config files. Per-invocation preferences like `format`, `verbose`, and `quiet` are intentionally CLI-only.
+Config files are meant for project-level settings. `format` is CLI-only. `verbose` and `quiet` are honoured from config and environment today, but `validate` reports them as unknown keys; treat them as per-invocation flags.
 :::
 
 ## ID Strategy Configuration {#id-strategy-configuration}
@@ -293,20 +293,34 @@ web:
 
 ## Environment Variables
 
-taskmd supports environment variables with the `TASKMD_` prefix. Nested config
-keys map to an underscore, so `web.host` becomes `TASKMD_WEB_HOST`:
+Every scalar config key can be set from the environment: prefix the key with
+`TASKMD_`, upper-case it, and replace `.` and `-` with `_`. So `web.host`
+becomes `TASKMD_WEB_HOST` and `worktree_scope` becomes `TASKMD_WORKTREE_SCOPE`:
 
 ```bash
-export TASKMD_DIR=./tasks
+export TASKMD_WEB_PORT=3000
+export TASKMD_WEB_READONLY=true
 export TASKMD_VERBOSE=true
 ```
 
+Commonly used:
+
 | Variable | Config key | Description |
 |----------|-----------|-------------|
-| `TASKMD_DIR` | `dir` | Task directory to scan |
-| `TASKMD_VERBOSE` | `verbose` | Enable verbose output |
+| `TASKMD_TASK_DIR` | `task-dir` | Task directory to scan (see the note below) |
 | `TASKMD_WEB_HOST` | `web.host` | Address the web server binds to (default `127.0.0.1`; use `0.0.0.0` to accept connections from other hosts) |
 | `TASKMD_WEB_PORT` | `web.port` | Port the web server listens on (default `8080`) |
+| `TASKMD_WEB_READONLY` | `web.readonly` | Start the web server read-only (the repo's `docker-compose.yml` sets this) |
+| `TASKMD_WORKTREE_SCOPE` | `worktree_scope` | `unified` or `isolated` |
+| `TASKMD_VERBOSE`, `TASKMD_QUIET` | `verbose`, `quiet` | Output verbosity |
+
+::: warning Task directory from the environment
+`TASKMD_TASK_DIR` only takes effect when the loaded `.taskmd.yaml` already has a
+`task-dir` key (likewise `TASKMD_DIR` needs a `dir` key). With no config file, or
+a config file without that key, the variable is ignored. This is a known
+limitation of the loader; use `--task-dir` / `-d` when you need an override that
+always works.
+:::
 
 ::: tip Docker
 The published image already sets `TASKMD_WEB_HOST=0.0.0.0` so that
@@ -513,7 +527,9 @@ old values in the list.
 
 ## Projects Configuration {#projects-configuration}
 
-The `projects` key in the **global** config (`~/.taskmd.yaml`) registers projects for multi-project workflows. Use `taskmd projects register` to add entries, or edit the config directly.
+The `projects` key in the **global** config registers projects for multi-project workflows. Use `taskmd projects register` to add entries, or edit the file directly.
+
+The registry is read by its own loader from `~/.taskmd.yaml`, or from the file named by `$TASKMD_HOME_CONFIG` when set. It is independent of the config discovery described above: `--config` does not change where the registry is read from, and `projects` and `default_project` are only meaningful in the global file. `validate` currently reports both keys as unknown; that is a known gap in the validator, not a sign the keys are ignored.
 
 ```yaml
 # ~/.taskmd.yaml
@@ -535,7 +551,7 @@ Each project entry has the following fields:
 |-------|----------|-------------|
 | `id` | Yes | Unique project identifier (auto-generated from directory basename if omitted during registration) |
 | `name` | No | Human-readable display name (defaults to the same value as `id`) |
-| `path` | Yes | Absolute path to the project directory (must contain a `.taskmd.yaml` file) |
+| `path` | Yes | Absolute path to the project directory. `taskmd projects register` refuses a directory with no `.taskmd.yaml` |
 
 **Usage:**
 
@@ -552,7 +568,7 @@ taskmd stats --all-projects
 taskmd list --all-projects
 ```
 
-When `default_project` is set, commands automatically scope to that project unless `--project` or `--all-projects` is explicitly provided.
+`default_project` is the last fallback for the task directory: it applies only when no `.taskmd.yaml` is found from the current directory and no `--task-dir` was given. A discovered project config always wins, and `--project` or `--all-projects` override everything.
 
 ## Shell Aliases
 

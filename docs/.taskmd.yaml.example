@@ -141,5 +141,6 @@ worklogs: true
 #         jql: 'status != "Done"'        # Additional JQL filter (ANDed with project)
 
 # Note: Only project-level settings are supported in config files. Per-invocation
-# preferences like 'format', 'verbose', and 'quiet' are intentionally CLI-only.
+# preferences like 'format' are CLI-only ('verbose' and 'quiet' are honoured
+# here but flagged by 'taskmd validate'; prefer the flags).
 # See the full list of supported options in the configuration reference.
