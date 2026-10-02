@@ -535,8 +535,6 @@ taskmd snapshot --out snapshot.json
 
 ### get - View Task Details
 
-> **Alias:** `show` is a deprecated alias for `get`. Use `get` instead.
-
 Display detailed information about a specific task, identified by ID, title, or file path.
 
 **Matching priority:**
@@ -573,8 +571,6 @@ taskmd get sho --exact
 | `--context` | `false` | Include context files in output |
 
 ### set - Update Task Fields
-
-> **Alias:** `update` is a deprecated alias for `set`. Use `set` instead.
 
 Modify a task's frontmatter fields by ID. Writes always target the current git
 worktree's files: in a multi-worktree repository, `set` fails with a guard error
