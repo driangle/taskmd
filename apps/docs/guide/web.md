@@ -66,6 +66,17 @@ The interface automatically updates when task files change:
 
 No page refresh needed.
 
+## Header and Keyboard Shortcuts
+
+Every page shares a header with:
+
+- **Phase selector** - limits the Board, Graph, Stats, and Next views to one configured phase. The choice lives in the URL as `?phase=<id>`, so links keep it.
+- **Project selector** - switches between registered projects when the server was started with `--all-projects`.
+- **Dark mode toggle** - switches the theme; the choice is remembered in the browser.
+- **Global search** - press `Cmd+K` (`Ctrl+K` on Windows and Linux) or `/` anywhere outside a text field to open a search dialog over task IDs, titles, and bodies. Use the arrow keys and `Enter` to open a result, `Escape` to close.
+
+The arrow keys also move focus between rows in the task table and between columns on the board.
+
 ## Views
 
 ### Tasks View
@@ -77,11 +88,12 @@ The main task list in a sortable, filterable table.
 ![Tasks view showing the filterable, sortable task table](/images/web/tasks.view.png)
 
 **Features:**
-- **Sortable columns** - click headers to sort (ID, Title, Status, Priority, Effort)
-- **Search** - real-time filtering across ID, title, and tags
-- **Status filtering** - dropdown to filter by status
+- **Columns** - ID, Title, Status, Blocked, Priority, Effort, Type, Phase (when phases are configured), Owner, Tags
+- **Sortable columns** - click any header except Tags to sort
+- **Text filter** - a text box narrows the table as you type, matching against every column
+- **Pill filters** - toggle pills for Status, Priority, Effort, Type, and Phase; several values per field can be active at once. Click a tag in the Tags column to filter by it.
+- **Filters in the URL** - active filters are written to the query string (`?status=pending&priority=high`), so a filtered view can be bookmarked or shared
 - **Clickable tasks** - click ID or title to view full details
-- **Dependency counts** - see how many dependencies each task has
 
 Click a task to open its detail page, showing full metadata and rendered markdown body.
 
@@ -99,10 +111,10 @@ Visual board with tasks organized in columns.
 
 | Grouping | Columns | Best for |
 |----------|---------|----------|
-| Status | pending, in-progress, completed, blocked, cancelled | Standard kanban workflow |
+| Status | pending, in-progress, in-review, completed, blocked, cancelled | Standard kanban workflow |
 | Priority | critical, high, medium, low | Prioritization planning |
 | Effort | small, medium, large (or your configured `effort:` vocabulary) | Capacity planning |
-| Type | feature, bug, chore, docs, test | Work type classification |
+| Type | feature, bug, improvement, chore, docs | Work type classification |
 | Group | Task groups (cli, web, docs...) | Team-based views |
 | Tag | One per unique tag | Feature-based organization |
 | Phase | One column per configured phase | Release/milestone planning |
@@ -136,7 +148,7 @@ Project metrics and analytics.
 
 **URL:** `/next`
 
-AI-powered task recommendations showing which tasks to work on next.
+Ranked task recommendations showing which tasks to work on next, using the same deterministic score as `taskmd next` (priority, critical path, downstream impact, effort, and phase order).
 
 ![Next view showing recommended tasks with scores and reasoning](/images/web/next.view.png)
 
@@ -222,7 +234,7 @@ The web UI supports editing tasks directly from the browser:
 **Board Drag-and-Drop:**
 - Drag task cards between columns to update the grouping field
 - Supported when grouping by: status, priority, effort, or type
-- Drag-and-drop is disabled when grouping by group or tag
+- Drag-and-drop is disabled when grouping by group, tag, or phase
 - Visual feedback: columns highlight with a blue ring when dragging over
 
 Both editing features are disabled when the server runs in `--readonly` mode.
@@ -242,7 +254,7 @@ taskmd web export -o ./public
 taskmd web export --base-path /demo/
 ```
 
-The exported site includes all views (Tasks, Board, Graph, Stats, etc.) with pre-rendered data. No backend server required — deploy to GitHub Pages, Netlify, S3, or any static host.
+The exported site includes the Tasks, Board, Graph, Next, Stats, Validate, and Tracks views and every task detail page, with pre-rendered data. The Phases and Feed views are not exported, and the exported board offers every grouping except phase. No backend server required — deploy to GitHub Pages, Netlify, S3, or any static host.
 
 ### Read-Only Mode
 
@@ -262,10 +274,10 @@ When enabled:
 
 The Board page includes interactive pill-based filters for narrowing displayed tasks:
 
-- **Status** — pending, in-progress, completed, blocked, cancelled
+- **Status** — pending, in-progress, in-review, completed, blocked, cancelled
 - **Priority** — critical, high, medium, low
 - **Effort** — small, medium, large, or the vocabulary set by `effort:` in `.taskmd.yaml`
-- **Type** — feature, bug, chore, docs, test
+- **Type** — feature, bug, improvement, chore, docs
 - **Tags** — autocomplete dropdown with all available tags
 
 The effort pills, and the effort dropdown in the task edit form, follow the project's
@@ -334,7 +346,7 @@ The web server exposes a JSON API you can access directly. All endpoints return 
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/board?groupBy=<field>` | Tasks grouped by field (`status`, `priority`, `effort`, `type`, `group`, `tag`) |
+| `GET` | `/api/board?groupBy=<field>` | Tasks grouped by field (`status`, `priority`, `effort`, `type`, `group`, `tag`, `phase`) |
 | `GET` | `/api/graph` | Dependency graph as JSON (nodes and edges) |
 | `GET` | `/api/graph/mermaid` | Dependency graph in Mermaid syntax (returns `text/plain`) |
 | `GET` | `/api/stats` | Project statistics and metrics |
