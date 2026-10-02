@@ -454,7 +454,6 @@ taskmd stats --format json
 - Priority breakdown
 - Effort breakdown
 - Blocked tasks count
-- Completion rate
 - Critical path length
 - Max dependency depth
 - Average dependencies per task
