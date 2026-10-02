@@ -1,7 +1,7 @@
 {
   "name": "taskmd-mcp",
   "version": "1.1.1",
-  "description": "MCP server for taskmd. Provides direct tool access for task operations (list, get, next, search, set, validate, graph) without shelling out to the CLI.",
+  "description": "MCP server for taskmd. Provides direct tool access for task operations (list, get, status, next, search, context, set, validate, graph) without shelling out to the CLI.",
   "author": {
     "name": "driangle"
   },

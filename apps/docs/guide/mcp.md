@@ -84,7 +84,7 @@ If your tasks live outside the current directory, pass the `task_dir` parameter 
 
 ## Available Tools
 
-The MCP server exposes 8 tools. All tools accept an optional `task_dir` parameter (defaults to the current directory).
+The MCP server exposes 9 tools: `list`, `get`, `status`, `next`, `search`, `context`, `set`, `validate`, and `graph`. All tools accept an optional `task_dir` parameter (defaults to the current directory).
 
 ---
 
@@ -120,6 +120,26 @@ Get full details of a single task by ID, including body content and dependency i
 | `task_id` | string | **yes** | Task ID to retrieve |
 
 **Returns:** JSON object with task metadata, full markdown `content`, `depends_on` (upstream dependencies with titles), `blocks` (downstream dependents), and `children` (subtasks).
+
+**Example:**
+```json
+{
+  "task_id": "042"
+}
+```
+
+---
+
+### status
+
+Get lightweight metadata for a task: frontmatter fields only, with no body content and no resolved dependency titles. Cheaper than `get` when you only need to check a task's state.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `task_dir` | string | no | Directory to scan (default: `.`) |
+| `task_id` | string | **yes** | Task ID to look up |
+
+**Returns:** JSON object with `id`, `title`, `status`, `priority`, `effort`, `tags`, `created`, `dependencies` (IDs only), `group`, and `file_path`.
 
 **Example:**
 ```json
