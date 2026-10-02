@@ -33,14 +33,16 @@ taskmd --version
 
 **Option 2: Download Pre-built Binary**
 ```bash
-# Download from the releases page
+# Download the archive for your platform from
 # https://github.com/driangle/taskmd/releases
+# Archives contain a single binary named taskmd-<os>-<arch>
 
-# Extract the archive
-tar -xzf taskmd-v*.tar.gz  # or unzip for Windows
+# macOS / Linux (example: Apple Silicon)
+tar -xzf taskmd-v*-darwin-arm64.tar.gz
+sudo install -m755 taskmd-darwin-arm64 /usr/local/bin/taskmd
 
-# Move to PATH
-sudo mv taskmd /usr/local/bin/  # macOS/Linux
+# Windows: unzip, rename taskmd-windows-<arch>.exe to taskmd.exe,
+# and add its folder to your PATH
 ```
 
 **Option 3: Install with Go**

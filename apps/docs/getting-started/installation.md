@@ -20,19 +20,20 @@ taskmd --version
 Download from the [GitHub releases page](https://github.com/driangle/taskmd/releases):
 
 ```bash
-# Download the archive for your platform
-# Extract it
-tar -xzf taskmd-v*.tar.gz  # macOS/Linux
-# or unzip for Windows
+# Archives contain a single binary named taskmd-<os>-<arch>
 
-# Move to a directory in your PATH
-sudo mv taskmd /usr/local/bin/  # macOS/Linux
+# macOS / Linux (example: Apple Silicon)
+tar -xzf taskmd-v*-darwin-arm64.tar.gz
+sudo install -m755 taskmd-darwin-arm64 /usr/local/bin/taskmd
+
+# Windows: unzip, rename taskmd-windows-<arch>.exe to taskmd.exe,
+# and add its folder to your PATH
 ```
 
 Available platforms:
 - **Linux**: AMD64, ARM64
 - **macOS**: AMD64 (Intel), ARM64 (Apple Silicon)
-- **Windows**: AMD64
+- **Windows**: AMD64, ARM64
 
 ## Docker
 
