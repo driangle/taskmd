@@ -98,8 +98,8 @@ The test: **does this grouping end, and must it happen before another one?**
 Do not put long-lived workstreams in `phases`. A phase list is a sequence
 (`v0.4` → `v0.5` → `v1.0`); entries like `vscode-extension` are initiatives that finish
 but are not stages, and belong in a parent task — with `dependencies` between parents for
-any ordering that genuinely exists. Keep the phase list short: `next` ranks by phase
-position, and a long unordered list dilutes that signal.
+any ordering that genuinely exists. Keep the phase list short: `next` finishes earlier
+phases before recommending later ones, so a long unordered list holds back work for no reason.
 
 ## Configuration (.taskmd.yaml)
 

@@ -432,9 +432,10 @@ the list is not actually ordered.
 Modeling an initiative as a parent task also gives it a home for its rationale and
 acceptance criteria, and lets `next --root <id>` scope recommendations to that initiative.
 
-Keep the phase list short. Phase position contributes a ranking bonus in `next` that
-decays with position, so a list of many unordered "phases" dilutes the signal it exists
-to provide.
+Keep the phase list short and genuinely ordered. `next` treats the list order as strict:
+no task in a later phase is recommended ahead of actionable work in an earlier phase. A
+list of many unordered "phases" therefore does more than dilute a signal — it holds back
+work that has no real reason to wait.
 
 ## File Organization
 

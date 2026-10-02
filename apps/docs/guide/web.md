@@ -142,6 +142,7 @@ AI-powered task recommendations showing which tasks to work on next.
 
 - Ranked task cards with priority scores
 - Explains why each task is recommended (unblocked dependencies, priority, effort)
+- Uses the same ranking as `taskmd next`, including strict [phase ordering](/guide/cli#next-find-what-to-work-on) from the selected project's `.taskmd.yaml` (also applied to `next.json` in a static export)
 
 ### Tracks View
 

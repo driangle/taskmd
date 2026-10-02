@@ -209,7 +209,7 @@ taskmd scores tasks based on:
 - **Critical path**: Tasks on the critical path score higher
 - **Downstream impact**: Tasks blocking many others score higher
 - **Effort**: Smaller tasks get a boost (quick wins); points scale with the value's position in the [configured effort vocabulary](/reference/configuration#effort-configuration)
-- **Phase proximity**: Tasks in phases with nearer due dates score higher
+- **Phase order**: When `.taskmd.yaml` lists phases, earlier phases rank first — see **Phase ordering** below
 - **Actionability**: Only tasks with satisfied dependencies
 
 In a multi-worktree git repository, `next` also excludes tasks claimed in a
@@ -1677,6 +1677,14 @@ taskmd list --all-projects
 taskmd stats --all-projects
 taskmd next --all-projects
 ```
+
+`next --all-projects` ranks each project against **its own** `.taskmd.yaml` —
+its phase order and its effort vocabulary — then merges the per-project lists
+into one. The merge keeps every project's internal order (so strict phase
+ordering holds within each project) and interleaves projects by score. Phases
+are never compared across projects, since phase ids are project-local.
+`--strict-priority` does apply across projects: no lower-priority task from one
+project is ranked above an actionable higher-priority task from another.
 
 ### completion - Generate Shell Completions
 

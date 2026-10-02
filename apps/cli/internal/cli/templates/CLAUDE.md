@@ -106,7 +106,7 @@ parents for any ordering that genuinely exists. See `TASKMD_SPEC.md` for the ful
 ### Phases
 
 - When introducing a new phase, add it to the `phases` list in `.taskmd.yaml` before assigning it to tasks
-- Keep the phase list short and genuinely ordered -- `next` ranks by phase position
+- Keep the phase list short and genuinely ordered -- `next` recommends earlier-phase work before any later-phase task
 
 ## Worklogs
 

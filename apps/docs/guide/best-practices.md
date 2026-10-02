@@ -314,15 +314,17 @@ Common uses:
 
 ### Configuring Phases
 
-Define phases in `.taskmd.yaml` to enable validation and due-date-aware ranking:
+Define phases in `.taskmd.yaml`, in the order you will work them, to enable validation and phase-ordered recommendations:
 
 ```yaml
 # .taskmd.yaml
 phases:
-  - name: "v0.2"
+  - id: "v0.2"
+    name: "Core CLI"
     description: "Core CLI features"
     due: 2026-04-01
-  - name: "v0.3"
+  - id: "v0.3"
+    name: "Web dashboard"
     description: "Web dashboard"
     due: 2026-06-01
 ```
@@ -364,7 +366,7 @@ taskmd stats --group-by phase
 
 - **Start with phases when you have deadlines.** If everything is "someday," tags work fine. Once you have a release date, phases make priorities concrete.
 - **Keep phase names short.** They appear in tables and boards. `v0.2` is better than `Version 0.2 - Core CLI Features Release`.
-- **Add `due` dates** to get phase-aware ranking in `taskmd next`. Tasks in phases with closer due dates score higher.
+- **Order the list the way you will work it.** `taskmd next` finishes earlier phases before recommending later ones, so a critical task in `v0.3` waits behind actionable `v0.2` work. Unphased tasks (e.g. an urgent bug) compete in the current phase rather than queueing behind everything. Use `taskmd next --strict-phases=false` for a one-off view that treats phase as a score bonus only.
 - **Review phase progress** with `taskmd board --group-by phase` to see which phases are on track.
 
 ## CI/CD Integration

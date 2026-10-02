@@ -431,8 +431,9 @@ Each phase entry has the following fields:
 
 **Behavior:**
 
-- When phases are configured, any `phase` value in a task that does not match a configured phase name produces a warning.
+- When phases are configured, any `phase` value in a task that does not match a configured phase `id` produces a warning.
 - When no phases config exists, all `phase` values are accepted silently.
+- **List order is significant.** `next` recommends earlier phases first: no task in a later phase is ranked above an actionable task in an earlier one, and score ranks tasks within a phase. A task with no `phase` competes in the earliest phase that still has actionable tasks; a task whose phase is not in the list ranks last. This applies to the CLI, `next --all-projects` (each project against its own list), the MCP `next` tool, the web `/api/next` endpoint, and the static export. `taskmd next --strict-phases=false` opts out, treating phase as a score bonus only. See [`next`](/guide/cli#next-find-what-to-work-on).
 
 ## Effort Configuration {#effort-configuration}
 
