@@ -19,56 +19,31 @@ Everything runs locally. Task data stays in your repo and is never shared extern
 
 ### Installation
 
-**Option 1: Homebrew (macOS and Linux)**
+**Homebrew (macOS and Linux)**
 ```bash
-# Add the tap
 brew tap driangle/tap
-
-# Install taskmd
 brew install taskmd
-
-# Verify installation
 taskmd --version
 ```
 
-**Option 2: Download Pre-built Binary**
+**Docker** (CLI and web dashboard, nothing to install)
 ```bash
-# Download the archive for your platform from
-# https://github.com/driangle/taskmd/releases
-# Archives contain a single binary named taskmd-<os>-<arch>
-
-# macOS / Linux (example: Apple Silicon)
-tar -xzf taskmd-v*-darwin-arm64.tar.gz
-sudo install -m755 taskmd-darwin-arm64 /usr/local/bin/taskmd
-
-# Windows: unzip, rename taskmd-windows-<arch>.exe to taskmd.exe,
-# and add its folder to your PATH
-```
-
-**Option 3: Install with Go**
-```bash
-go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
-```
-
-> **Note:** `go install` builds the CLI only — the web dashboard is not included
-> (the built frontend assets are not part of the Go module). Use a pre-built
-> binary, Homebrew, or Docker if you want `taskmd web start`.
-
-**Option 4: Build from Source**
-```bash
-git clone https://github.com/driangle/taskmd.git
-cd taskmd/apps/cli
-make build-full
-```
-
-**Option 5: Docker**
-```bash
-# Web dashboard (default)
+# Web dashboard
 docker run --rm -p 8080:8080 -v ./tasks:/tasks:ro ghcr.io/driangle/taskmd
 
 # CLI commands
 docker run --rm -v ./tasks:/tasks ghcr.io/driangle/taskmd taskmd list
 ```
+
+**Go**
+```bash
+go install github.com/driangle/taskmd/apps/cli/cmd/taskmd@latest
+```
+
+> `go install` builds the CLI only; the web dashboard is not included because the
+> built frontend is not part of the Go module.
+
+Pre-built binaries for Linux, macOS, and Windows, and building from source, are covered on the [installation page](https://driangle.github.io/taskmd/getting-started/installation).
 
 ### 30-Second Setup
 
