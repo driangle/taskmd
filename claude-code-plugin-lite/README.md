@@ -28,25 +28,27 @@ claude plugin install taskmd-lite@taskmd-marketplace --scope project
 | `get-task-status` | Get just the status of a task by ID | `/taskmd-lite:get-task-status 042` |
 | `next-task` | Find the highest-priority pending task with all dependencies met | `/taskmd-lite:next-task` |
 | `add-task` | Create a new task file with generated ID and frontmatter | `/taskmd-lite:add-task Add search feature, high priority` |
-| `update-task` | Modify frontmatter fields on an existing task | `/taskmd-lite:update-task 042 --status in-progress` |
-| `complete-task` | Mark a task as completed and check off all subtasks | `/taskmd-lite:complete-task 042` |
+| `update-task` | Modify frontmatter fields on an existing task, described in plain language | `/taskmd-lite:update-task set 042 to high priority and in-progress` |
+| `complete-task` | Confirm the task's subtasks and acceptance criteria are met (running its `verify` checks if it has any), then set `status: completed`; in pr-review mode sets `in-review` instead | `/taskmd-lite:complete-task 042` |
 | `validate-tasks` | Check all task files for schema errors, broken deps, and circular refs | `/taskmd-lite:validate-tasks` |
-| `verify-task` | Run a task's verify steps (bash commands, assertions) to confirm completion | `/taskmd-lite:verify-task 042` |
-| `do-task` | Pick up the next task and start working on it end-to-end | `/taskmd-lite:do-task` |
+| `verify-task` | Run a task's `verify` checks (shell commands via Bash, file and content assertions) and report pass/fail | `/taskmd-lite:verify-task 042` |
+| `do-task` | Look up a task by ID or name and work on it end-to-end, checking off subtasks and keeping the worklog as it goes | `/taskmd-lite:do-task 042` |
 | `split-task` | Break a large task into smaller subtasks | `/taskmd-lite:split-task 042` |
-| `divide-and-conquer` | Recursively decompose a task tree into actionable units | `/taskmd-lite:divide-and-conquer 042` |
-| `import-todos` | Scan source files for TODO/FIXME comments and create tasks from them | `/taskmd-lite:import-todos src/` |
+| `divide-and-conquer` | Work on a task by splitting it into independent workstreams, each run by a subagent in its own git worktree and branch (`dnc/<id>/<slug>`); asks before anything is merged | `/taskmd-lite:divide-and-conquer 042` |
+| `import-todos` | Scan source files for TODO/FIXME comments and create tasks from the ones you pick | `/taskmd-lite:import-todos --dir ./src` |
 
 ## How It Works
 
-This plugin operates entirely through Claude's native file tools:
+Task management itself runs through Claude's native file tools, with no `taskmd` binary:
 
 1. **Glob** finds task files matching `tasks/**/*.md` patterns
 2. **Read** parses YAML frontmatter and markdown body from each file
 3. **Edit** and **Write** modify frontmatter fields or create new task files
 4. **Grep** searches across task content for filtering and validation
 
-No shell commands are executed. All task operations -- listing, filtering, sorting, dependency resolution, validation -- are performed by Claude directly using file contents.
+Listing, filtering, sorting, dependency resolution, and validation are performed by Claude directly from file contents and never run a shell command.
+
+Four skills do more than manage task files, and are allowed **Bash**: `do-task` and `divide-and-conquer` carry out the work the task describes, `verify-task` runs the task's `verify` commands, and `complete-task` runs them before marking the task done. `divide-and-conquer` also runs `git` to create worktrees and branches for its subagents. Each skill's `allowed-tools` line in its `SKILL.md` is the exact list.
 
 ## Specification Reference
 
