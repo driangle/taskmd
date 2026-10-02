@@ -47,7 +47,9 @@ Projects with no `phases` configured see no change.
       keep unknown-phase tasks last; update `sdk/go/next` tests
 - [ ] CLI: default strict phase ordering on; mark `--strict-phases` deprecated;
       honour `--strict-phases=false` as the opt-out
-- [ ] MCP and web: pass `StrictPhases: true` (phase order is wired by 01m3xkmtn)
+- [ ] MCP, web `/api/next` and the static export (`web/export.go`): pass
+      `StrictPhases: true` (phase order is wired by 01m3xkmtn); `next
+      --all-projects` inherits the CLI flag default via `recommendForProject`
 - [ ] Update `next` long help: remove `--strict-phases` examples, describe the
       default tiering and the `--strict-phases=false` opt-out; update the
       `--strict-priority` text ("phase is primary" now applies by default)
@@ -65,5 +67,7 @@ Projects with no `phases` configured see no change.
   phased tasks
 - `taskmd next --strict-phases` still works and prints a deprecation warning
 - `taskmd next --strict-phases=false` restores score-only phase ranking
-- MCP `next` and web `/api/next` produce the same ordering as the CLI default
+- MCP `next`, web `/api/next` and the static export produce the same ordering
+  as the CLI default; `next --all-projects` applies strict phase tiers within
+  each project by default
 - Projects without `phases` configured produce identical output to before

@@ -64,12 +64,13 @@ func runWebExport(_ *cobra.Command, _ []string) error {
 	}
 
 	return web.Export(web.ExportConfig{
-		OutputDir: absOutput,
-		ScanDir:   absDir,
-		BasePath:  webExportBasePath,
-		Verbose:   flags.Verbose,
-		Version:   FullVersion(),
-		Efforts:   resolveEffortScale(),
-		Worktrees: builder,
+		OutputDir:  absOutput,
+		ScanDir:    absDir,
+		BasePath:   webExportBasePath,
+		Verbose:    flags.Verbose,
+		Version:    FullVersion(),
+		Efforts:    resolveEffortScale(),
+		PhaseOrder: loadPhaseOrder(),
+		Worktrees:  builder,
 	})
 }

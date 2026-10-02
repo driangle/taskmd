@@ -244,11 +244,7 @@ func handleBoard(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) htt
 		}
 
 		if groupBy == "phase" && len(phases) > 0 {
-			phaseOrder := make([]string, len(phases))
-			for i, p := range phases {
-				phaseOrder[i] = p.ID
-			}
-			board.ReorderKeys(grouped, phaseOrder)
+			board.ReorderKeys(grouped, phaseIDs(phases))
 		}
 
 		overlay, err := dp.GetOverlay()
@@ -303,9 +299,10 @@ func handleStats(dp *DataProvider) http.HandlerFunc {
 	}
 }
 
-func handleNext(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
+func handleNext(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
+		phases := effectivePhases(r, phases)
 		overlay, err := dp.GetOverlay()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -343,6 +340,7 @@ func handleNext(dp *DataProvider, efforts effort.Scale) http.HandlerFunc {
 			Limit:         limit,
 			Filters:       filters,
 			ArchivedTasks: archivedTasks,
+			PhaseOrder:    phaseIDs(phases),
 			Efforts:       efforts,
 			Excluded:      excluded,
 		})

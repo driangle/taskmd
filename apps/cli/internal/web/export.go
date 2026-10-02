@@ -31,6 +31,9 @@ type ExportConfig struct {
 	// Efforts is the project's effort vocabulary. The zero value means the
 	// default small, medium, large.
 	Efforts effort.Scale
+	// PhaseOrder lists the project's phase ids in configured order; nil means
+	// no phases.
+	PhaseOrder []string
 	// Worktrees builds the cross-worktree overlay; the export bakes effective
 	// status and provenance in at export time. The zero value disables it,
 	// leaving single-worktree exports unchanged.
@@ -143,7 +146,7 @@ func generateDataFiles(cfg ExportConfig, tasks, archivedTasks []*model.Task, ove
 		return err
 	}
 
-	return generateAnalyticsFiles(apiDir, effective, archivedTasks, efforts)
+	return generateAnalyticsFiles(cfg, apiDir, effective, archivedTasks)
 }
 
 // exportTaskList returns the tasks that get detail files and SPA routes:
@@ -221,7 +224,8 @@ func generateBoardFiles(boardDir string, tasks []*model.Task, efforts effort.Sca
 	return nil
 }
 
-func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []*model.Task, efforts effort.Scale) error {
+func generateAnalyticsFiles(cfg ExportConfig, apiDir string, tasks []*model.Task, archivedTasks []*model.Task) error {
+	efforts := cfg.Efforts
 	if err := writeJSONFile(apiDir, "graph.json", graph.NewGraph(tasks).ToJSON()); err != nil {
 		return err
 	}
@@ -230,7 +234,12 @@ func generateAnalyticsFiles(apiDir string, tasks []*model.Task, archivedTasks []
 		return err
 	}
 
-	recs, err := next.Recommend(tasks, next.Options{Limit: 5, ArchivedTasks: archivedTasks, Efforts: efforts})
+	recs, err := next.Recommend(tasks, next.Options{
+		Limit:         5,
+		ArchivedTasks: archivedTasks,
+		PhaseOrder:    cfg.PhaseOrder,
+		Efforts:       efforts,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to generate recommendations: %w", err)
 	}

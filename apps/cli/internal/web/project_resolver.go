@@ -126,3 +126,15 @@ func effectivePhases(r *http.Request, defaultPhases []PhaseInfo) []PhaseInfo {
 	}
 	return defaultPhases
 }
+
+// phaseIDs returns the ids of phases in configured order.
+func phaseIDs(phases []PhaseInfo) []string {
+	if len(phases) == 0 {
+		return nil
+	}
+	ids := make([]string, len(phases))
+	for i, p := range phases {
+		ids[i] = p.ID
+	}
+	return ids
+}

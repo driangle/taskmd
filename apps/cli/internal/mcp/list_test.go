@@ -93,10 +93,18 @@ func setupTestServer(t *testing.T) *gomcp.ClientSession {
 // overlay builder, for tests that inject sibling discovery.
 func setupTestServerWith(t *testing.T, wt worktree.Builder) *gomcp.ClientSession {
 	t.Helper()
+	return setupTestServerWithConfig(t, Config{Efforts: effort.Default(), Worktrees: wt})
+}
+
+// setupTestServerWithConfig starts an in-memory MCP session with the given
+// server configuration.
+func setupTestServerWithConfig(t *testing.T, cfg Config) *gomcp.ClientSession {
+	t.Helper()
 
 	ctx := context.Background()
 
-	server := NewServer("test", effort.Default(), wt)
+	cfg.Version = "test"
+	server := NewServer(cfg)
 	client := gomcp.NewClient(&gomcp.Implementation{
 		Name:    "test-client",
 		Version: "1.0",

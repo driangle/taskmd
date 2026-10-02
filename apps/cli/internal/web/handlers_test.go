@@ -798,7 +798,7 @@ func TestHandleNext(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp, effort.Default())(rec, req)
+	handleNext(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -834,7 +834,7 @@ func TestHandleNext_WithLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/next?limit=1", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp, effort.Default())(rec, req)
+	handleNext(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -868,7 +868,7 @@ priority: high
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp, effort.Default())(rec, req)
+	handleNext(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -904,7 +904,7 @@ priority: medium
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 	rec := httptest.NewRecorder()
 
-	handleNext(dp, effort.Default())(rec, req)
+	handleNext(dp, nil, effort.Default())(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)

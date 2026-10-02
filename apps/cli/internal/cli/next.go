@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -226,15 +225,12 @@ type ProjectRecommendation struct {
 func runNextAllProjects() error {
 	expandNextShortcutFilters()
 
-	allRecs, err := collectAllProjectRecs()
+	perProject, err := collectAllProjectRecs()
 	if err != nil {
 		return err
 	}
 
-	// Sort by score descending, re-assign ranks
-	sort.Slice(allRecs, func(i, j int) bool {
-		return allRecs[i].Score > allRecs[j].Score
-	})
+	allRecs := mergeProjectRecs(perProject, nextStrictPriority)
 	if nextLimit > 0 && nextLimit < len(allRecs) {
 		allRecs = allRecs[:nextLimit]
 	}
@@ -254,8 +250,9 @@ func runNextAllProjects() error {
 	}
 }
 
-// collectAllProjectRecs gathers recommendations from every registered project.
-func collectAllProjectRecs() ([]ProjectRecommendation, error) {
+// collectAllProjectRecs gathers recommendations from every registered project,
+// one ranked list per project.
+func collectAllProjectRecs() ([][]ProjectRecommendation, error) {
 	entries, err := LoadGlobalRegistry()
 	if err != nil {
 		return nil, fmt.Errorf("load global registry: %w", err)
@@ -268,18 +265,20 @@ func collectAllProjectRecs() ([]ProjectRecommendation, error) {
 	// runs inside it — the same dedupe list --all-projects applies.
 	entries = dedupeRepoEntries(entries)
 
-	var allRecs []ProjectRecommendation
+	var perProject [][]ProjectRecommendation
 	for _, entry := range entries {
 		recs, recErr := recommendForProject(entry)
 		if recErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: skipping project %q: %v\n", entry.ID, recErr)
 			continue
 		}
-		for _, rec := range recs {
-			allRecs = append(allRecs, ProjectRecommendation{ProjectID: entry.ID, Recommendation: rec})
+		projectRecs := make([]ProjectRecommendation, len(recs))
+		for i, rec := range recs {
+			projectRecs[i] = ProjectRecommendation{ProjectID: entry.ID, Recommendation: rec}
 		}
+		perProject = append(perProject, projectRecs)
 	}
-	return allRecs, nil
+	return perProject, nil
 }
 
 // recommendForProject scans a project and returns recommendations. With that
@@ -299,9 +298,10 @@ func recommendForProject(entry GlobalProjectEntry) ([]Recommendation, error) {
 		Scope:          nextScope,
 		ScopeExact:     nextExact,
 		Phase:          nextPhase,
+		PhaseOrder:     loadProjectPhaseOrder(entry.Path),
 		StrictPhases:   nextStrictPhases,
 		StrictPriority: nextStrictPriority,
-		Efforts:        resolveEffortScale(),
+		Efforts:        loadProjectEffortScale(entry.Path),
 		Excluded:       excluded,
 	})
 }

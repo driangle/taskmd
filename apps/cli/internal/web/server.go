@@ -147,7 +147,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))
 	mux.HandleFunc("GET /api/graph/mermaid", handleGraphMermaid(s.dp))
 	mux.HandleFunc("GET /api/stats", handleStats(s.dp))
-	mux.HandleFunc("GET /api/next", handleNext(s.dp, s.config.Efforts))
+	mux.HandleFunc("GET /api/next", handleNext(s.dp, s.config.Phases, s.config.Efforts))
 	mux.HandleFunc("GET /api/tracks", handleTracks(s.dp, s.config.Efforts))
 	mux.HandleFunc("GET /api/validate", handleValidate(s.dp, s.config.Efforts))
 	mux.HandleFunc("GET /api/feed", handleFeed(s.dp))

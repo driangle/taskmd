@@ -1,13 +1,14 @@
 ---
 id: "01m3xkmtn"
 title: "Apply phase order consistently across all next surfaces"
-status: pending
+status: completed
 priority: high
 effort: small
 type: bug
 dependencies: []
 tags: ["cli", "next", "mcp", "web"]
 created_at: 2026-10-02
+completed_at: 2026-10-02
 ---
 
 # Apply phase order consistently across all next surfaces
@@ -34,12 +35,12 @@ flipping the default only in the CLI would widen the CLI-vs-MCP/web gap.
 
 ## Tasks
 
-- [ ] Pass the project's phase order to `next.Recommend` from the MCP `next` tool
-- [ ] Pass it from the web `/api/next` handler and the static export
-- [ ] For `--all-projects`, load each project's **own** phase order from that
+- [x] Pass the project's phase order to `next.Recommend` from the MCP `next` tool
+- [x] Pass it from the web `/api/next` handler and the static export
+- [x] For `--all-projects`, load each project's **own** phase order from that
       project's config (not the current directory's viper config —
       `loadPhaseOrder()` reads global viper state today)
-- [ ] Add tests per surface proving a phased project gets the phase bonus
+- [x] Add tests per surface proving a phased project gets the phase bonus
       (and, for all-projects, that `--strict-phases` now orders within each project)
 
 ## Acceptance Criteria

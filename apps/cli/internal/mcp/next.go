@@ -7,8 +7,6 @@ import (
 
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/driangle/taskmd/apps/cli/internal/worktree"
-	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/next"
 	"github.com/driangle/taskmd/sdk/go/scanner"
 )
@@ -22,17 +20,17 @@ type NextInput struct {
 	Critical  bool     `json:"critical,omitempty" jsonschema:"only show tasks on the critical path"`
 }
 
-func registerNextTool(server *gomcp.Server, efforts effort.Scale, wt worktree.Builder) {
+func registerNextTool(server *gomcp.Server, cfg Config) {
 	gomcp.AddTool(server, &gomcp.Tool{
 		Name:        "next",
 		Description: "Get ranked task recommendations based on priority, dependencies, and critical path analysis",
 	}, func(ctx context.Context, req *gomcp.CallToolRequest, input NextInput) (*gomcp.CallToolResult, any, error) {
-		return handleNext(ctx, req, input, efforts, wt)
+		return handleNext(ctx, req, input, cfg)
 	})
 }
 
-func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, efforts effort.Scale, wt worktree.Builder) (*gomcp.CallToolResult, any, error) {
-	tasks, overlay, err := scanWithOverlay(input.TaskDir, wt)
+func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, cfg Config) (*gomcp.CallToolResult, any, error) {
+	tasks, overlay, err := scanWithOverlay(input.TaskDir, cfg.Worktrees)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,7 +51,8 @@ func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, ef
 		QuickWins:     input.QuickWins,
 		Critical:      input.Critical,
 		ArchivedTasks: archivedTasks,
-		Efforts:       efforts,
+		PhaseOrder:    cfg.PhaseOrder,
+		Efforts:       cfg.Efforts,
 		Excluded:      excluded,
 	}
 
