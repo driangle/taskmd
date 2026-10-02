@@ -145,7 +145,8 @@ Get ranked task recommendations based on priority, dependencies, and critical pa
 **Returns:** JSON array of ranked task recommendations with scores.
 
 Ranking matches `taskmd next`, including strict [phase ordering](/guide/cli#next-find-what-to-work-on):
-earlier phases in `.taskmd.yaml` are recommended first. The phase list and effort
+earlier phases in `.taskmd.yaml` are recommended first. The phase list, the
+[`next.unphased`](/reference/configuration#unphased-tasks) setting and the effort
 vocabulary are read once, from the project the server was started in; a call whose
 `task_dir` points at a different project still ranks against that startup configuration.
 

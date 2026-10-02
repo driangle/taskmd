@@ -524,6 +524,7 @@ var knownConfigKeys = map[string]bool{
 	"effort":         true,
 	"worklogs":       true,
 	"worktree_scope": true,
+	"next":           true,
 }
 
 // checkUnknownConfigKeys warns about unrecognized top-level config keys.

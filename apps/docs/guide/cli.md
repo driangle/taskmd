@@ -321,6 +321,12 @@ the MCP `next` tool, the web `/api/next` endpoint, the static export, and
 fall back to treating phase as a score bonus only. Projects without phases are
 unaffected.
 
+If "no phase" means "unscheduled" in your project, set `next.unphased: last` in
+`.taskmd.yaml` to rank unphased tasks after every configured phase instead (still
+ahead of tasks with an unknown phase). Every `next` surface above honours it, and
+`--all-projects` reads it per project. See
+[Unphased tasks](/reference/configuration#unphased-tasks).
+
 **Flags:**
 
 | Flag | Default | Description |

@@ -46,15 +46,16 @@ func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, cf
 	}
 
 	opts := next.Options{
-		Limit:         input.Limit,
-		Filters:       input.Filters,
-		QuickWins:     input.QuickWins,
-		Critical:      input.Critical,
-		ArchivedTasks: archivedTasks,
-		PhaseOrder:    cfg.PhaseOrder,
-		StrictPhases:  true,
-		Efforts:       cfg.Efforts,
-		Excluded:      excluded,
+		Limit:             input.Limit,
+		Filters:           input.Filters,
+		QuickWins:         input.QuickWins,
+		Critical:          input.Critical,
+		ArchivedTasks:     archivedTasks,
+		PhaseOrder:        cfg.PhaseOrder,
+		StrictPhases:      true,
+		UnphasedPlacement: cfg.UnphasedPlacement,
+		Efforts:           cfg.Efforts,
+		Excluded:          excluded,
 	}
 
 	recs, err := next.Recommend(tasks, opts)

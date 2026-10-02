@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/driangle/taskmd/sdk/go/effort"
 	"github.com/driangle/taskmd/sdk/go/next"
 )
 
@@ -74,7 +73,7 @@ func TestHandleNext_PhaseOrder_RanksEarlierPhaseFirst(t *testing.T) {
 	dp := NewDataProvider(createPhasedTaskDir(t), false)
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 
-	recs := serveNext(t, handleNext(dp, earlyLatePhases, effort.Default()), req)
+	recs := serveNext(t, handleNext(dp, Config{Phases: earlyLatePhases}), req)
 
 	if id := firstID(t, recs); id != "002" {
 		t.Errorf("expected earlier-phase task 002 first, got %s", id)
@@ -85,7 +84,7 @@ func TestHandleNext_NoPhases_IgnoresPhases(t *testing.T) {
 	dp := NewDataProvider(createPhasedTaskDir(t), false)
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 
-	recs := serveNext(t, handleNext(dp, nil, effort.Default()), req)
+	recs := serveNext(t, handleNext(dp, Config{}), req)
 
 	if id := firstID(t, recs); id != "001" {
 		t.Errorf("without phases, expected ID tiebreak to put 001 first, got %s", id)
@@ -99,7 +98,7 @@ func TestHandleNext_ProjectScopedPhasesOverrideDefault(t *testing.T) {
 	projectPhases := []PhaseInfo{{ID: "late"}, {ID: "early"}}
 	req = req.WithContext(context.WithValue(req.Context(), projectPhasesKey, projectPhases))
 
-	recs := serveNext(t, handleNext(dp, earlyLatePhases, effort.Default()), req)
+	recs := serveNext(t, handleNext(dp, Config{Phases: earlyLatePhases}), req)
 
 	if id := firstID(t, recs); id != "001" {
 		t.Errorf("expected project phase order to put 001 first, got %s", id)
@@ -136,7 +135,7 @@ func TestHandleNext_PhaseOrder_StrictByDefault(t *testing.T) {
 	dp := NewDataProvider(createStrictPhaseTaskDir(t), false)
 	req := httptest.NewRequest(http.MethodGet, "/api/next", nil)
 
-	recs := serveNext(t, handleNext(dp, earlyLatePhases, effort.Default()), req)
+	recs := serveNext(t, handleNext(dp, Config{Phases: earlyLatePhases}), req)
 
 	if id := firstID(t, recs); id != "002" {
 		t.Errorf("expected strict phase order to put low-priority early task 002 first, got %s", id)

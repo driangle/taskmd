@@ -366,7 +366,7 @@ taskmd stats --group-by phase
 
 - **Start with phases when you have deadlines.** If everything is "someday," tags work fine. Once you have a release date, phases make priorities concrete.
 - **Keep phase names short.** They appear in tables and boards. `v0.2` is better than `Version 0.2 - Core CLI Features Release`.
-- **Order the list the way you will work it.** `taskmd next` finishes earlier phases before recommending later ones, so a critical task in `v0.3` waits behind actionable `v0.2` work. Unphased tasks (e.g. an urgent bug) compete in the current phase rather than queueing behind everything. Use `taskmd next --strict-phases=false` for a one-off view that treats phase as a score bonus only.
+- **Order the list the way you will work it.** `taskmd next` finishes earlier phases before recommending later ones, so a critical task in `v0.3` waits behind actionable `v0.2` work. Unphased tasks (e.g. an urgent bug) compete in the current phase rather than queueing behind everything; set `next.unphased: last` if unphased means unscheduled in your project. Use `taskmd next --strict-phases=false` for a one-off view that treats phase as a score bonus only.
 - **Review phase progress** with `taskmd board --group-by phase` to see which phases are on track.
 
 ## CI/CD Integration

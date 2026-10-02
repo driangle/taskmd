@@ -299,10 +299,10 @@ func handleStats(dp *DataProvider) http.HandlerFunc {
 	}
 }
 
-func handleNext(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) http.HandlerFunc {
+func handleNext(dp *DataProvider, cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dp := effectiveDP(r, dp)
-		phases := effectivePhases(r, phases)
+		phases := effectivePhases(r, cfg.Phases)
 		overlay, err := dp.GetOverlay()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -337,13 +337,14 @@ func handleNext(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) http
 		filters := r.URL.Query()["filter"]
 
 		recs, err := next.Recommend(tasks, next.Options{
-			Limit:         limit,
-			Filters:       filters,
-			ArchivedTasks: archivedTasks,
-			PhaseOrder:    phaseIDs(phases),
-			StrictPhases:  true,
-			Efforts:       efforts,
-			Excluded:      excluded,
+			Limit:             limit,
+			Filters:           filters,
+			ArchivedTasks:     archivedTasks,
+			PhaseOrder:        phaseIDs(phases),
+			StrictPhases:      true,
+			UnphasedPlacement: cfg.UnphasedPlacement,
+			Efforts:           cfg.Efforts,
+			Excluded:          excluded,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

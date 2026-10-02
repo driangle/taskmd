@@ -60,6 +60,7 @@ Command-line flags always override config file values.
 | `effort` | string[] | `[small, medium, large]` | Ordered effort vocabulary, lowest to highest ([details](#effort-configuration)) |
 | `scopes` | map | — | Scope-to-path mappings for the `touches` field ([details](#scopes-configuration)) |
 | `phases` | array | `[]` | Phase definitions with metadata ([details](#phases-configuration)) |
+| `next.unphased` | string | `"current"` | Where `next` ranks tasks with no `phase`: `current` (the current phase) or `last` (after every phase) ([details](#unphased-tasks)) |
 | `projects` | array | `[]` | Registered projects for multi-project workflows ([details](#projects-configuration)) (global config only) |
 | `default_project` | string | `""` | Default project ID to use when no `--project` flag is specified (global config only) |
 
@@ -434,6 +435,29 @@ Each phase entry has the following fields:
 - When phases are configured, any `phase` value in a task that does not match a configured phase `id` produces a warning.
 - When no phases config exists, all `phase` values are accepted silently.
 - **List order is significant.** `next` recommends earlier phases first: no task in a later phase is ranked above an actionable task in an earlier one, and score ranks tasks within a phase. A task with no `phase` competes in the earliest phase that still has actionable tasks; a task whose phase is not in the list ranks last. This applies to the CLI, `next --all-projects` (each project against its own list), the MCP `next` tool, the web `/api/next` endpoint, and the static export. `taskmd next --strict-phases=false` opts out, treating phase as a score bonus only. See [`next`](/guide/cli#next-find-what-to-work-on).
+
+### Unphased tasks {#unphased-tasks}
+
+`next.unphased` chooses where `next` ranks tasks that have no `phase`:
+
+```yaml
+# .taskmd.yaml
+next:
+  unphased: current   # default — compete in the current phase on score
+  # unphased: last    # rank after every configured phase
+```
+
+- `current` (default) — an unphased task joins the earliest phase that still has
+  actionable tasks, so an urgent unphased bug is not buried behind phased chores.
+- `last` — unphased tasks rank after every actionable task in a configured phase
+  (but still ahead of tasks whose phase is not in the list). Use it when "no
+  phase" means "unscheduled" in your project.
+
+Any other value is a config error: `next` (and the MCP server, `web start` and
+`web export`) refuses to run, and `taskmd validate` reports it. Like the phase
+list, the setting applies to every `next` surface, and `next --all-projects`
+reads it from each project's own `.taskmd.yaml`. It has no effect without
+`phases` or under `--strict-phases=false`.
 
 ## Effort Configuration {#effort-configuration}
 

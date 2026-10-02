@@ -5,6 +5,7 @@ import (
 
 	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
+	"github.com/driangle/taskmd/sdk/go/next"
 )
 
 // Config is the server-wide configuration, resolved once at startup.
@@ -18,6 +19,9 @@ type Config struct {
 	Efforts effort.Scale
 	// PhaseOrder lists phase ids in configured order; nil means no phases.
 	PhaseOrder []string
+	// UnphasedPlacement sets where the next tool ranks unphased tasks under
+	// strict phase ordering. The zero value means next.UnphasedCurrent.
+	UnphasedPlacement next.UnphasedPlacement
 
 	// Worktrees builds the cross-worktree overlay per scanned dir; read tools
 	// serve the merged view (effective status plus additive provenance fields)

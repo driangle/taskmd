@@ -34,6 +34,9 @@ type ExportConfig struct {
 	// PhaseOrder lists the project's phase ids in configured order; nil means
 	// no phases.
 	PhaseOrder []string
+	// UnphasedPlacement sets where next.json ranks unphased tasks under strict
+	// phase ordering. The zero value means next.UnphasedCurrent.
+	UnphasedPlacement next.UnphasedPlacement
 	// Worktrees builds the cross-worktree overlay; the export bakes effective
 	// status and provenance in at export time. The zero value disables it,
 	// leaving single-worktree exports unchanged.
@@ -235,11 +238,12 @@ func generateAnalyticsFiles(cfg ExportConfig, apiDir string, tasks []*model.Task
 	}
 
 	recs, err := next.Recommend(tasks, next.Options{
-		Limit:         5,
-		ArchivedTasks: archivedTasks,
-		PhaseOrder:    cfg.PhaseOrder,
-		StrictPhases:  true,
-		Efforts:       efforts,
+		Limit:             5,
+		ArchivedTasks:     archivedTasks,
+		PhaseOrder:        cfg.PhaseOrder,
+		StrictPhases:      true,
+		UnphasedPlacement: cfg.UnphasedPlacement,
+		Efforts:           efforts,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to generate recommendations: %w", err)

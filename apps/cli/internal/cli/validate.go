@@ -300,6 +300,10 @@ func loadConfigForValidation() *validator.ConfigData {
 		config.StructuralErrors = append(config.StructuralErrors, errs...)
 	}
 
+	if _, err := resolveUnphasedPlacement(); err != nil {
+		config.StructuralErrors = append(config.StructuralErrors, err.Error())
+	}
+
 	return config
 }
 

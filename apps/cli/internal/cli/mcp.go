@@ -39,11 +39,16 @@ func runMcp(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	unphased, err := resolveUnphasedPlacement()
+	if err != nil {
+		return err
+	}
 	server := taskmcp.NewServer(taskmcp.Config{
-		Version:    Version,
-		Efforts:    resolveEffortScale(),
-		PhaseOrder: loadPhaseOrder(),
-		Worktrees:  builder,
+		Version:           Version,
+		Efforts:           resolveEffortScale(),
+		PhaseOrder:        loadPhaseOrder(),
+		UnphasedPlacement: unphased,
+		Worktrees:         builder,
 	})
 	return server.Run(context.Background(), &gomcp.StdioTransport{})
 }

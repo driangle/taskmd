@@ -102,20 +102,25 @@ func runWebStart(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	unphased, err := resolveUnphasedPlacement()
+	if err != nil {
+		return err
+	}
 
 	srv := web.NewServer(web.Config{
-		Port:           port,
-		Host:           host,
-		ScanDir:        absDir,
-		Dev:            webDev,
-		Verbose:        flags.Verbose,
-		ReadOnly:       viper.GetBool("web.readonly"),
-		Version:        FullVersion(),
-		Phases:         parsePhasesForWeb(),
-		Efforts:        resolveEffortScale(),
-		Worktrees:      builder,
-		ListProjects:   buildListProjects(),
-		ResolveProject: buildResolveProject(),
+		Port:              port,
+		Host:              host,
+		ScanDir:           absDir,
+		Dev:               webDev,
+		Verbose:           flags.Verbose,
+		ReadOnly:          viper.GetBool("web.readonly"),
+		Version:           FullVersion(),
+		Phases:            parsePhasesForWeb(),
+		Efforts:           resolveEffortScale(),
+		UnphasedPlacement: unphased,
+		Worktrees:         builder,
+		ListProjects:      buildListProjects(),
+		ResolveProject:    buildResolveProject(),
 	})
 
 	ctx, cancel := signal.NotifyContext(

@@ -212,7 +212,7 @@ func TestHandleNext_WorktreeOverlay_ExcludesSiblingClaims(t *testing.T) {
 	dp, _, _ := overlayFixtureDP(t)
 
 	var recs []map[string]any
-	getJSON(t, handleNext(dp, nil, effortScaleForTest()), "/api/next", &recs)
+	getJSON(t, handleNext(dp, Config{Efforts: effortScaleForTest()}), "/api/next", &recs)
 
 	if len(recs) == 0 {
 		t.Fatal("expected a recommendation for 002")

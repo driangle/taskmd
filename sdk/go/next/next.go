@@ -73,6 +73,9 @@ type Options struct {
 	PhaseOrder     []string
 	StrictPhases   bool
 	StrictPriority bool
+	// UnphasedPlacement sets where strict phase ordering ranks tasks with no
+	// phase. The zero value means UnphasedCurrent.
+	UnphasedPlacement UnphasedPlacement
 	// Efforts is the project's effort vocabulary. The zero value means the
 	// default small, medium, large.
 	Efforts effort.Scale
@@ -82,6 +85,19 @@ type Options struct {
 	// reason text belongs to the caller.
 	Excluded map[string]string
 }
+
+// UnphasedPlacement controls where strict phase ordering ranks tasks with no
+// phase. It has no effect without strict phases or a configured phase order.
+type UnphasedPlacement string
+
+const (
+	// UnphasedCurrent ranks unphased tasks in the current phase tier (the
+	// earliest phase with actionable tasks), competing there on score.
+	UnphasedCurrent UnphasedPlacement = "current"
+	// UnphasedLast ranks unphased tasks after every configured phase, but
+	// before tasks whose phase is not in the configured order.
+	UnphasedLast UnphasedPlacement = "last"
+)
 
 type scoredTask struct {
 	task       *model.Task
@@ -121,6 +137,7 @@ func Recommend(tasks []*model.Task, opts Options) ([]Recommendation, error) {
 		phaseOrder:     opts.PhaseOrder,
 		strictPhases:   opts.StrictPhases,
 		strictPriority: opts.StrictPriority,
+		unphased:       opts.UnphasedPlacement,
 		efforts:        opts.Efforts,
 	}, criticalPath, downstreamInfo)
 
@@ -281,6 +298,7 @@ type sortOptions struct {
 	phaseOrder     []string
 	strictPhases   bool
 	strictPriority bool
+	unphased       UnphasedPlacement
 	efforts        effort.Scale
 }
 
@@ -304,7 +322,7 @@ func scoreAndSort(
 
 	strictPhases := opts.strictPhases && len(phaseIndex) > 0
 	if strictPhases {
-		assignPhaseTiers(scored, phaseIndex)
+		assignPhaseTiers(scored, phaseIndex, opts.unphased)
 	}
 
 	sort.SliceStable(scored, func(i, j int) bool {
@@ -340,20 +358,17 @@ func buildPhaseIndex(phaseOrder []string) map[string]int {
 }
 
 // assignPhaseTiers sets each task's strict-phase tier: its phase's position in
-// the configured order. Unphased tasks join the current tier — the earliest
-// phase among the tasks being ranked — so they compete on score with current
-// work instead of trailing every phase. Tasks whose phase is not in the
+// the configured order. By default unphased tasks join the current tier — the
+// earliest phase among the tasks being ranked — so they compete on score with
+// current work instead of trailing every phase. With UnphasedLast they rank
+// after every configured phase instead. Tasks whose phase is not in the
 // configured order sort after everything else.
-func assignPhaseTiers(scored []scoredTask, phaseIndex map[string]int) {
+func assignPhaseTiers(scored []scoredTask, phaseIndex map[string]int, unphased UnphasedPlacement) {
+	unphasedTier := currentPhaseTier(scored, phaseIndex)
 	unknown := len(phaseIndex)
-	current := unknown
-	for _, st := range scored {
-		if idx, ok := phaseIndex[st.task.Phase]; ok && idx < current {
-			current = idx
-		}
-	}
-	if current == unknown {
-		current = 0
+	if unphased == UnphasedLast {
+		unphasedTier = len(phaseIndex)
+		unknown = unphasedTier + 1
 	}
 
 	for i := range scored {
@@ -361,11 +376,26 @@ func assignPhaseTiers(scored []scoredTask, phaseIndex map[string]int) {
 		if idx, ok := phaseIndex[phase]; ok {
 			scored[i].phaseTier = idx
 		} else if phase == "" {
-			scored[i].phaseTier = current
+			scored[i].phaseTier = unphasedTier
 		} else {
 			scored[i].phaseTier = unknown
 		}
 	}
+}
+
+// currentPhaseTier returns the earliest configured phase among the tasks being
+// ranked, or 0 when none of them is in a configured phase.
+func currentPhaseTier(scored []scoredTask, phaseIndex map[string]int) int {
+	current := len(phaseIndex)
+	for _, st := range scored {
+		if idx, ok := phaseIndex[st.task.Phase]; ok && idx < current {
+			current = idx
+		}
+	}
+	if current == len(phaseIndex) {
+		return 0
+	}
+	return current
 }
 
 func buildRecommendations(

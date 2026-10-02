@@ -56,6 +56,12 @@ phase (the earliest one with actionable work); a task whose phase is not in
 the configured list ranks last. Pass --strict-phases=false to fall back to
 treating phase as a score bonus only. Projects without phases are unaffected.
 
+To rank unphased tasks after every configured phase instead (still ahead of
+unknown-phase tasks), set this in .taskmd.yaml:
+
+  next:
+    unphased: last   # default: current
+
 In a git repository with multiple worktrees, next recommends against the merged
 cross-worktree view: a task that is in-progress (or further along) in a sibling
 worktree is never recommended, so setting a task in-progress in one worktree
@@ -149,21 +155,27 @@ func runNext(cmd *cobra.Command, args []string) error {
 
 	expandNextShortcutFilters()
 
+	unphased, err := resolveUnphasedPlacement()
+	if err != nil {
+		return err
+	}
+
 	recs, err := next.Recommend(recTasks, next.Options{
-		Limit:          nextLimit,
-		Filters:        nextFilters,
-		QuickWins:      nextQuickWins,
-		Critical:       nextCritical,
-		Scope:          nextScope,
-		ScopeExact:     nextExact,
-		Root:           nextRoot,
-		ArchivedTasks:  archivedTasks,
-		Phase:          nextPhase,
-		PhaseOrder:     loadPhaseOrder(),
-		StrictPhases:   nextStrictPhases,
-		StrictPriority: nextStrictPriority,
-		Efforts:        resolveEffortScale(),
-		Excluded:       worktreeExcluded,
+		Limit:             nextLimit,
+		Filters:           nextFilters,
+		QuickWins:         nextQuickWins,
+		Critical:          nextCritical,
+		Scope:             nextScope,
+		ScopeExact:        nextExact,
+		Root:              nextRoot,
+		ArchivedTasks:     archivedTasks,
+		Phase:             nextPhase,
+		PhaseOrder:        loadPhaseOrder(),
+		StrictPhases:      nextStrictPhases,
+		StrictPriority:    nextStrictPriority,
+		UnphasedPlacement: unphased,
+		Efforts:           resolveEffortScale(),
+		Excluded:          worktreeExcluded,
 	})
 	if err != nil {
 		return err
@@ -296,20 +308,25 @@ func recommendForProject(entry GlobalProjectEntry) ([]Recommendation, error) {
 	if err != nil {
 		return nil, err
 	}
+	unphased, err := loadProjectUnphasedPlacement(entry.Path)
+	if err != nil {
+		return nil, err
+	}
 	tasks, excluded := scan.recommendationInputs()
 	return next.Recommend(tasks, next.Options{
-		Limit:          0, // get all, we'll limit after merging
-		Filters:        nextFilters,
-		QuickWins:      nextQuickWins,
-		Critical:       nextCritical,
-		Scope:          nextScope,
-		ScopeExact:     nextExact,
-		Phase:          nextPhase,
-		PhaseOrder:     loadProjectPhaseOrder(entry.Path),
-		StrictPhases:   nextStrictPhases,
-		StrictPriority: nextStrictPriority,
-		Efforts:        loadProjectEffortScale(entry.Path),
-		Excluded:       excluded,
+		Limit:             0, // get all, we'll limit after merging
+		Filters:           nextFilters,
+		QuickWins:         nextQuickWins,
+		Critical:          nextCritical,
+		Scope:             nextScope,
+		ScopeExact:        nextExact,
+		Phase:             nextPhase,
+		PhaseOrder:        loadProjectPhaseOrder(entry.Path),
+		StrictPhases:      nextStrictPhases,
+		StrictPriority:    nextStrictPriority,
+		UnphasedPlacement: unphased,
+		Efforts:           loadProjectEffortScale(entry.Path),
+		Excluded:          excluded,
 	})
 }
 

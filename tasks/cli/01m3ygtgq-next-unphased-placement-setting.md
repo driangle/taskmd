@@ -1,13 +1,14 @@
 ---
 title: "Add a .taskmd.yaml setting for where next ranks unphased tasks"
 id: "01m3ygtgq"
-status: pending
+status: completed
 priority: low
 type: feature
 tags: ["cli", "next", "config"]
 created: "2026-10-02"
 dependencies: ["01m3xf0rs"]
 effort: small
+completed_at: 2026-10-02
 ---
 
 # Add a .taskmd.yaml setting for where next ranks unphased tasks
@@ -47,14 +48,14 @@ next:
 
 ## Tasks
 
-- [ ] SDK: add the unphased-placement option to `next.Options`, honour it in
+- [x] SDK: add the unphased-placement option to `next.Options`, honour it in
       `assignPhaseTiers`, and add tests for both placements
-- [ ] Config: parse and validate the key (reject unknown values with a clear
+- [x] Config: parse and validate the key (reject unknown values with a clear
       error), defaulting to `current`
-- [ ] Wire it through CLI `next`, `--all-projects` (per-project config), MCP
+- [x] Wire it through CLI `next`, `--all-projects` (per-project config), MCP
       `next`, web `/api/next` and the static export
-- [ ] CLI tests covering both values, the default, and an invalid value
-- [ ] Document the setting in the `.taskmd.yaml` config reference, the
+- [x] CLI tests covering both values, the default, and an invalid value
+- [x] Document the setting in the `.taskmd.yaml` config reference, the
       `apps/docs/guide/cli.md` "Phase ordering" section, and the `next` long help
 
 ## Acceptance Criteria

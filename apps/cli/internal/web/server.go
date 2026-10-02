@@ -13,6 +13,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/watcher"
 	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/effort"
+	"github.com/driangle/taskmd/sdk/go/next"
 )
 
 // PhaseInfo holds phase metadata served to the frontend.
@@ -37,6 +38,9 @@ type Config struct {
 	// Efforts is the project's effort vocabulary. The zero value means the
 	// default small, medium, large.
 	Efforts effort.Scale
+	// UnphasedPlacement sets where /api/next ranks unphased tasks under strict
+	// phase ordering. The zero value means next.UnphasedCurrent.
+	UnphasedPlacement next.UnphasedPlacement
 	// Worktrees builds the cross-worktree overlay for the data layer. The
 	// zero value disables it.
 	Worktrees worktree.Builder
@@ -147,7 +151,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/graph", handleGraph(s.dp))
 	mux.HandleFunc("GET /api/graph/mermaid", handleGraphMermaid(s.dp))
 	mux.HandleFunc("GET /api/stats", handleStats(s.dp))
-	mux.HandleFunc("GET /api/next", handleNext(s.dp, s.config.Phases, s.config.Efforts))
+	mux.HandleFunc("GET /api/next", handleNext(s.dp, s.config))
 	mux.HandleFunc("GET /api/tracks", handleTracks(s.dp, s.config.Efforts))
 	mux.HandleFunc("GET /api/validate", handleValidate(s.dp, s.config.Efforts))
 	mux.HandleFunc("GET /api/feed", handleFeed(s.dp))
