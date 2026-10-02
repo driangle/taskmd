@@ -9,10 +9,9 @@ None. This plugin requires no CLI binary, no runtime, and no external dependenci
 ## Installation
 
 ```bash
-claude plugin install --marketplace https://github.com/driangle/taskmd
+claude plugin marketplace add driangle/taskmd
+claude plugin install taskmd-lite@taskmd-marketplace --scope project
 ```
-
-Then select `taskmd-lite` from the list of available plugins.
 
 ## Available Skills
 
