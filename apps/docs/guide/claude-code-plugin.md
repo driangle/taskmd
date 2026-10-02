@@ -64,10 +64,18 @@ claude plugin install taskmd-lite@taskmd-marketplace --scope project
 | `/taskmd:do-task <ID>` | Look up a task and start working on it |
 | `/taskmd:next-task` | Find the next recommended task |
 | `/taskmd:get-task <ID>` | View task details by ID or name |
+| `/taskmd:get-task-status <ID>` | Show only a task's metadata, without the body |
 | `/taskmd:add-task <description>` | Create a new task file |
+| `/taskmd:update-task <description>` | Update a task's fields (status, priority, title, tags, ...) |
 | `/taskmd:complete-task <ID>` | Mark a task as completed |
 | `/taskmd:list-tasks` | List tasks with optional filters |
 | `/taskmd:validate-tasks` | Validate task files for errors |
+| `/taskmd:verify-task <ID>` | Run the task's `verify` checks and report pass/fail |
+| `/taskmd:split-task <ID>` | Split a large task into smaller sub-tasks |
+| `/taskmd:divide-and-conquer <ID>` | Execute a task with parallel subagents, each in its own git worktree and branch; asks before merging |
+| `/taskmd:import-todos` | Turn TODO/FIXME comments into task files |
+
+`do-task` and `divide-and-conquer` carry out the work the task describes and run your build and test commands. `divide-and-conquer` is the only skill that creates branches and worktrees. The `taskmd-lite` plugin offers the same skills under the `/taskmd-lite:` prefix.
 
 ## Usage
 

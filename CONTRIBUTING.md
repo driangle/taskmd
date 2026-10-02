@@ -68,17 +68,29 @@ integration.
 Most "I wish taskmd could also…" ideas are better — and ship faster — as
 something layered on top:
 
-- **Agent skills** — the `claude-code-plugin/` skills are thin wrappers that
-  shell out to the `taskmd` CLI. Great for encoding a workflow. Keep them thin;
-  if a skill grows real logic, that logic probably wants to be a CLI command or
-  an SDK function instead.
+- **Agent skills** — most skills in `claude-code-plugin/` and
+  `claude-code-plugin-lite/` are thin wrappers over the `taskmd` CLI (or, for
+  lite, over Claude's file tools). Keep them thin; if a skill grows real task
+  logic, that logic probably wants to be a CLI command or an SDK function.
+
+  The **execution skills** are the deliberate exception to the non-goals above:
+  `do-task`, `divide-and-conquer`, `verify-task`, and `complete-task` drive an
+  agent through the work, run build and test commands, and `divide-and-conquer`
+  creates branches and Git worktrees, commits to them, and may open a PR in
+  pr-review mode. That is allowed because a plugin is not core: nothing in
+  `apps/cli`, `sdk/go`, or `apps/web` does any of it, and the plugins are
+  optional installs with their own version lines. Two rules keep the carve-out
+  honest: a skill that mutates Git or runs the user's commands must say so in
+  its `description` and in the plugin README's skill table, and it must never
+  write to the primary checkout's branch without asking.
 - **The SDK** — `sdk/go` exposes taskmd's scanning, scoring, and track logic so
   other tools can build on the same primitives the CLI uses.
 - **The MCP server** — for programmatic, tool-based access to task data.
-- **Standalone integrations** — anything that mutates Git, drives worktrees, or
-  depends on an external tool belongs in its own plugin/repo (e.g. a
-  hypothetical `taskmd-worktrunk`). We're happy to link well-maintained
-  community integrations from the docs.
+- **Standalone integrations** — anything else that mutates Git, drives
+  worktrees, or depends on an external tool belongs in its own plugin or repo
+  (the in-tree Claude Code plugins count; so would a hypothetical
+  `taskmd-worktrunk`). We're happy to link well-maintained community
+  integrations from the docs.
 
 ## Pull requests
 

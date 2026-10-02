@@ -66,10 +66,14 @@ Use `--scope user` instead of `--scope project` to install across all projects.
 | complete-task | `/taskmd:complete-task <ID>` | Mark a task as completed |
 | update-task | `/taskmd:update-task <description>` | Update a task's fields (status, priority, title, tags, etc.) |
 | list-tasks | `/taskmd:list-tasks` | List tasks with optional filters |
+| get-task-status | `/taskmd:get-task-status <ID>` | Show only a task's metadata (status, priority, ...) without the body |
 | validate-tasks | `/taskmd:validate-tasks` | Validate task files for errors |
+| verify-task | `/taskmd:verify-task <ID>` | Run the task's `verify` checks (shell commands and assertions) and report pass/fail |
 | split-task | `/taskmd:split-task <ID>` | Split a large task into smaller sub-tasks |
-| divide-and-conquer | `/taskmd:divide-and-conquer <ID>` | Execute a task using parallel subagents for independent workstreams |
+| divide-and-conquer | `/taskmd:divide-and-conquer <ID>` | Execute a task with parallel subagents, each in its own git worktree and branch (`dnc/<ID>/<slug>`); commits to those branches and asks before merging |
 | import-todos | `/taskmd:import-todos` | Discover TODO/FIXME comments and convert them into task files |
+
+`do-task` and `divide-and-conquer` carry out the work the task describes and run your build and test commands; `verify-task` and `complete-task` run the task's `verify` commands. `divide-and-conquer` is the only skill that creates branches and worktrees.
 
 ## Usage Examples
 
