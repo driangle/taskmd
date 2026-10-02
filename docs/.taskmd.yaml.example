@@ -93,7 +93,8 @@ worklogs: true
 
 # Phase definitions
 # phases:
-#   - name: "v0.2"
+#   - id: v0.2                # referenced by the task `phase` field
+#     name: "v0.2 – Core CLI" # display name (required)
 #     description: "Core CLI features"
 #     due: 2026-04-01
 

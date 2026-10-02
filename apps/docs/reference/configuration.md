@@ -437,8 +437,8 @@ Each phase entry has the following fields:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | Yes | Unique phase identifier (must match the task's `phase` field) |
-| `name` | Yes | Human-readable display name for the phase |
+| `id` | Recommended | Unique phase identifier (must match the task's `phase` field). If omitted, `name` is used as the id and `validate` warns. |
+| `name` | Yes | Human-readable display name for the phase. Missing `name` is a validation error. |
 | `description` | No | Description of the phase's scope |
 | `due` | No | Target date in `YYYY-MM-DD` format |
 
