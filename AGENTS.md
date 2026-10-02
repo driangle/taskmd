@@ -43,7 +43,7 @@ Before developing, ensure you have the following tools installed:
 - **pnpm**: `npm install -g pnpm` (for web frontend)
 - **golangci-lint**: Required for `make lint` and `make lint-fix`
   - macOS: `brew install golangci-lint`
-  - go install: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
+  - go install: `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest` (the config is schema v2; v1 binaries reject it)
   - Other: See [golangci-lint install docs](https://golangci-lint.run/welcome/install/)
 - **Git hooks**: Run `git config core.hooksPath .githooks` to enable project git hooks (see [Git Hooks Setup](#git-hooks-setup))
 
@@ -287,7 +287,7 @@ When working on tasks:
 3. **Maintain a worklog** as you work (this repo sets `worklogs: true` in `.taskmd.yaml`):
    - Create/append to `tasks/<group>/.worklogs/<ID>.md`
    - Add timestamped entries when starting, making decisions, hitting blockers, or finishing
-   - See the agent template (e.g., `CLAUDE.md`) for format details and examples
+   - Format and examples: the **Worklogs** section of `docs/taskmd_specification.md`
 
 4. **Reference the task specification** document:
    - See `docs/taskmd_specification.md` for task format conventions
@@ -362,12 +362,7 @@ make build
 
 ### Production Builds
 
-For release builds with version information:
-
-```bash
-cd apps/cli
-go build -ldflags="-X 'main.Version=1.0.0' -X 'main.GitCommit=$(git rev-parse HEAD)' -X 'main.BuildDate=$(date)'" -o bin/taskmd ./cmd/taskmd
-```
+Release binaries are built by the release workflow, not by hand; see `apps/docs/contributing/releasing.md`. If you need a versioned local build, the version variables live in package `internal/cli`, so the `-X` flags must use that import path (`github.com/driangle/taskmd/apps/cli/internal/cli.Version`, `.GitCommit`, `.BuildDate`). `-X main.Version=...` is accepted by the linker and silently does nothing.
 
 ## Documentation
 
@@ -381,10 +376,11 @@ Update documentation when:
 
 ### Specification Sync
 
-The taskmd specification lives in `docs/taskmd_specification.md` (the canonical source). Three other artifacts derive from it and must stay in sync:
+The taskmd specification lives in `docs/taskmd_specification.md` (the canonical source). Four other artifacts derive from it and must stay in sync:
 
 - `apps/cli/internal/cli/templates/TASKMD_SPEC.md` (embedded in the CLI binary) — **byte-identical copy**
 - `apps/docs/reference/specification.md` (docs site) — **byte-identical copy**
+- `apps/docs/reference/taskmd_operations.md` (docs site) — copy of `docs/taskmd_operations.md` with its spec links rewritten
 - `claude-code-plugin-lite/SPEC_REFERENCE.md` (embedded in the lite plugin) — **condensed subset**, not a verbatim copy
 
 **After editing `docs/taskmd_specification.md`, always run:**
@@ -534,7 +530,7 @@ have to mean something to people importing the library:
 The `sdk/go/` prefix is not decoration — Go requires a module in a subdirectory to be
 tagged with its directory path, or the tag is invisible to `go get`.
 
-`apps/cli/go.mod` pins a **released** SDK version (`v0.4.0`), not a pseudo-version
+`apps/cli/go.mod` pins a **released** SDK version (`vX.Y.Z`), not a pseudo-version
 (`v0.0.0-20260811122305-775ccf445961`). Both work, but a pseudo-version is an opaque
 commit pointer that no reviewer can evaluate — which is how the pin went stale twice.
 
@@ -721,5 +717,5 @@ os.WriteFile(path, data, 0644)
 
 ---
 
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-10-02
 **Maintained By**: taskmd contributors
