@@ -6,6 +6,12 @@ A zero-dependency taskmd plugin that uses Claude's native tools (Read, Write, Ed
 
 None. This plugin requires no CLI binary, no runtime, and no external dependencies.
 
+Use it when the `taskmd` binary cannot be installed. If you can install the CLI, prefer the
+[`taskmd`](../claude-code-plugin/README.md) plugin: it exposes the same skills but delegates
+ranking, validation, and graph analysis to the CLI instead of re-deriving them from the files.
+Do not install both; they provide the same skills under different prefixes. See the
+[plugin guide](https://driangle.github.io/taskmd/guide/claude-code-plugin) for a comparison.
+
 ## Installation
 
 ```bash

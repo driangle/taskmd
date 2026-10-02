@@ -2,7 +2,7 @@
 
 Use the taskmd MCP server to give LLM-based tools direct access to your tasks. Any client that supports the [Model Context Protocol](https://modelcontextprotocol.io) (Claude Code, Claude Desktop, Cursor, Windsurf, etc.) can list, query, update, and analyze tasks without running CLI commands.
 
-For a comparison of the MCP server plugin versus the slash-command skills plugin in Claude Code, see the [Claude Code Plugin](/guide/claude-code-plugin) guide.
+For a comparison of the three Claude Code plugins (slash-command skills, MCP server, and the CLI-free variant), see the [Claude Code Plugin](/guide/claude-code-plugin) guide.
 
 ## Installation via MCPB Bundle
 

@@ -305,7 +305,7 @@ Use taskmd directly inside [Claude Code](https://claude.com/claude-code) with sl
 /taskmd:validate-tasks         # Validate task files
 ```
 
-Two plugins are available — **taskmd** provides slash command skills for interactive workflows, and **taskmd-mcp** provides an MCP server for direct tool access. You can install either or both.
+Three plugins are available. **taskmd** provides slash command skills that drive the CLI. **taskmd-mcp** provides an MCP server so Claude can call task operations as tools, and can be installed alongside **taskmd**. **taskmd-lite** re-implements the skills with Claude's file tools for environments where the binary cannot be installed. See the [plugin guide](https://driangle.github.io/taskmd/guide/claude-code-plugin) for which to pick.
 
 ```bash
 # Add the taskmd marketplace
@@ -314,8 +314,11 @@ claude plugin marketplace add driangle/taskmd
 # Install slash command skills (/taskmd:do-task, /taskmd:next-task, etc.)
 claude plugin install taskmd@taskmd-marketplace --scope project
 
-# Optional: install the MCP server for direct tool access
+# Optional: add the MCP server for direct tool access
 claude plugin install taskmd-mcp@taskmd-marketplace --scope project
+
+# Or, with no taskmd binary available:
+claude plugin install taskmd-lite@taskmd-marketplace --scope project
 ```
 
 See [`claude-code-plugin/README.md`](claude-code-plugin/README.md) for full details.

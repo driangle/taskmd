@@ -2,11 +2,11 @@
 
 A [Claude Code](https://claude.com/claude-code) plugin that exposes taskmd operations as
 MCP tools, so Claude can call them directly instead of shelling out to the CLI. Best for
-autonomous task operations; if you prefer human-driven slash commands, install
-[`taskmd`](../claude-code-plugin/README.md) instead.
-
-> **Choose one, not both.** `taskmd` and `taskmd-mcp` overlap in functionality —
-> installing both clutters your environment with redundant capabilities.
+autonomous task operations. It complements the slash-command plugin
+[`taskmd`](../claude-code-plugin/README.md), which adds workflow skills (`do-task`,
+`split-task`, `divide-and-conquer`, `import-todos`, `verify-task`) that have no MCP
+equivalent; the two can be installed together. If you cannot install the `taskmd` binary,
+see [`taskmd-lite`](../claude-code-plugin-lite/README.md) instead.
 
 ## Prerequisites
 

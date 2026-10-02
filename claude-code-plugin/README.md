@@ -23,16 +23,19 @@ taskmd --version
 
 ## Installation
 
-There are two plugins available:
+There are three plugins available:
 
 | Plugin | What it provides | Requires CLI? |
 |--------|-----------------|---------------|
 | **taskmd** | Slash command skills (`/taskmd:do-task`, `/taskmd:next-task`, etc.) that orchestrate task workflows by invoking the `taskmd` CLI | Yes |
-| **taskmd-mcp** | An MCP server that exposes task operations as tools (`list`, `get`, `next`, `search`, `set`, etc.), letting Claude call taskmd directly through the Model Context Protocol | Yes |
+| **taskmd-mcp** | An MCP server that exposes task operations as tools (`list`, `get`, `status`, `next`, `search`, `context`, `set`, `validate`, `graph`), letting Claude call taskmd directly through the Model Context Protocol | Yes |
+| **taskmd-lite** | The same slash command skills re-implemented with Claude's file tools (Read, Write, Edit, Glob, Grep), for environments where the `taskmd` binary cannot be installed | No |
 
-**taskmd** is best for interactive, human-driven workflows via slash commands. **taskmd-mcp** gives Claude direct tool access for autonomous task operations.
+**Which one?**
 
-> **Choose one, not both.** The two plugins overlap in functionality — installing both will clutter your environment with redundant commands. Pick **taskmd** if you prefer slash-command-driven workflows, or **taskmd-mcp** if you want Claude to have direct tool access via MCP.
+- You have the CLI and want slash-command workflows: install **taskmd**.
+- You want Claude to call task operations as tools, for autonomous work or from other MCP clients: install **taskmd-mcp**. It complements **taskmd** rather than replacing it; the MCP server has no equivalent for workflow skills such as `do-task`, `split-task`, `divide-and-conquer`, `import-todos`, and `verify-task`, so installing both is reasonable.
+- You cannot install the binary (sandboxed or restricted environment): install **taskmd-lite** on its own. It has no MCP server, and because Claude re-derives results from the files, ranking and validation are approximations of the CLI's. Do not install it alongside **taskmd**, which provides the same skills.
 
 First, add the taskmd marketplace:
 
@@ -40,13 +43,13 @@ First, add the taskmd marketplace:
 claude plugin marketplace add driangle/taskmd
 ```
 
-Then install **one** of the plugins:
+Then install this plugin, optionally with the MCP server:
 
 ```bash
-# Option A: Slash command skills (interactive workflows)
+# Slash command skills (this plugin)
 claude plugin install taskmd@taskmd-marketplace --scope project
 
-# Option B: MCP server (direct tool access for Claude)
+# Optional: MCP server (direct tool access for Claude)
 claude plugin install taskmd-mcp@taskmd-marketplace --scope project
 ```
 
