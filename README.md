@@ -75,31 +75,17 @@ docker run --rm -v ./tasks:/tasks ghcr.io/driangle/taskmd taskmd list
 1. **Initialize taskmd in your project**:
    ```bash
    cd my-project
-   taskmd init  # Creates tasks/ directory and .taskmd.yaml config
+   taskmd init  # Creates tasks/, .taskmd.yaml, task templates, the spec, and an agent config file
    ```
 
-2. **Create your first task** (`tasks/001-first-task.md`):
-   ```markdown
-   ---
-   id: "001"
-   title: "My first task"
-   status: pending
-   priority: high
-   ---
-
-   # My First Task
-
-   ## Objective
-   This is my first task using taskmd!
-
-   ## Tasks
-   - [ ] Learn taskmd basics
-   - [ ] Create more tasks
+2. **Create your first task**:
+   ```bash
+   taskmd add "My first task" --priority high
    ```
 
 3. **List your tasks**:
    ```bash
-   taskmd list tasks/
+   taskmd list
    ```
 
 4. **Launch the web interface**:
@@ -107,7 +93,7 @@ docker run --rm -v ./tasks:/tasks ghcr.io/driangle/taskmd taskmd list
    taskmd web start --open
    ```
 
-That's it! You're ready to manage tasks with taskmd.
+Tasks are plain markdown files under `tasks/`, so you can also create and edit them in your editor. The [tutorial](https://driangle.github.io/taskmd/getting-started/tutorial) walks through dependencies, recommendations, and validation from here.
 
 ## Usage
 
