@@ -73,7 +73,7 @@ worklogs: true
 # id:
 #   strategy: sequential    # sequential, prefixed, random, or ulid
 #   padding: 3              # zero-padding width for sequential
-#   # prefix: "dr"          # prefix for prefixed strategy
+#   # prefix: "dr-"         # prefix for prefixed strategy (used literally)
 #   # length: 6             # length for random/ulid strategies
 
 # Effort vocabulary for the 'effort' task field, ordered lowest to highest.
