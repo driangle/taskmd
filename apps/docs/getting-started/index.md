@@ -1,27 +1,8 @@
 # Quick Start
 
-Get up and running with taskmd in under 5 minutes.
+Install taskmd, create a project, and add your first task. The [Tutorial](/getting-started/tutorial) continues from here with dependencies, recommendations, validation, and AI assistant setup.
 
-::: tip Looking for a full walkthrough?
-See the **[Tutorial](/getting-started/tutorial)** for a comprehensive, step-by-step guide covering installation, project setup, CLI usage, the web dashboard, and AI assistant integration.
-:::
-
-## What You'll Learn
-
-- Install taskmd
-- Create your first tasks
-- Use basic CLI commands
-- Launch the web interface
-
-## Prerequisites
-
-- A terminal
-- A text editor
-- Go 1.25+ (only if building from source)
-
-## Step 1: Install taskmd
-
-The easiest way is via Homebrew:
+## 1. Install
 
 ```bash
 brew tap driangle/tap
@@ -29,129 +10,36 @@ brew install taskmd
 taskmd --version
 ```
 
-See [Installation](./installation) for all options including pre-built binaries, Go install, and building from source.
+Other options, including pre-built binaries for Linux, macOS, and Windows, Docker, and `go install`, are on the [Installation](./installation) page.
 
-## Step 2: Create a Project
+## 2. Initialize a project
 
 ```bash
-mkdir -p my-project/tasks
 cd my-project
+taskmd init
 ```
 
-## Step 3: Create Your First Task
+`init` creates a `tasks/` directory, a `.taskmd.yaml` config, task templates, the format specification, and an agent configuration file for Claude Code, Codex, or Gemini if you want one. Run it non-interactively with `taskmd init --task-dir ./tasks --claude`.
 
-Create `tasks/001-setup-project.md`:
-
-```markdown
----
-id: "001"
-title: "Set up project repository"
-status: pending
-priority: high
-effort: small
-tags:
-  - setup
-created_at: 2026-02-09
----
-
-# Set Up Project Repository
-
-## Objective
-Initialize the project repository with basic structure.
-
-## Tasks
-- [x] Create tasks directory
-- [ ] Add .gitignore
-- [ ] Initialize git repository
-- [ ] Create README
-
-## Acceptance Criteria
-- Repository is initialized
-- Basic structure is in place
-```
-
-## Step 4: Validate Your Task
+## 3. Add a task and list it
 
 ```bash
-taskmd validate tasks/
+taskmd add "Set up project repository" --priority high
+taskmd list
 ```
 
-Expected output:
-```
-✓ All tasks valid
-Found 1 task(s)
-```
+The task is a markdown file under `tasks/` with YAML frontmatter. Open it in your editor to fill in the objective, subtasks, and acceptance criteria.
 
-## Step 5: List Your Tasks
-
-```bash
-taskmd list tasks/
-```
-
-You should see your task displayed in a table format.
-
-## Step 6: Create a Second Task with Dependency
-
-Create `tasks/002-write-docs.md`:
-
-```markdown
----
-id: "002"
-title: "Write project documentation"
-status: pending
-priority: medium
-effort: medium
-dependencies:
-  - "001"
-tags:
-  - documentation
-created_at: 2026-02-09
----
-
-# Write Project Documentation
-
-## Objective
-Create comprehensive documentation for the project.
-
-## Tasks
-- [ ] Write README
-- [ ] Add usage examples
-- [ ] Document API
-
-## Acceptance Criteria
-- README is complete
-- Examples are clear and tested
-```
-
-## Step 7: Visualize Dependencies
-
-```bash
-taskmd graph tasks/ --format ascii
-```
-
-You'll see a dependency graph showing that task 002 depends on 001.
-
-## Step 8: Find Next Task
-
-```bash
-taskmd next tasks/
-```
-
-taskmd will recommend task 001 since it has no dependencies and is pending.
-
-## Step 9: Launch the Web Interface
+## 4. Open the dashboard
 
 ```bash
 taskmd web start --open
 ```
 
-This opens a web dashboard with task list, board, graph, and statistics views.
-
 ![Tasks view on first launch](/images/web/tasks.view.png)
 
-## Next Steps
+## Next
 
-- [Installation](./installation) - All installation methods
-- [Core Concepts](./concepts) - Understand tasks, statuses, and dependencies
-- [CLI Guide](/guide/cli) - Full command reference
-- [Web Interface](/guide/web) - Web dashboard walkthrough
+- [Tutorial](./tutorial): dependencies, the dependency graph, `next`, validation, and AI assistants
+- [Core Concepts](./concepts): statuses, priorities, dependencies, and file organization
+- [CLI Guide](/guide/cli): full command reference
