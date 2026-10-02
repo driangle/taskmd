@@ -30,7 +30,7 @@ EXPOSE 8080
 # unreachable through Docker's published-port DNAT: the container's network
 # namespace is already the isolation boundary and `-p` is the operator's
 # explicit opt-in. Set as ENV rather than baked into CMD so that documented
-# CMD overrides (e.g. `web start --port 3000`) keep working unchanged.
+# CMD overrides (e.g. `taskmd web start --port 3000`) keep working unchanged.
 ENV TASKMD_WEB_HOST=0.0.0.0
 
 ENTRYPOINT ["tini", "--"]

@@ -488,10 +488,10 @@ The taskmd web server is available as a Docker image from GitHub Container Regis
 docker run -p 8080:8080 -v $(pwd)/tasks:/tasks ghcr.io/driangle/taskmd:latest
 
 # Custom port
-docker run -p 3000:3000 -v $(pwd)/tasks:/tasks ghcr.io/driangle/taskmd:latest web start --port 3000
+docker run -p 3000:3000 -v $(pwd)/tasks:/tasks ghcr.io/driangle/taskmd:latest taskmd web start --port 3000
 
 # Read-only mode
-docker run -p 8080:8080 -v $(pwd)/tasks:/tasks:ro ghcr.io/driangle/taskmd:latest web start --readonly
+docker run -p 8080:8080 -v $(pwd)/tasks:/tasks:ro ghcr.io/driangle/taskmd:latest taskmd web start --readonly
 ```
 
 **Docker Compose:**
