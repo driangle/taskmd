@@ -112,7 +112,7 @@ The [web interface](/guide/web) also provides an interactive graph view.
 ### How do I start the web interface?
 
 ```bash
-taskmd web start --dir tasks/ --open
+taskmd web start --task-dir tasks/ --open
 ```
 
 ### Does the web UI auto-refresh?

@@ -275,7 +275,7 @@ taskmd list              # Uses ./tasks directory
 taskmd web start         # Uses port 3000 and opens browser
 
 # CLI flags still override config
-taskmd list --dir ./other-tasks
+taskmd list --task-dir ./other-tasks
 taskmd web start --port 8080
 ```
 
@@ -559,7 +559,7 @@ For quick access, add aliases to your shell config:
 
 ```bash
 # ~/.bashrc or ~/.zshrc
-alias tm='taskmd --dir ./tasks'
+alias tm='taskmd --task-dir ./tasks'
 alias tmw='taskmd web start --port 8080 --open'
 alias tnext='taskmd next --limit 3'
 alias thigh='taskmd list --filter priority=high --filter status=pending'

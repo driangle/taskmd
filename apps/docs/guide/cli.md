@@ -1261,7 +1261,7 @@ taskmd spec
 taskmd spec --stdout
 
 # Write to a specific directory
-taskmd spec --dir ./docs
+taskmd spec --task-dir ./docs
 
 # Overwrite existing file
 taskmd spec --force

@@ -31,7 +31,7 @@ valid values, file naming conventions, and directory structure.
 Examples:
   taskmd spec                    # Writes TASKMD_SPEC.md to current directory
   taskmd spec --stdout           # Print spec to stdout
-  taskmd spec --dir ./docs       # Write to docs/ directory
+  taskmd spec --task-dir ./docs  # Write to docs/ directory
   taskmd spec --force            # Overwrite existing file`,
 	Args: cobra.NoArgs,
 	RunE: runSpec,

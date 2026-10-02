@@ -130,7 +130,7 @@ taskmd next tasks/
 taskmd graph tasks/ --format ascii
 
 # Start web interface
-taskmd web start --dir tasks/ --open
+taskmd web start --task-dir tasks/ --open
 ```
 
 ### Web Interface
