@@ -127,12 +127,12 @@ taskmd list --sort priority --limit 5
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--filter` | | Filter tasks (repeatable, AND logic); `priority` and `effort` support `>=`, `>`, `<=`, `<` (effort values come from the [configured vocabulary](/reference/configuration#effort-configuration)) |
-| `--phase` | | Filter tasks by phase name |
+| `--filter` | | Filter tasks (repeatable, AND logic); `priority` and `effort` support `>=`, `>`, `<=`, `<` (effort values come from the [configured vocabulary](/reference/configuration#effort-configuration)). The values `none` and `any` match by presence: `phase=none` is tasks with no phase, `owner=any` is tasks with an owner |
+| `--phase` | | Filter tasks by phase name; `none` / `any` match tasks without / with a phase |
 | `--scope` | | Filter by scope; supports wildcards (e.g. `cli`, `cli*`) |
 | `--status` | | Shortcut for `--filter status=<value>` |
 | `--priority` | | Shortcut for `--filter priority=<value>` |
-| `--sort` | | Sort by field (`id`, `title`, `status`, `priority`, `effort`, `created`) |
+| `--sort` | | Sort by field (`id`, `title`, `status`, `priority`, `effort`, `created_at`; `created` is accepted as an alias) |
 | `--reverse` / `-r` | `false` | Reverse the sort order (or the default file-scan order when `--sort` is omitted) |
 | `--columns` | `id,title,status,priority,file` | Comma-separated list of columns to display |
 | `--limit` | `0` | Maximum number of tasks to display (0 = unlimited) |
@@ -194,6 +194,7 @@ taskmd validate --format json
 - Missing dependencies (references to non-existent tasks)
 - Circular dependencies
 - YAML syntax errors
+- `.taskmd.yaml`, when present: no unknown top-level keys, every `scopes` entry has a non-empty paths list, and every task `touches` value names a defined scope
 
 **Exit codes:**
 - `0` - Valid (no errors)
@@ -333,8 +334,8 @@ ahead of tasks with an unknown phase). Every `next` surface above honours it, an
 |------|---------|-------------|
 | `--format` | `table` | Output format (`table`, `json`, `yaml`) |
 | `--limit` | `5` | Maximum number of recommendations |
-| `--filter` | | Filter tasks (repeatable, e.g. `--filter tag=cli`) |
-| `--phase` | | Filter recommendations by phase name |
+| `--filter` | | Filter tasks (repeatable, e.g. `--filter tag=cli`; `field=none` / `field=any` match by presence) |
+| `--phase` | | Filter recommendations by phase name; `none` / `any` match tasks without / with a phase |
 | `--scope` | | Filter by scope; supports wildcards (e.g. `cli`, `cli*`) |
 | `--exact` | `false` | Disable dependency expansion for `--scope` (only direct matches) |
 | `--root` | | Limit recommendations to tasks reachable from an ID (its upstream deps + subtasks) |
@@ -695,6 +696,9 @@ taskmd tags --format json
 Move completed or cancelled task files into an `archive/` subdirectory, or permanently delete them.
 
 ```bash
+# Archive one task (prompts for confirmation; -y skips the prompt)
+taskmd archive 042
+
 # Archive all completed tasks
 taskmd archive --all-completed -y
 
@@ -780,7 +784,7 @@ taskmd deduplicate --format json
 
 ### next-id - Get Next Available ID
 
-Scan task files and output the next available sequential ID. Finds the highest numeric ID and returns max + 1, preserving any common prefix and zero-padding.
+Scan task files and output the next available ID using the strategy configured in `.taskmd.yaml` (see [ID Strategy Configuration](/reference/configuration#id-strategy-configuration)). With the default `sequential` strategy it finds the highest numeric ID and returns max + 1, preserving any common prefix and zero-padding; `prefixed`, `random`, and `ulid` generate accordingly.
 
 ```bash
 # Get next ID
@@ -853,7 +857,7 @@ When `--task-id` is omitted, the command runs `git diff --cached` and looks for 
 
 ### add - Create a New Task
 
-Create a new task markdown file with proper frontmatter. The title is used to generate both the task title and the filename slug. A sequential ID is automatically assigned based on existing tasks.
+Create a new task markdown file with proper frontmatter. The title is used to generate both the task title and the filename slug. An ID is assigned automatically using the configured [ID strategy](/reference/configuration#id-strategy-configuration) (sequential by default).
 
 ```bash
 # Create a task with just a title
@@ -888,7 +892,7 @@ taskmd add "Automated task" --format json
 | `--priority` | `medium` | Task priority (`low`, `medium`, `high`, `critical`) |
 | `--effort` | | Task effort (`small`, `medium`, `large`) |
 | `--tags` | | Comma-separated tags |
-| `--status` | `pending` | Task status (`pending`, `in-progress`, `completed`, `blocked`, `cancelled`) |
+| `--status` | `pending` | Task status (`pending`, `in-progress`, `in-review`, `completed`, `blocked`, `cancelled`) |
 | `--owner` | | Task owner/assignee |
 | `--depends-on` | | Comma-separated dependency task IDs |
 | `--parent` | | Parent task ID |
@@ -952,7 +956,7 @@ taskmd search "bug fix" --format yaml
 |------|---------|-------------|
 | `--format` | `table` | Output format (`table`, `json`, `yaml`) |
 | `--filter` | | Filter tasks (repeatable, AND logic, e.g., `--filter status=pending --filter priority=high`) |
-| `--sort` | | Sort by field (`id`, `title`, `status`, `priority`, `effort`, `created`) |
+| `--sort` | | Sort by field (`id`, `title`, `status`, `priority`, `effort`, `created_at`; `created` is accepted as an alias) |
 | `--limit` | `0` | Maximum number of results (0 = unlimited) |
 
 ### verify - Run Verification Checks
@@ -1066,7 +1070,7 @@ Worktrees:
   agent-b (branch dnc/042/parser): in-progress
 ```
 
-In `json`/`yaml`, as in [`list`](#list-list-tasks), `status` stays the **local** copy's
+In `json`/`yaml`, as in [`list`](#list-view-and-filter-tasks), `status` stays the **local** copy's
 and the merged one is added as `effective_status`, alongside `worktree`, `branch`,
 `remote_only`, and `worktrees`. All of them are absent when the local copy is the most
 advanced one, and in single-worktree repositories the output is unchanged.
@@ -1797,18 +1801,19 @@ APIs expose.
 Available for all commands:
 
 ```bash
---config string       # Config file path
--d, --task-dir string # Task directory to scan (default ".")
---format string       # Output format (table, json, yaml)
---verbose             # Verbose logging
---quiet               # Suppress non-essential output
---stdin               # Read from stdin instead of files
---debug               # Enable debug output (prints to stderr)
---no-color            # Disable colored output
---project string      # Operate on a registered project by ID
---all-projects        # Aggregate tasks from all registered projects
+--config string          # Config file; replaces the search for .taskmd.yaml
+-d, --task-dir string    # Task directory to scan (default ".")
+-v, --verbose            # Verbose logging
+-q, --quiet              # Suppress non-essential output
+--debug                  # Enable debug output (prints to stderr)
+--no-color               # Disable colored output
+--project string         # Operate on a registered project by ID
+--all-projects           # Aggregate tasks from all registered projects
 --worktree-scope string  # unified (default) merges task state across git worktrees; isolated reads this checkout only
+--version                # Print version, git commit, and build date
 ```
+
+`--format` is not global: each command that supports it lists it in its own flags table.
 
 ## Common Workflows
 
@@ -1904,7 +1909,7 @@ variables, the one `.taskmd.yaml` found (nearest ancestor directory, else
 
 - Check YAML frontmatter is properly formatted
 - Ensure required fields are present: `id`, `title`
-- Verify status is valid if present: `pending`, `in-progress`, `completed`, `blocked`, `cancelled`
+- Verify status is valid if present: `pending`, `in-progress`, `in-review`, `completed`, `blocked`, `cancelled`
 - Run `taskmd validate tasks/` for line-level error messages
 
 ### "Circular dependency detected"
