@@ -30,14 +30,16 @@ web:
 
 ## Config File Locations
 
-Config files are loaded in this order (highest precedence first):
+taskmd loads exactly **one** config file. It searches, in order:
 
-1. **Project-level**: `./.taskmd.yaml` - project-specific settings
-2. **Global**: `~/.taskmd.yaml` - user-wide defaults
-3. **Custom**: `--config path/to/config.yaml` - explicit path
-4. **Built-in defaults** - fallback values
+1. The current directory, then each parent directory up to the repository root (the first directory containing `.git`)
+2. `~/.taskmd.yaml`
 
-Command-line flags always override config file values.
+The first `.taskmd.yaml` found wins and the search stops. Files are **not merged**: when a project file exists, `~/.taskmd.yaml` is ignored entirely, so a home setting such as `web.port` has no effect inside a project that has its own file. Running from a subdirectory still finds the project file.
+
+`--config path/to/config.yaml` replaces this search with the given file.
+
+Command-line flags and `TASKMD_*` environment variables override values from whichever file was loaded. See [Precedence](#environment-variables).
 
 ## Supported Options
 
@@ -281,7 +283,7 @@ taskmd web start --port 8080
 
 ### Global Defaults
 
-Create `~/.taskmd.yaml` for defaults that apply to all projects:
+Create `~/.taskmd.yaml` for defaults used in directories that have no project `.taskmd.yaml`. It is a fallback, not a base layer: a project file replaces it entirely.
 
 ```yaml
 web:
@@ -316,11 +318,10 @@ Override it if you want to restrict the bind further.
 **Precedence** (highest to lowest):
 1. Command-line flags
 2. Environment variables (`TASKMD_*`)
-3. Project-level `.taskmd.yaml`
-4. Global `~/.taskmd.yaml`
-5. Built-in defaults
+3. The one `.taskmd.yaml` that was found (nearest ancestor, else `~/.taskmd.yaml`), or the file given by `--config`
+4. Built-in defaults
 
-An environment variable overrides both config files. This is what makes
+An environment variable overrides the config file. This is what makes
 `docker run -e TASKMD_WEB_PORT=3000` work against an image whose mounted
 project already carries a `.taskmd.yaml`.
 

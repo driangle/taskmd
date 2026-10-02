@@ -1,14 +1,17 @@
 # Example .taskmd.yaml configuration file
 #
 # This file can be placed in:
-#   - Project directory (./.taskmd.yaml) - for project-specific settings
-#   - Home directory (~/.taskmd.yaml) - for global user settings
+#   - A project directory (./.taskmd.yaml) - found from any subdirectory
+#   - Your home directory (~/.taskmd.yaml) - used only when no project file is found
+#
+# Only ONE file is loaded: the nearest .taskmd.yaml walking up from the current
+# directory, else ~/.taskmd.yaml. The two are not merged.
 #
 # Precedence order (highest to lowest):
-#   1. Command-line flags (explicit user intent)
-#   2. Project-level .taskmd.yaml (project-specific defaults)
-#   3. Global ~/.taskmd.yaml (user-wide defaults)
-#   4. Built-in defaults (fallback)
+#   1. Command-line flags
+#   2. TASKMD_* environment variables
+#   3. The loaded .taskmd.yaml (or the file given by --config)
+#   4. Built-in defaults
 
 # Default directory to search for task files
 # This sets the default value for the --dir flag

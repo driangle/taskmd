@@ -211,10 +211,7 @@ web:
   auto_open_browser: true      # Auto-open browser on web start
 ```
 
-**Config file locations** (in order of precedence):
-1. `./.taskmd.yaml` - Project-specific settings
-2. `~/.taskmd.yaml` - User-wide defaults
-3. Command-line flags always override config values
+taskmd loads **one** config file: the nearest `.taskmd.yaml` walking up from the current directory to the repository root, else `~/.taskmd.yaml`. The two are not merged, so a project file means the home file is ignored. Command-line flags and `TASKMD_*` environment variables override whatever the file says.
 
 See [docs/.taskmd.yaml.example](docs/.taskmd.yaml.example) for a complete example with all supported options.
 

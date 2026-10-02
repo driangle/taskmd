@@ -1886,9 +1886,10 @@ export TASKMD_DIR=./tasks
 export TASKMD_VERBOSE=true
 ```
 
-Environment variables override both `.taskmd.yaml` files but are themselves
+Environment variables override the loaded `.taskmd.yaml` but are themselves
 overridden by CLI flags. Full order, highest to lowest: flags, environment
-variables, project `.taskmd.yaml`, global `~/.taskmd.yaml`, built-in defaults.
+variables, the one `.taskmd.yaml` found (nearest ancestor directory, else
+`~/.taskmd.yaml`; they are not merged), built-in defaults.
 
 ## Troubleshooting
 

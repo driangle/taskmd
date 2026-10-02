@@ -90,7 +90,7 @@ func init() {
 	rootCmd.SetVersionTemplate(versionTemplate)
 
 	// Global flags available to all subcommands
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.taskmd.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (replaces the search for .taskmd.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&stdin, "stdin", false, "read input from stdin instead of file")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
