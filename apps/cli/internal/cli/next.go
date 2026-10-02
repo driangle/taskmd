@@ -49,6 +49,13 @@ Tasks are scored based on priority, critical path position, downstream impact,
 effort, and phase ordering (from .taskmd.yaml). Only actionable tasks
 (pending or in-progress with all dependencies completed) are shown.
 
+When .taskmd.yaml declares an ordered phases list, that order is strict: no
+later-phase task is ranked above an actionable earlier-phase one, and score
+ranks tasks within a phase. A task with no phase competes in the current
+phase (the earliest one with actionable work); a task whose phase is not in
+the configured list ranks last. Pass --strict-phases=false to fall back to
+treating phase as a score bonus only. Projects without phases are unaffected.
+
 In a git repository with multiple worktrees, next recommends against the merged
 cross-worktree view: a task that is in-progress (or further along) in a sibling
 worktree is never recommended, so setting a task in-progress in one worktree
@@ -63,9 +70,9 @@ lower-priority task is ranked above an actionable higher-priority one
 (critical > high > medium > low/unset), with the existing score breaking ties
 within each tier. Unlike --priority <value> (which filters out non-matching
 tasks), --strict-priority keeps all actionable tasks and only reorders them.
-When combined with --strict-phases, phase is the primary sort key and priority
-is secondary: earlier-phase tasks rank first, and within a phase, higher
-priority ranks first.
+In a project with phases, phase stays the primary sort key and priority is
+secondary: earlier-phase tasks rank first, and within a phase, higher priority
+ranks first.
 
 --explain prints, beneath each recommendation, an itemized breakdown of every
 scoring component (priority, phase, critical path, downstream, effort) with its
@@ -90,9 +97,8 @@ Examples:
   taskmd next --scope web/graph --exact
   taskmd next --root 022
   taskmd next --phase v0.2
-  taskmd next --strict-phases
   taskmd next --strict-priority
-  taskmd next --strict-phases --strict-priority
+  taskmd next --strict-phases=false
   taskmd next --columns rank,id,title,reason`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runNext,
@@ -110,8 +116,9 @@ func init() {
 	nextCmd.Flags().BoolVar(&nextExact, "exact", false, "disable dependency expansion for --scope (only direct matches)")
 	nextCmd.Flags().StringVar(&nextRoot, "root", "", "limit recommendations to tasks reachable from an ID (its upstream deps + subtasks)")
 	nextCmd.Flags().StringVar(&nextPhase, "phase", "", "filter by phase")
-	nextCmd.Flags().BoolVar(&nextStrictPhases, "strict-phases", false, "enforce strict phase ordering (earlier phases always rank first)")
-	nextCmd.Flags().BoolVar(&nextStrictPriority, "strict-priority", false, "enforce strict priority ordering (higher priority always ranks first, score breaks ties within a tier; with --strict-phases, phase is primary and priority secondary)")
+	nextCmd.Flags().BoolVar(&nextStrictPhases, "strict-phases", true, "enforce strict phase ordering (earlier phases always rank first); =false ranks phase by score only")
+	_ = nextCmd.Flags().MarkDeprecated("strict-phases", "strict phase ordering is now the default; use --strict-phases=false to opt out")
+	nextCmd.Flags().BoolVar(&nextStrictPriority, "strict-priority", false, "enforce strict priority ordering (higher priority always ranks first, score breaks ties within a tier; in a project with phases, phase is primary and priority secondary)")
 	nextCmd.Flags().StringVar(&nextColumns, "columns", nextDefaultColumns, "comma-separated columns for table output (e.g. rank,id,title,reason)")
 	nextCmd.Flags().StringVar(&nextStatus, "status", "", "shortcut for --filter status=<value>")
 	nextCmd.Flags().StringVar(&nextPriority, "priority", "", "shortcut for --filter priority=<value>")

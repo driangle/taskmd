@@ -75,7 +75,7 @@ func TestNextAllProjects_UsesEachProjectsPhaseOrder(t *testing.T) {
 	}
 }
 
-func TestNextAllProjects_StrictPhases_OrdersWithinProject(t *testing.T) {
+func TestNextAllProjects_StrictPhasesByDefault_OrdersWithinProject(t *testing.T) {
 	resetCLIState()
 	defer resetCLIState()
 	other := createProjectWithTasks(t, "tasks", map[string]string{
@@ -84,14 +84,14 @@ func TestNextAllProjects_StrictPhases_OrdersWithinProject(t *testing.T) {
 	setupProjectFlagRegistry(t, "  - id: alpha\n    path: "+createPhasedProject(t)+
 		"\n  - id: beta\n    path: "+other+"\n")
 
-	recs := runNextAllProjectsJSON(t, "--strict-phases")
+	recs := runNextAllProjectsJSON(t)
 
 	early, late := indexOfRec(recs, "alpha", "002"), indexOfRec(recs, "alpha", "001")
 	if early == -1 || late == -1 {
 		t.Fatalf("expected both alpha tasks in output, got %+v", recs)
 	}
 	if early > late {
-		t.Errorf("with --strict-phases, alpha's early-phase 002 must precede late-phase 001; got %+v", recs)
+		t.Errorf("by default, alpha's early-phase 002 must precede late-phase 001; got %+v", recs)
 	}
 	if indexOfRec(recs, "beta", "001") == -1 {
 		t.Errorf("expected beta/001 in merged output, got %+v", recs)

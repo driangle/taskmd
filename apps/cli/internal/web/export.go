@@ -238,6 +238,7 @@ func generateAnalyticsFiles(cfg ExportConfig, apiDir string, tasks []*model.Task
 		Limit:         5,
 		ArchivedTasks: archivedTasks,
 		PhaseOrder:    cfg.PhaseOrder,
+		StrictPhases:  true,
 		Efforts:       efforts,
 	})
 	if err != nil {

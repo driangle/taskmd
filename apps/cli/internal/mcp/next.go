@@ -52,6 +52,7 @@ func handleNext(_ context.Context, _ *gomcp.CallToolRequest, input NextInput, cf
 		Critical:      input.Critical,
 		ArchivedTasks: archivedTasks,
 		PhaseOrder:    cfg.PhaseOrder,
+		StrictPhases:  true,
 		Efforts:       cfg.Efforts,
 		Excluded:      excluded,
 	}

@@ -1710,7 +1710,7 @@ func TestLoadPhaseOrder_NilPhases(t *testing.T) {
 }
 
 // strictPhaseFiles returns tasks with different phases and priorities to test
-// --strict-phases behavior.
+// strict phase ordering (the default) and its --strict-phases=false opt-out.
 //
 // Task layout:
 //
@@ -1750,63 +1750,81 @@ priority: high
 	}
 }
 
-func TestNext_StrictPhasesOff_DefaultBehavior(t *testing.T) {
+// strictPhaseIDs runs `next` over strictPhaseFiles with phases v0.2, v0.3 and
+// returns the ranked IDs plus the command's stderr.
+func strictPhaseIDs(t *testing.T, args ...string) ([]string, string) {
+	t.Helper()
 	repo := newTaskRepo(t, strictPhaseFiles())
-
-	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10")
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, append([]string{"--format", "json", "--limit", "10"}, args...)...)
 	if res.Err != nil {
 		t.Fatalf("runNext failed: %v", res.Err)
 	}
-
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
 		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
-
-	if len(recs) == 0 {
-		t.Fatal("Expected recommendations, got none")
+	ids := make([]string, len(recs))
+	for i, r := range recs {
+		ids[i] = r.ID
 	}
+	return ids, res.Stderr
+}
 
-	// Without strict phases, the critical-priority v0.3 task (002) should rank first
-	if recs[0].ID != "002" {
-		t.Errorf("Without --strict-phases, expected critical task 002 first, got %s", recs[0].ID)
+func assertIDOrder(t *testing.T, got []string, want ...string) {
+	t.Helper()
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("order = %v, want %v", got, want)
 	}
 }
 
-func TestNext_StrictPhasesOn_EarlierPhaseFirst(t *testing.T) {
+func TestNext_StrictPhasesDefault_EarlierPhaseFirst(t *testing.T) {
+	ids, stderr := strictPhaseIDs(t)
+
+	// Strict phase tiers by default: v0.2 tasks (003 medium, 001 low) precede
+	// the critical v0.3 task (002). Unphased 004 competes in the current tier
+	// (v0.2) on score: 003 (45) > 001 (35) > 004 (30).
+	assertIDOrder(t, ids, "003", "001", "004", "002")
+	if strings.Contains(stderr, "deprecated") {
+		t.Errorf("no deprecation warning expected without the flag, got stderr: %q", stderr)
+	}
+}
+
+func TestNext_StrictPhasesFlag_StillWorksWithDeprecationWarning(t *testing.T) {
+	ids, stderr := strictPhaseIDs(t, "--strict-phases")
+
+	assertIDOrder(t, ids, "003", "001", "004", "002")
+	if !strings.Contains(stderr, "--strict-phases has been deprecated") {
+		t.Errorf("expected a deprecation warning on stderr, got: %q", stderr)
+	}
+}
+
+func TestNext_StrictPhasesFalse_ScoreOnly(t *testing.T) {
+	ids, stderr := strictPhaseIDs(t, "--strict-phases=false")
+
+	// Score-only ranking: the critical v0.3 task (40+20) outranks everything.
+	if len(ids) == 0 || ids[0] != "002" {
+		t.Errorf("with --strict-phases=false expected critical task 002 first, got %v", ids)
+	}
+	if !strings.Contains(stderr, "deprecated") {
+		t.Errorf("expected a deprecation warning on stderr, got: %q", stderr)
+	}
+}
+
+func TestNext_StrictPhases_NoPhasesConfiguredUnchanged(t *testing.T) {
 	repo := newTaskRepo(t, strictPhaseFiles())
 
-	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases")
-	if res.Err != nil {
-		t.Fatalf("runNext failed: %v", res.Err)
-	}
+	strict := nextStdout(t, repo, "--format", "json", "--limit", "10")
+	scoreOnly := nextStdout(t, repo, "--format", "json", "--limit", "10", "--strict-phases=false")
 
-	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
-	}
-
-	if len(recs) != 4 {
-		t.Fatalf("Expected 4 recommendations, got %d", len(recs))
-	}
-
-	// v0.2 tasks (001, 003) must come before v0.3 task (002)
-	// Within v0.2, 003 (medium) should rank above 001 (low)
-	if recs[0].ID != "003" {
-		t.Errorf("Expected v0.2 medium task 003 first, got %s", recs[0].ID)
-	}
-	if recs[1].ID != "001" {
-		t.Errorf("Expected v0.2 low task 001 second, got %s", recs[1].ID)
-	}
-	if recs[2].ID != "002" {
-		t.Errorf("Expected v0.3 critical task 002 third, got %s", recs[2].ID)
+	if strict != scoreOnly {
+		t.Errorf("without configured phases the default must match score-only ranking\ndefault: %s\nscore-only: %s", strict, scoreOnly)
 	}
 }
 
 func TestNext_StrictPhases_SamePhaseUsesScore(t *testing.T) {
 	repo := newTaskRepo(t, strictPhaseFiles())
 
-	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases")
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10")
 	if res.Err != nil {
 		t.Fatalf("runNext failed: %v", res.Err)
 	}
@@ -1832,33 +1850,35 @@ func TestNext_StrictPhases_SamePhaseUsesScore(t *testing.T) {
 	}
 }
 
-func TestNext_StrictPhases_NoPhaseSortedLast(t *testing.T) {
-	repo := newTaskRepo(t, strictPhaseFiles())
+func TestNext_StrictPhases_UnphasedJoinsCurrentPhase(t *testing.T) {
+	repo := newTaskRepo(t, map[string]string{
+		"chore.md": "---\nid: \"chore\"\ntitle: \"v0.2 chore\"\nstatus: pending\npriority: low\nphase: v0.2\n---",
+		"late.md":  "---\nid: \"late\"\ntitle: \"v0.3 task\"\nstatus: pending\npriority: high\nphase: v0.3\n---",
+		"bug.md":   "---\nid: \"bug\"\ntitle: \"Unphased bug\"\nstatus: pending\npriority: critical\n---",
+	})
 
-	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases")
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10")
 	if res.Err != nil {
 		t.Fatalf("runNext failed: %v", res.Err)
 	}
-
 	var recs []next.Recommendation
 	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
 		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
 	}
-
-	if len(recs) != 4 {
-		t.Fatalf("Expected 4 recommendations, got %d", len(recs))
+	ids := make([]string, len(recs))
+	for i, r := range recs {
+		ids[i] = r.ID
 	}
 
-	// Task 004 (no phase) should be last
-	if recs[3].ID != "004" {
-		t.Errorf("Expected no-phase task 004 last, got %s", recs[3].ID)
-	}
+	// The unphased critical bug (40) outscores the v0.2 chore (10+25) within
+	// the current tier, and is not buried behind the v0.3 task.
+	assertIDOrder(t, ids, "bug", "chore", "late")
 }
 
 func TestNext_StrictPhases_WithPhaseFilter(t *testing.T) {
 	repo := newTaskRepo(t, strictPhaseFiles())
 
-	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases", "--phase", "v0.2")
+	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--phase", "v0.2")
 	if res.Err != nil {
 		t.Fatalf("runNext failed: %v", res.Err)
 	}
@@ -1971,35 +1991,12 @@ func TestNext_StrictPriority_ScoreBreaksTieWithinTier(t *testing.T) {
 }
 
 func TestNext_StrictPhasesAndPriority_PhasePrimary(t *testing.T) {
-	repo := newTaskRepo(t, strictPhaseFiles())
+	ids, _ := strictPhaseIDs(t, "--strict-priority")
 
-	res := runNextWithPhases(t, repo, []string{"v0.2", "v0.3"}, "--format", "json", "--limit", "10", "--strict-phases", "--strict-priority")
-	if res.Err != nil {
-		t.Fatalf("runNext failed: %v", res.Err)
-	}
-
-	var recs []next.Recommendation
-	if err := json.Unmarshal([]byte(res.Stdout), &recs); err != nil {
-		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, res.Stdout)
-	}
-
-	if len(recs) != 4 {
-		t.Fatalf("Expected 4 recommendations, got %d", len(recs))
-	}
-
-	// Phase primary: v0.2 tasks (001 low, 003 medium) before v0.3 critical (002),
-	// then the no-phase task (004) last.
-	// Priority secondary within v0.2: 003 (medium) before 001 (low).
-	gotIDs := make([]string, len(recs))
-	for i, r := range recs {
-		gotIDs[i] = r.ID
-	}
-	expected := []string{"003", "001", "002", "004"}
-	for i, id := range expected {
-		if recs[i].ID != id {
-			t.Errorf("rank %d: expected %s, got %s (full order: %v)", i, id, recs[i].ID, gotIDs)
-		}
-	}
+	// Phase primary: the current tier (v0.2 plus unphased 004) precedes the
+	// v0.3 critical task (002). Priority secondary within that tier: 004
+	// (high) before 003 (medium) before 001 (low).
+	assertIDOrder(t, ids, "004", "003", "001", "002")
 }
 
 func TestNext_Columns_DefaultMatchesLegacy(t *testing.T) {

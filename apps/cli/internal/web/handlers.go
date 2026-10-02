@@ -341,6 +341,7 @@ func handleNext(dp *DataProvider, phases []PhaseInfo, efforts effort.Scale) http
 			Filters:       filters,
 			ArchivedTasks: archivedTasks,
 			PhaseOrder:    phaseIDs(phases),
+			StrictPhases:  true,
 			Efforts:       efforts,
 			Excluded:      excluded,
 		})

@@ -14,10 +14,17 @@ import (
 // earlier-phase task first.
 func createPhasedTaskFiles(t *testing.T) string {
 	t.Helper()
+	return writePhasedTaskFiles(t, "medium", "medium")
+}
+
+// writePhasedTaskFiles writes task 001 in phase "late" and task 002 in phase
+// "early" with the given priorities.
+func writePhasedTaskFiles(t *testing.T, latePriority, earlyPriority string) string {
+	t.Helper()
 	tmpDir := t.TempDir()
 	files := map[string]string{
-		"001-late.md":  "---\nid: \"001\"\ntitle: \"Late\"\nstatus: pending\npriority: medium\nphase: late\n---\n# Late\n",
-		"002-early.md": "---\nid: \"002\"\ntitle: \"Early\"\nstatus: pending\npriority: medium\nphase: early\n---\n# Early\n",
+		"001-late.md":  "---\nid: \"001\"\ntitle: \"Late\"\nstatus: pending\npriority: " + latePriority + "\nphase: late\n---\n# Late\n",
+		"002-early.md": "---\nid: \"002\"\ntitle: \"Early\"\nstatus: pending\npriority: " + earlyPriority + "\nphase: early\n---\n# Early\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0644); err != nil {
@@ -58,6 +65,22 @@ func TestNextTool_NoPhaseOrder_IgnoresPhases(t *testing.T) {
 	}
 	if recs[0].ID != "001" {
 		t.Errorf("without phase order, expected ID tiebreak to put 001 first, got %s", recs[0].ID)
+	}
+}
+
+func TestNextTool_PhaseOrder_StrictByDefault(t *testing.T) {
+	// The critical later-phase task outscores the low earlier-phase one, so
+	// only strict phase tiering can put the earlier-phase task first.
+	tmpDir := writePhasedTaskFiles(t, "critical", "low")
+	session := setupTestServerWithConfig(t, Config{
+		Efforts:    effort.Default(),
+		PhaseOrder: []string{"early", "late"},
+	})
+
+	recs := callNext(t, session, map[string]any{"task_dir": tmpDir})
+
+	if len(recs) != 2 || recs[0].ID != "002" {
+		t.Errorf("expected strict phase order to put low-priority early task 002 first, got %+v", recs)
 	}
 }
 

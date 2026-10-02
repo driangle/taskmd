@@ -308,6 +308,19 @@ it?". Because a parent task is never actionable while it has open children,
 `--root` only narrows the candidate set, so scoring and ranking are unchanged
 and it composes with the other filters.
 
+**Phase ordering:**
+
+When `.taskmd.yaml` declares an ordered `phases` list, `next` treats that order
+as strict: no later-phase task is ranked above an actionable earlier-phase one,
+and score ranks tasks within a phase. A task with no `phase` competes in the
+_current_ phase — the earliest phase that still has actionable tasks — so an
+unphased critical bug is not buried behind every phased chore. A task whose
+phase is not in the configured list ranks last. The same ordering applies to
+the MCP `next` tool, the web `/api/next` endpoint, the static export, and
+`next --all-projects` (within each project). Pass `--strict-phases=false` to
+fall back to treating phase as a score bonus only. Projects without phases are
+unaffected.
+
 **Flags:**
 
 | Flag | Default | Description |
@@ -323,8 +336,8 @@ and it composes with the other filters.
 | `--priority` | | Shortcut for `--filter priority=<value>` |
 | `--columns` | `rank,id,title,priority,effort,file,reason` | Comma-separated columns for table output |
 | `--explain` | `false` | Show an itemized score breakdown beneath each recommendation (table format). `score_breakdown` is always present in json/yaml; worktree exclusions are added to json/yaml only under `--explain` |
-| `--strict-phases` | `false` | Enforce strict phase ordering (earlier phases always rank first) |
-| `--strict-priority` | `false` | Enforce strict priority ordering (higher priority always ranks first; score breaks ties within a tier). With `--strict-phases`, phase is primary and priority secondary |
+| `--strict-phases` | `true` | **Deprecated** — strict phase ordering is now the default. `--strict-phases=false` opts out, ranking phase by score bonus only |
+| `--strict-priority` | `false` | Enforce strict priority ordering (higher priority always ranks first; score breaks ties within a tier). In a project with phases, phase is primary and priority secondary |
 | `--quick-wins` | `false` | Show only quick wins (tasks at the lowest configured effort) |
 | `--critical` | `false` | Show only critical path tasks |
 

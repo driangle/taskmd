@@ -88,6 +88,8 @@ type scoredTask struct {
 	score      int
 	reasons    []string
 	components []ScoreComponent
+	// phaseTier is the strict-phase sort tier; see assignPhaseTiers.
+	phaseTier int
 }
 
 // Recommend scores and ranks actionable tasks, returning the top recommendations.
@@ -300,14 +302,15 @@ func scoreAndSort(
 		scored[i] = scoredTask{task: task, score: sumComponents(comps), reasons: r, components: comps}
 	}
 
+	strictPhases := opts.strictPhases && len(phaseIndex) > 0
+	if strictPhases {
+		assignPhaseTiers(scored, phaseIndex)
+	}
+
 	sort.SliceStable(scored, func(i, j int) bool {
 		// Primary key: phase tier, when strict-phases is enabled.
-		if opts.strictPhases && len(opts.phaseOrder) > 0 {
-			pi := taskPhaseIndex(scored[i].task, phaseIndex)
-			pj := taskPhaseIndex(scored[j].task, phaseIndex)
-			if pi != pj {
-				return pi < pj
-			}
+		if strictPhases && scored[i].phaseTier != scored[j].phaseTier {
+			return scored[i].phaseTier < scored[j].phaseTier
 		}
 		// Secondary key: priority tier, when strict-priority is enabled.
 		if opts.strictPriority {
@@ -336,16 +339,33 @@ func buildPhaseIndex(phaseOrder []string) map[string]int {
 	return idx
 }
 
-// taskPhaseIndex returns the phase index for a task. Tasks with no phase
-// or a phase not in the order are sorted after all phased tasks.
-func taskPhaseIndex(task *model.Task, phaseIndex map[string]int) int {
-	if task.Phase == "" {
-		return len(phaseIndex)
+// assignPhaseTiers sets each task's strict-phase tier: its phase's position in
+// the configured order. Unphased tasks join the current tier — the earliest
+// phase among the tasks being ranked — so they compete on score with current
+// work instead of trailing every phase. Tasks whose phase is not in the
+// configured order sort after everything else.
+func assignPhaseTiers(scored []scoredTask, phaseIndex map[string]int) {
+	unknown := len(phaseIndex)
+	current := unknown
+	for _, st := range scored {
+		if idx, ok := phaseIndex[st.task.Phase]; ok && idx < current {
+			current = idx
+		}
 	}
-	if idx, ok := phaseIndex[task.Phase]; ok {
-		return idx
+	if current == unknown {
+		current = 0
 	}
-	return len(phaseIndex)
+
+	for i := range scored {
+		phase := scored[i].task.Phase
+		if idx, ok := phaseIndex[phase]; ok {
+			scored[i].phaseTier = idx
+		} else if phase == "" {
+			scored[i].phaseTier = current
+		} else {
+			scored[i].phaseTier = unknown
+		}
+	}
 }
 
 func buildRecommendations(
