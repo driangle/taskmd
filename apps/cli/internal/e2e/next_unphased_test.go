@@ -61,17 +61,30 @@ func TestNext_UnphasedConfig(t *testing.T) {
 	}
 }
 
-func TestNext_UnphasedConfig_InvalidValue(t *testing.T) {
-	root := newUnphasedProject(t, "next:\n  unphased: lst\n")
+func TestNext_UnphasedConfig_InvalidConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  string
+		wantMsg string
+	}{
+		{"invalid value", "next:\n  unphased: lst\n", "invalid next.unphased"},
+		{"scalar instead of mapping", "next: last\n", "next must be a mapping"},
+		{"misspelled key", "next:\n  unphase: last\n", `did you mean "unphased"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newUnphasedProject(t, tt.config)
 
-	for _, args := range [][]string{{"next"}, {"validate"}} {
-		result := run(t, root, args...)
-		if result.ExitCode == 0 {
-			t.Fatalf("expected %v to fail, got exit 0:\n%s", args, result.Stdout)
-		}
-		if combined := result.Stdout + result.Stderr; !strings.Contains(combined, "invalid next.unphased") {
-			t.Errorf("%v: expected a next.unphased config error, got:\n%s", args, combined)
-		}
+			for _, args := range [][]string{{"next"}, {"validate"}} {
+				result := run(t, root, args...)
+				if result.ExitCode == 0 {
+					t.Fatalf("expected %v to fail, got exit 0:\n%s", args, result.Stdout)
+				}
+				if combined := result.Stdout + result.Stderr; !strings.Contains(combined, tt.wantMsg) {
+					t.Errorf("%v: expected %q in output, got:\n%s", args, tt.wantMsg, combined)
+				}
+			}
+		})
 	}
 }
 

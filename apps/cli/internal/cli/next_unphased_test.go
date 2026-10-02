@@ -118,6 +118,41 @@ func TestNext_UnphasedSetting_InvalidValue(t *testing.T) {
 	}
 }
 
+func TestParseNextConfig(t *testing.T) {
+	cases := []struct {
+		name    string
+		raw     any
+		want    next.UnphasedPlacement
+		wantMsg string
+	}{
+		{"absent", nil, next.UnphasedCurrent, ""},
+		{"empty section", map[string]any{}, next.UnphasedCurrent, ""},
+		{"last", map[string]any{"unphased": "last"}, next.UnphasedLast, ""},
+		{"scalar instead of mapping", "last", "", "next must be a mapping"},
+		{"list instead of mapping", []any{"last"}, "", "found a list"},
+		{"misspelled key", map[string]any{"unphase": "last"}, "", `did you mean "unphased"`},
+		{"unknown key alongside valid one", map[string]any{"unphased": "last", "limit": 3}, "", `"limit"`},
+		{"invalid value", map[string]any{"unphased": "lst"}, "", "invalid next.unphased"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseNextConfig(tc.raw)
+			if tc.wantMsg == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if got != tc.want {
+					t.Errorf("got %q, want %q", got, tc.want)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Errorf("expected error containing %q, got %v", tc.wantMsg, err)
+			}
+		})
+	}
+}
+
 func TestParseUnphasedPlacement(t *testing.T) {
 	cases := []struct {
 		raw     any

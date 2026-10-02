@@ -453,8 +453,10 @@ next:
   (but still ahead of tasks whose phase is not in the list). Use it when "no
   phase" means "unscheduled" in your project.
 
-Any other value is a config error: `next` (and the MCP server, `web start` and
-`web export`) refuses to run, and `taskmd validate` reports it. Like the phase
+Any other value is a config error, and so is a malformed `next` section (a plain
+value such as `next: last`, or an unknown key such as `unphase`): `next` (and the
+MCP server, `web start` and `web export`) refuses to run, and `taskmd validate`
+reports it. Like the phase
 list, the setting applies to every `next` surface, and `next --all-projects`
 reads it from each project's own `.taskmd.yaml`. It has no effect without
 `phases` or under `--strict-phases=false`.
