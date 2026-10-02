@@ -21,7 +21,7 @@ claude plugin install taskmd-lite@taskmd-marketplace --scope project
 | `get-task` | Retrieve a single task by its ID, showing full frontmatter and body | `/taskmd-lite:get-task 042` |
 | `get-task-status` | Get just the status of a task by ID | `/taskmd-lite:get-task-status 042` |
 | `next-task` | Find the highest-priority pending task with all dependencies met | `/taskmd-lite:next-task` |
-| `add-task` | Create a new task file with generated ID and frontmatter | `/taskmd-lite:add-task --title "Add search feature" --priority high` |
+| `add-task` | Create a new task file with generated ID and frontmatter | `/taskmd-lite:add-task Add search feature, high priority` |
 | `update-task` | Modify frontmatter fields on an existing task | `/taskmd-lite:update-task 042 --status in-progress` |
 | `complete-task` | Mark a task as completed and check off all subtasks | `/taskmd-lite:complete-task 042` |
 | `validate-tasks` | Check all task files for schema errors, broken deps, and circular refs | `/taskmd-lite:validate-tasks` |

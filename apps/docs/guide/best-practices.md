@@ -343,7 +343,7 @@ phase: "v0.2"
 ```bash
 # Via CLI
 taskmd set 042 --phase v0.2
-taskmd add --title "New feature" --phase v0.2
+taskmd add "New feature" --phase v0.2
 ```
 
 ### Filtering and Viewing by Phase
