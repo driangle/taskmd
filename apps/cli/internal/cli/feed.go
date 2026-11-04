@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
 	"github.com/driangle/taskmd/sdk/go/feed"
 )
 
@@ -213,12 +214,7 @@ func pickFieldChanges(changes []feed.FieldChange, field string) []feed.FieldChan
 }
 
 func runGitLog(_ string, args []string) (string, error) {
-	cmd := exec.Command("git", args...)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return gitmeta.FeedLog(args)
 }
 
 func runGitShow(hash, path string) (string, error) {

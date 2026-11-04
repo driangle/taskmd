@@ -14,6 +14,7 @@ import (
 	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/board"
 	"github.com/driangle/taskmd/sdk/go/effort"
+	"github.com/driangle/taskmd/sdk/go/feed"
 	"github.com/driangle/taskmd/sdk/go/metrics"
 	"github.com/driangle/taskmd/sdk/go/next"
 	"github.com/driangle/taskmd/sdk/go/search"
@@ -1573,5 +1574,40 @@ func TestHandleBoard_WithProject(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected project task P01 in board response")
+	}
+}
+
+func TestHandleFeed_OutsideRepository(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	wlDir := filepath.Join(dir, "api", "accounts", ".worklogs")
+	if err := os.MkdirAll(wlDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wlDir, "001.md"), []byte("## 2026-02-15T10:00:00Z\n\nUpdated account.\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{"", "all", "worklog", "git"} {
+		t.Run(source, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/feed?source="+source, nil)
+			rec := httptest.NewRecorder()
+			handleFeed(NewDataProvider(dir, false))(rec, req)
+			if source == "git" {
+				if rec.Code != http.StatusInternalServerError {
+					t.Fatalf("got %d", rec.Code)
+				}
+				return
+			}
+			if rec.Code != http.StatusOK {
+				t.Fatalf("got %d: %s", rec.Code, rec.Body.String())
+			}
+			var entries []feed.FeedEntry
+			if err := json.Unmarshal(rec.Body.Bytes(), &entries); err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 1 || entries[0].TaskID != "001" {
+				t.Fatalf("unexpected entries: %v", entries)
+			}
+		})
 	}
 }

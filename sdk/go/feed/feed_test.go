@@ -1,7 +1,12 @@
 package feed
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -381,5 +386,75 @@ A	apps/cli/internal/cli/templates/task_feature.md
 	}
 	if entries[0].Files[0].TaskID != "042" {
 		t.Errorf("expected only task 042 changes, got %+v", entries[0].Files)
+	}
+}
+
+func TestScanWorklogEntries_AllLayouts(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{".worklogs/001.md", "cli/.worklogs/002.md", "api/accounts/.worklogs/003.md", "api/documents/.worklogs/004.md"} {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("## 2026-02-15T10:00:00Z\n\nUpdated task.\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		scope string
+		ids   []string
+	}{
+		{"", []string{"001", "002", "003", "004"}},
+		{"api", []string{"003", "004"}},
+		{"api/acc*", []string{"003"}},
+		{"missing", nil},
+	} {
+		t.Run(tc.scope, func(t *testing.T) {
+			entries := ScanWorklogEntries(dir, tc.scope, "", false)
+			var ids []string
+			for _, entry := range entries {
+				ids = append(ids, entry.TaskID)
+			}
+			sort.Strings(ids)
+			if !reflect.DeepEqual(ids, tc.ids) {
+				t.Fatalf("got %v, want %v", ids, tc.ids)
+			}
+		})
+	}
+	if got := ScanWorklogEntries(dir, "", "2027-01-01", false); len(got) != 0 {
+		t.Fatalf("since filter returned %d entries", len(got))
+	}
+}
+
+func TestQuery_GitFailures(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".worklogs")
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "001.md"), []byte("## 2026-02-15T10:00:00Z\n\nWorklog survives.\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	otherErr := errors.New("repository is corrupt")
+	for _, tc := range []struct {
+		name, source string
+		gitErr       error
+		wantErr      bool
+	}{
+		{"default outside repository", "", fmt.Errorf("wrapped: %w", ErrNotGitRepository), false},
+		{"all outside repository", "all", ErrNotGitRepository, false},
+		{"explicit git outside repository", "git", ErrNotGitRepository, true},
+		{"other git failure", "all", otherErr, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := Query(Options{TasksDir: dir, Source: tc.source, GitLogFn: func(string, []string) (string, error) { return "", tc.gitErr }})
+			if tc.wantErr {
+				if !errors.Is(err, tc.gitErr) {
+					t.Fatalf("got %v, want %v", err, tc.gitErr)
+				}
+			} else if err != nil || len(entries) != 1 || entries[0].Message != "Worklog survives." {
+				t.Fatalf("entries=%v error=%v", entries, err)
+			}
+		})
 	}
 }

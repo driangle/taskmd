@@ -2,7 +2,9 @@ package feed
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -55,6 +57,9 @@ type GitLogFunc func(tasksDir string, args []string) (string, error)
 var taskIDFromFilenameRegex = regexp.MustCompile(`(?:^|/)(\w+)-`)
 var statusLineRegex = regexp.MustCompile(`(?m)^status:\s*(\S+)`)
 
+// ErrNotGitRepository indicates that Git history is unavailable outside a repository.
+var ErrNotGitRepository = errors.New("not a git repository")
+
 // Options configures a feed query.
 type Options struct {
 	TasksDir string
@@ -92,7 +97,7 @@ func Query(opts Options) ([]FeedEntry, error) {
 			args = BuildGitLogArgs(opts.TasksDir, opts.Limit, opts.Since, opts.Scope)
 		}
 		output, err := opts.GitLogFn(opts.TasksDir, args)
-		if err != nil {
+		if err != nil && !(opts.Source == "all" && errors.Is(err, ErrNotGitRepository)) {
 			return nil, fmt.Errorf("failed to read git history: %w", err)
 		}
 		gitEntries = ParseGitLogOutput(output)
@@ -443,8 +448,7 @@ func ScanWorklogEntries(tasksDir, scope, since string, verbose bool) []FeedEntry
 		sinceTime = ParseSinceTime(since)
 	}
 
-	pattern := buildWorklogGlobPattern(tasksDir, scope)
-	files, _ := filepath.Glob(pattern)
+	files := findWorklogFiles(tasksDir, scope)
 
 	var entries []FeedEntry
 	for _, f := range files {
@@ -473,14 +477,27 @@ func ScanWorklogEntries(tasksDir, scope, since string, verbose bool) []FeedEntry
 	return entries
 }
 
-func buildWorklogGlobPattern(tasksDir, scope string) string {
-	if scope != "" && containsGlobChars(scope) {
-		return filepath.Join(tasksDir, scope, ".worklogs", "*.md")
-	}
+func findWorklogFiles(tasksDir, scope string) []string {
+	roots := []string{tasksDir}
 	if scope != "" {
-		return filepath.Join(tasksDir, scope, ".worklogs", "*.md")
+		roots, _ = filepath.Glob(filepath.Join(tasksDir, scope))
 	}
-	return filepath.Join(tasksDir, "*", ".worklogs", "*.md")
+	var files []string
+	for _, root := range roots {
+		_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			if filepath.Base(filepath.Dir(path)) == ".worklogs" && filepath.Ext(path) == ".md" {
+				files = append(files, path)
+			}
+			return nil
+		})
+	}
+	return files
 }
 
 func truncateFirstLine(content string) string {
