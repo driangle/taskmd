@@ -21,6 +21,7 @@ type FilterShortcuts struct {
 	Status   string
 	Priority string
 	Phase    string
+	Group    string
 	Scope    string
 	Filters  []string
 }
@@ -37,6 +38,9 @@ func applyShortcutFilters(tasks []*model.Task, s FilterShortcuts) ([]*model.Task
 	}
 	if s.Phase != "" {
 		filters = append(filters, "phase="+s.Phase)
+	}
+	if s.Group != "" {
+		filters = append(filters, "group="+s.Group)
 	}
 
 	if len(filters) > 0 {

@@ -132,6 +132,7 @@ taskmd list --sort priority --limit 5
 | `--scope` | | Filter by scope; supports wildcards (e.g. `cli`, `cli*`) |
 | `--status` | | Shortcut for `--filter status=<value>` |
 | `--priority` | | Shortcut for `--filter priority=<value>` |
+| `--group` | | Filter by group; shortcut for `--filter group=<value>`. Supports wildcards (e.g. `web*`) and `none` / `any` |
 | `--sort` | | Sort by field (`id`, `title`, `status`, `priority`, `effort`, `created_at`; `created` is accepted as an alias) |
 | `--reverse` / `-r` | `false` | Reverse the sort order (or the default file-scan order when `--sort` is omitted) |
 | `--columns` | `id,title,status,priority,file` | Comma-separated list of columns to display |
@@ -160,6 +161,11 @@ taskmd list --format json > tasks.json
 
 # Filter by phase
 taskmd list --phase v0.2
+
+# Filter by group (wildcards and none/any work too)
+taskmd list --group cli
+taskmd list --group "web*"
+taskmd list --group none
 ```
 
 ### validate - Check Task Files

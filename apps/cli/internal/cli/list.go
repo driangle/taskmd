@@ -25,6 +25,7 @@ var (
 	listPhase    string
 	listStatus   string
 	listPriority string
+	listGroup    string
 )
 
 // listCmd represents the list command
@@ -62,6 +63,9 @@ Examples:
   taskmd list --filter owner=any
   taskmd list --phase none
   taskmd list --phase none --status pending
+  taskmd list --group cli
+  taskmd list --group "web*"
+  taskmd list --group none
   taskmd list --sort priority
   taskmd list --sort priority --reverse
   taskmd list --sort created_at -r
@@ -87,6 +91,7 @@ func init() {
 	listCmd.Flags().StringVar(&listPhase, "phase", "", "filter by phase (use 'none'/'any' to match tasks without/with a phase)")
 	listCmd.Flags().StringVar(&listStatus, "status", "", "shortcut for --filter status=<value>")
 	listCmd.Flags().StringVar(&listPriority, "priority", "", "shortcut for --filter priority=<value>")
+	listCmd.Flags().StringVar(&listGroup, "group", "", "filter by group, shortcut for --filter group=<value>; supports wildcards (e.g. cli, web*) and 'none'/'any'")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -242,6 +247,7 @@ func applyListFiltersAndSort(tasks []*model.Task) ([]*model.Task, error) {
 		Status:   listStatus,
 		Priority: listPriority,
 		Phase:    listPhase,
+		Group:    listGroup,
 		Scope:    listScope,
 		Filters:  listFilters,
 	})

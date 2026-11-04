@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -761,5 +762,106 @@ func TestApplyShortcutFilters_Phase(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// groupedListFixtures returns tasks spread across group directories, a
+// root-level task (no group), and a task whose frontmatter group overrides
+// the directory it lives in.
+func groupedListFixtures() map[string]string {
+	task := func(id, title, status, priority, extra string) string {
+		return "---\nid: \"" + id + "\"\ntitle: \"" + title + "\"\nstatus: " + status +
+			"\npriority: " + priority + "\n" + extra + "created: 2026-01-01\n---\n# " + title + "\n"
+	}
+	return map[string]string{
+		"cli/001-cli.md":         task("001", "CLI feature", "pending", "high", ""),
+		"cli/002-cli-done.md":    task("002", "CLI done", "completed", "low", ""),
+		"web/003-web.md":         task("003", "Web feature", "pending", "medium", ""),
+		"web-admin/004-admin.md": task("004", "Admin page", "pending", "high", ""),
+		"005-root.md":            task("005", "Root task", "pending", "medium", ""),
+		"web/006-overridden.md":  task("006", "Moved to CLI", "pending", "medium", "group: cli\n"),
+	}
+}
+
+// listJSONIDs runs `list --format json <args...>` and returns the task IDs.
+func listJSONIDs(t *testing.T, repo *taskRepo, args ...string) []string {
+	t.Helper()
+	output := listStdout(t, repo, append([]string{"--format", "json"}, args...)...)
+	var tasks []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(output), &tasks); err != nil {
+		t.Fatalf("parse list JSON: %v\noutput: %s", err, output)
+	}
+	ids := make([]string, len(tasks))
+	for i, task := range tasks {
+		ids[i] = task.ID
+	}
+	return ids
+}
+
+func TestListCommand_GroupFlag(t *testing.T) {
+	repo := newTaskRepo(t, groupedListFixtures())
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantIDs []string
+	}{
+		{"exact match includes frontmatter override", []string{"--group", "cli"}, []string{"001", "002", "006"}},
+		{"frontmatter override excluded from dir group", []string{"--group", "web"}, []string{"003"}},
+		{"wildcard", []string{"--group", "web*"}, []string{"003", "004"}},
+		{"none matches root-level tasks", []string{"--group", "none"}, []string{"005"}},
+		{"any matches grouped tasks", []string{"--group", "any"}, []string{"001", "002", "003", "004", "006"}},
+		{"combined with --status", []string{"--group", "cli", "--status", "pending"}, []string{"001", "006"}},
+		{"combined with --filter", []string{"--group", "web*", "--filter", "priority=high"}, []string{"004"}},
+		{"no matches", []string{"--group", "nonexistent"}, []string{}},
+		{"without --group behavior is unchanged", nil, []string{"001", "002", "003", "004", "005", "006"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := listJSONIDs(t, repo, append(tt.args, "--sort", "id")...)
+			if strings.Join(got, ",") != strings.Join(tt.wantIDs, ",") {
+				t.Errorf("list %v = %v, want %v", tt.args, got, tt.wantIDs)
+			}
+		})
+	}
+}
+
+func TestListCommand_GroupFlagMatchesFilterGroup(t *testing.T) {
+	repo := newTaskRepo(t, groupedListFixtures())
+
+	for _, value := range []string{"cli", "web*", "none"} {
+		viaFlag := listJSONIDs(t, repo, "--group", value, "--sort", "id")
+		viaFilter := listJSONIDs(t, repo, "--filter", "group="+value, "--sort", "id")
+		if strings.Join(viaFlag, ",") != strings.Join(viaFilter, ",") {
+			t.Errorf("--group %s = %v, --filter group=%s = %v", value, viaFlag, value, viaFilter)
+		}
+	}
+}
+
+func TestListCommand_GroupFlagTableNoMatches(t *testing.T) {
+	repo := newTaskRepo(t, groupedListFixtures())
+
+	output := listStdout(t, repo, "--group", "nonexistent")
+	if !strings.Contains(output, "No tasks found") {
+		t.Errorf("expected 'No tasks found', got %q", output)
+	}
+}
+
+func TestApplyShortcutFilters_Group(t *testing.T) {
+	tasks := []*model.Task{
+		{ID: "001", Status: model.StatusPending, Group: "cli"},
+		{ID: "002", Status: model.StatusCompleted, Group: "web"},
+		{ID: "003", Status: model.StatusPending},
+	}
+
+	result, err := applyShortcutFilters(tasks, FilterShortcuts{Group: "cli", Filters: []string{"status=pending"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := strings.Join(idsOf(result), ","); got != "001" {
+		t.Errorf("Group=cli + status=pending = %s, want 001", got)
 	}
 }
