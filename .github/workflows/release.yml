@@ -383,6 +383,9 @@ jobs:
           mkdir -p "$(dirname "$BREW_TAP_DIR")"
           ln -sfn "$(pwd)" "$BREW_TAP_DIR"
 
+          # Homebrew refuses to load formulae from a tap it hasn't been told to trust
+          brew trust driangle/tap
+
           # Audit formula before pushing
           brew audit --strict --formula driangle/tap/taskmd
 
