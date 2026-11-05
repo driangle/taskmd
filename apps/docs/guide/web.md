@@ -193,6 +193,8 @@ Chronological activity feed showing recent task changes from git history and wor
 - Git entries display per-file changes with field change badges (e.g. status transitions) and subtask completions
 - Worklog entries are distinguished with a separate icon
 
+The combined feed includes worklogs when the task directory is outside a Git repository. Worklogs are discovered at the task root and recursively within task groups; the scope filter limits the groups scanned. Selecting Git explicitly still requires a Git repository.
+
 ### Validate View
 
 **URL:** `/validate`

@@ -9,6 +9,7 @@ import (
 
 	"os/exec"
 
+	"github.com/driangle/taskmd/apps/cli/internal/gitmeta"
 	"github.com/driangle/taskmd/apps/cli/internal/worktree"
 	"github.com/driangle/taskmd/sdk/go/board"
 	"github.com/driangle/taskmd/sdk/go/effort"
@@ -636,12 +637,7 @@ func handleFeed(dp *DataProvider) http.HandlerFunc {
 }
 
 func webGitLog(_ string, args []string) (string, error) {
-	cmd := exec.Command("git", args...)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return gitmeta.FeedLog(args)
 }
 
 func webGitShow(hash, path string) (string, error) {
