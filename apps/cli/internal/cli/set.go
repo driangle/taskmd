@@ -171,7 +171,7 @@ func runSet(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	applyTerminalDateLogic(task, &req)
+	taskfile.ApplyStatusTransitionDates(task, &req, time.Now())
 
 	if err := runSetVerification(task, req); err != nil {
 		return err
@@ -233,28 +233,6 @@ func resolveTitleFlags(cmd *cobra.Command) error {
 		return fmt.Errorf("--rename requires --title")
 	}
 	return nil
-}
-
-// applyTerminalDateLogic auto-sets or clears completed_at/cancelled_at based on status transitions.
-func applyTerminalDateLogic(task *model.Task, req *taskfile.UpdateRequest) {
-	if req.Status == nil {
-		return
-	}
-	today := time.Now().Format("2006-01-02")
-	newStatus := model.Status(*req.Status)
-	wasTerminal := task.Status.IsResolved()
-
-	switch {
-	case newStatus == model.StatusCompleted:
-		req.Completed = &today
-		req.RemoveFields = append(req.RemoveFields, "cancelled_at")
-	case newStatus == model.StatusCancelled:
-		req.CancelledAt = &today
-		req.RemoveFields = append(req.RemoveFields, "completed_at")
-	case wasTerminal:
-		// Reopening: task was completed/cancelled, now moving to a non-terminal status.
-		req.RemoveFields = append(req.RemoveFields, "completed_at", "cancelled_at")
-	}
 }
 
 func buildSetRequest(cmd *cobra.Command) (taskfile.UpdateRequest, error) {

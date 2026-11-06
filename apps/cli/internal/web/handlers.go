@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"os/exec"
 
@@ -491,6 +492,8 @@ func handleUpdateTask(dp *DataProvider, readonly bool, efforts effort.Scale) htt
 			writeMutationMiss(w, dp, taskID)
 			return
 		}
+
+		taskfile.ApplyStatusTransitionDates(found, &req, time.Now())
 
 		if err := taskfile.UpdateTaskFile(found.FilePath, req); err != nil {
 			handleFileUpdateError(w, err)
